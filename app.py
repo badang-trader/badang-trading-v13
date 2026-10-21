@@ -239,7 +239,7 @@ def scan():
         for fut in as_completed(futures):
             try: results.append(fut.result())
             except Exception as e: errors.append({'symbol':futures[fut],'error':str(e)[:120]})
-    return jsonify(total=len(syms),offset=offset,next_offset=offset+len(batch),results=results,errors=errors,server_time=int(time.time())),recommendations=recommend_candidates(results))
+    return jsonify(total=len(syms),offset=offset,next_offset=offset+len(batch),results=results,errors=errors,server_time=int(time.time()),recommendations=recommend_candidates(results))
 def recommend_candidates(results, min_score=80, min_rr=1.5):
     candidates = []
 
