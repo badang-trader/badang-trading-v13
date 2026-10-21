@@ -240,20 +240,48 @@ def scan():
             try: results.append(fut.result())
             except Exception as e: errors.append({'symbol':futures[fut],'error':str(e)[:120]})
     return jsonify(total=len(syms),offset=offset,next_offset=offset+len(batch),results=results,errors=errors,server_time=int(time.time()))
-def recommend_candidates(results, min_score=80):
+def recommend_candidates(results, min_score=80, min_rr=1.5):
     candidates = []
-    for item in results:
-        long_score = item.get('long_score', 0)
-        short_score = item.get('short_score', 0)
-        score = max(long_score, short_score)
 
-        if score >= min_score:
-            candidate = dict(item)
-            candidate['recommend_score'] = score
-            candidate['recommend_direction'] = (
-                'LONG' if long_score >= short_score else 'SHORT'
-            )
-            candidates.append(candidate)
+    for item in results:
+        direction = item.get('signal')
+        if direction not in ('LONG', 'SHORT'):
+            continue
+
+        score = item.get(
+            'long_score' if direction == 'LONG' else 'short_score',
+            0
+        )
+        if score < min_score:
+            continue
+
+        plan = item.get('plan')
+        if not isinstance(plan, dict):
+            continue
+
+        entry = plan.get('entry')
+        stop = plan.get('stop')
+        tp1 = plan.get('tp1')
+
+        if any(v is None for v in (entry, stop, tp1)):
+            continue
+
+        risk = abs(entry - stop)
+        reward = abs(tp1 - entry)
+
+        if risk <= 0 or reward / risk < min_rr:
+            continue
+
+        if direction == 'LONG' and not (stop < entry < tp1):
+            continue
+        if direction == 'SHORT' and not (tp1 < entry < stop):
+            continue
+
+        candidate = dict(item)
+        candidate['recommend_score'] = score
+        candidate['recommend_direction'] = direction
+        candidate['risk_reward'] = round(reward / risk, 2)
+        candidates.append(candidate)
 
     return sorted(
         candidates,
