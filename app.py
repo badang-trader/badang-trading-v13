@@ -240,4 +240,24 @@ def scan():
             try: results.append(fut.result())
             except Exception as e: errors.append({'symbol':futures[fut],'error':str(e)[:120]})
     return jsonify(total=len(syms),offset=offset,next_offset=offset+len(batch),results=results,errors=errors,server_time=int(time.time()))
+def recommend_candidates(results, min_score=80):
+    candidates = []
+    for item in results:
+        long_score = item.get('long_score', 0)
+        short_score = item.get('short_score', 0)
+        score = max(long_score, short_score)
+
+        if score >= min_score:
+            candidate = dict(item)
+            candidate['recommend_score'] = score
+            candidate['recommend_direction'] = (
+                'LONG' if long_score >= short_score else 'SHORT'
+            )
+            candidates.append(candidate)
+
+    return sorted(
+        candidates,
+        key=lambda x: x['recommend_score'],
+        reverse=True
+    )
 if __name__=='__main__': app.run(host='0.0.0.0',port=int(os.environ.get('PORT',5000)))
