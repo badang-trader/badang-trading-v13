@@ -355,7 +355,7 @@ def wave_candidates(points):
                     }
                 )
 
-   return patterns
+    return patterns
 def trendline_analysis(
     rows: list[dict],
     points: list,
