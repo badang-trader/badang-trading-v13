@@ -38,14 +38,46 @@ if(offset<total)await wait(300);
 candidates.sort((a,b)=>Math.max(b.long_score||0,b.short_score||0)-Math.max(a.long_score||0,a.short_score||0));
 const top=candidates;
 majorStatus.textContent='전체 종목 분석 완료 · 상위 추천 '+top.length+'개';
+
 for(const x of top){
-const a=el('article','item','');
-a.append(el('h3','',x.symbol+' · '+x.candidate_side+' · '+Math.max(x.long_score||0,x.short_score||0)+'점'));
-a.append(el('p','', '추천: '+x.recommendation+' · 거래소: '+x.exchange));
-a.append(el('p','', '진입 기준 '+fmt(x.entry_reference)+' · 손절 '+fmt(x.stop_loss)+' · 1차 목표 '+fmt(x.take_profit_1)));
-a.append(el('p','', 'RSI '+fmt(x.rsi)+' · 손익비 '+fmt(x.risk_reward_1)));
-majorOut.append(a);
+  const a=el('article','item','');
+  const score=Math.max(x.long_score||0,x.short_score||0);
+
+  a.append(el('h3','',x.symbol+' · '+x.candidate_side+' · '+score+'점'));
+  a.append(el('p','','추천: '+x.recommendation+' · 거래소: '+x.exchange));
+  a.append(el('p','','진입 기준 '+fmt(x.entry_reference)+' · 손절 '+fmt(x.stop_loss)+' · 1차 목표 '+fmt(x.take_profit_1)+' · 2차 목표 '+fmt(x.take_profit_2)));
+  a.append(el('p','','RSI '+fmt(x.rsi)+' · 손익비 '+fmt(x.risk_reward_1)+' · 거래량 '+fmt(x.volume_ratio)+'배'));
+
+  const trends=x.timeframe_trends||{};
+  const trendText=Object.entries(trends).map(([tf,t])=>{
+    const v=typeof t==='string'?t:(t?.trend||t?.direction||'확인 필요');
+    return tf+' '+v;
+  }).join(' · ');
+  a.append(el('p','','시간봉 추세: '+(trendText||'데이터 없음')));
+  a.append(el('p','','다중 시간봉 일치: '+(x.trend_aligned?'예':'아니오 또는 미확인')));
+
+  const waves=Array.isArray(x.wave_candidates)?x.wave_candidates:[];
+  if(waves.length){
+    for(const w of waves){
+      a.append(el('p','','엘리엇 파동: '+w.pattern+' · '+w.direction+' · 신뢰 수준 '+w.confidence));
+      if(w.invalidation_price!=null){
+        a.append(el('p','','파동 무효화 기준: '+fmt(w.invalidation_price)));
+      }
+      if(w.reasons?.length){
+        a.append(el('p','','파동 근거: '+w.reasons.join(' / ')));
+      }
+    }
+  }else{
+    a.append(el('p','','엘리엇 파동: 현재 확인된 후보 없음'));
+  }
+
+  if(x.reasons?.length){
+    a.append(el('p','','기술적 분석 근거: '+x.reasons.join(' / ')));
+  }
+
+  majorOut.append(a);
 }
+
 if(!top.length)majorOut.textContent='현재 추천 기준을 통과한 코인이 없습니다.';
 out.textContent='전체 종목 '+done+'개 분석 완료. 추천 상위 5개를 위에서 확인하세요.';
 }catch(e){
