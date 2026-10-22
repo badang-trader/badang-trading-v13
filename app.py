@@ -233,7 +233,7 @@ def scan():
     # Limit work per request to protect free hosting; all eligible symbols scanned in batches by client.
     try: offset=max(0,int(request.args.get('offset',0)))
     except ValueError: offset=0
-    batch=syms[offset:offset+2]; results=[]; errors=[]
+    batch=syms[offset:offset+5]; results=[]; errors=[]
     with ThreadPoolExecutor(max_workers=4) as pool:
         futures={pool.submit(scan_one,s,mode):s for s,_ in batch}
         for fut in as_completed(futures):
