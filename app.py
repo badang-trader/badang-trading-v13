@@ -314,7 +314,9 @@ def v13_scan():
 
     try:
         offset = max(0, int(request.args.get('offset', 0)))
-        universe = [s for s, _ in symbols(1000000)]
+        
+universe = ['BTCUSDT', 'ETHUSDT'] + [s for s, _ in symbols(1000000) if s not in ('BTCUSDT', 'ETHUSDT')]
+
         batch = universe[offset:offset + 5]
         results, errors = [], []
         timeframe = '5m' if mode == 'scalp' else '1H'
