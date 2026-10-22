@@ -182,7 +182,7 @@ def fastest_candles(symbol, timeframe, limit=230, exchanges=None):
 
         started = time.monotonic()
         rows = providers[exchange](exchange_symbol, timeframe, limit)
-
+        rows = validate_candles(rows, timeframe)
         if len(rows) < 205:
             raise ValueError("Insufficient candles")
 
