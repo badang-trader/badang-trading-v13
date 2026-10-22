@@ -84,6 +84,16 @@ function koText(value){
     [/RSI bearish range/gi,'RSI 하락 우세 구간'],
     [/RSI bullish range/gi,'RSI 상승 우세 구간'],
     [/5-wave impulse candidate/gi,'5파 충격파 후보'],
+    [/ABC correction candidate/gi,'ABC 조정파 후보'],
+    [/Alternating A-B-C swings/gi,'A-B-C 파동이 교대로 진행'],
+    [/B retracement within plausible range/gi,'B파 되돌림이 가능한 범위'],
+    [/C length within Fibonacci range/gi,'C파 길이가 피보나치 범위 안에 있음'],
+    [/rising volume with green candle/gi,'양봉과 함께 거래량 증가'],
+    [/rising volume with red candle/gi,'음봉과 함께 거래량 증가'],
+    [/Wave 2 does not exceed wave 1 origin/gi,'2파가 1파 시작점을 넘지 않음'],
+    [/Wave 3 is not the shortest motive wave/gi,'3파가 추진파 중 가장 짧지 않음'],
+    [/Wave 4 does not overlap wave 1 territory/gi,'4파가 1파 가격 영역과 겹치지 않음'],
+    [/Fibonacci retracements checked/gi,'피보나치 되돌림 조건 확인'],
     [/bearish divergence/gi,'하락 다이버전스'],
     [/bullish divergence/gi,'상승 다이버전스'],
     [/sideways/gi,'횡보'],
@@ -162,18 +172,19 @@ async function start(){
       const side=x.candidate_side==='LONG'?'롱':
         x.candidate_side==='SHORT'?'숏':'방향 확인 필요';
       const isMajor=x.symbol==='BTCUSDT'||x.symbol==='ETHUSDT';
+      const confirmed=x.recommendation==='LONG'||x.recommendation==='SHORT';
+      const recommendation=confirmed
+        ?(x.recommendation==='LONG'?'롱 추천':'숏 추천')
+        :('관망 · '+(side==='롱'?'롱 우세':side==='숏'?'숏 우세':'방향 확인 필요'));
 
-      a.append(el('h3','',x.symbol+' · '+side+' · '+score+'점'));
-
-      const recommendation=isMajor
-        ?(side==='롱'?'롱 방향':side==='숏'?'숏 방향':'방향 확인 필요')
-        :x.recommendation==='LONG'?'롱 추천':
-         x.recommendation==='SHORT'?'숏 추천':'관망';
-
-      a.append(el('p','','추천: '+recommendation+' · 거래소: '+x.exchange));
+      a.append(el('h3','',x.symbol+' · '+recommendation+' · '+score+'점'));
+      a.append(el('p','','판정: '+recommendation+' · 거래소: '+x.exchange));
+      if(isMajor && !confirmed){
+        a.append(el('p','','BTC·ETH 참고 방향이며 정식 매매 추천 조건은 충족하지 않았습니다.'));
+      }
 
       a.append(el('p','',
-        '진입 기준 '+fmt(x.entry_reference)+
+        (confirmed?'진입 기준 ':'참고 기준가 (관망) ')+fmt(x.entry_reference)+
         ' · 손절 '+fmt(x.stop_loss)+
         ' · 1차 목표 '+fmt(x.take_profit_1)+
         ' · 2차 목표 '+fmt(x.take_profit_2)
@@ -193,10 +204,17 @@ async function start(){
       }).join(' · ');
 
       a.append(el('p','','시간봉 추세: '+(trendText||'데이터 없음')));
-      a.append(el('p','','다중 시간봉 일치: '+(x.trend_aligned?'예':'아니오 또는 미확인')));
-
-      if(!x.trend_aligned){
-        a.append(el('p','','주의: 시간봉 방향 불일치 또는 미확인'));
+      const trendValues=Object.values(trends).map(t=>typeof t==='string'?t:(t?.trend||t?.direction));
+      const known=trendValues.length>0 && trendValues.every(t=>t==='UP'||t==='DOWN');
+      const allSame=known && trendValues.every(t=>t===trendValues[0]);
+      const expected=x.candidate_side==='LONG'?'UP':x.candidate_side==='SHORT'?'DOWN':null;
+      const follows=known && expected!=null && trendValues.every(t=>t===expected);
+      a.append(el('p','','시간봉끼리 추세 일치: '+(known?(allSame?'예':'아니오'):'확인 필요')));
+      a.append(el('p','','우세 방향과 시간봉 일치: '+(known?(follows?'예':'아니오'):'확인 필요')));
+      if(known && !follows){
+        a.append(el('p','',allSame?'주의: 모든 시간봉이 우세 방향과 반대 · 역추세 후보':'주의: 일부 시간봉이 우세 방향과 다름 · 추세 혼재'));
+      }else if(!known){
+        a.append(el('p','','주의: 시간봉 추세 자료 확인 필요'));
       }
 
       const waves=Array.isArray(x.wave_candidates)?x.wave_candidates:[];
@@ -266,7 +284,7 @@ async function start(){
         '개 분석 · 성공 '+done+' · 실패 '+fail;
 
       count.textContent=
-        '추천 후보 '+candidates.length+'개 · 오류 '+fail+'개';
+        '표시 종목 '+candidates.length+'개 (BTC·ETH 포함) · 오류 '+fail+'개';
 
       showResults();
 
@@ -301,3 +319,4 @@ async function start(){
     btn.disabled=false;
   }
 }
+
