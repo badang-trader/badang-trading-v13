@@ -186,7 +186,7 @@ def majors():
     selected=[s for s in MAJORS if s in available]
     for s in MAJORS:
         if s not in available: errors.append({'symbol':s,'error':'현재 USDT 선물 종목 목록에 없음'})
-    with ThreadPoolExecutor(max_workers=4) as pool:
+    with ThreadPoolExecutor(max_workers=2) as pool:
         futures={pool.submit(scan_one,s,mode):s for s in selected}
         for fut in as_completed(futures):
             try: results.append(fut.result())
@@ -206,7 +206,7 @@ def scan():
     try: offset=max(0,int(request.args.get('offset',0)))
     except ValueError: offset=0
     batch=syms[offset:offset+5]; results=[]; errors=[]
-    with ThreadPoolExecutor(max_workers=4) as pool:
+    with ThreadPoolExecutor(max_workers=2) as pool:
         futures={pool.submit(scan_one,s,mode):s for s,_ in batch}
         for fut in as_completed(futures):
             try: results.append(fut.result())
