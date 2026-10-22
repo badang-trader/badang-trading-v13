@@ -1,3 +1,4 @@
+
 let mode='scalp',running=false;
 
 function choose(m){
@@ -75,6 +76,12 @@ function koText(value){
   if(value==null)return '확인 필요';
   let text=String(value);
   const phrases=[
+    [/confirmed downward trendline breakout/gi,'하락 추세선 상향 돌파(거래량 확인)'],
+    [/confirmed upward trendline breakdown/gi,'상승 추세선 하향 이탈(거래량 확인)'],
+    [/hidden bullish RSI divergence candidate/gi,'히든 상승 RSI 다이버전스 후보'],
+    [/hidden bearish RSI divergence candidate/gi,'히든 하락 RSI 다이버전스 후보'],
+    [/bullish RSI divergence candidate/gi,'일반 상승 RSI 다이버전스 후보'],
+    [/bearish RSI divergence candidate/gi,'일반 하락 RSI 다이버전스 후보'],
     [/EMA bearish alignment/gi,'이동평균선 하락 정렬'],
     [/EMA bullish alignment/gi,'이동평균선 상승 정렬'],
     [/EMA20 below EMA50/gi,'20기간 이동평균선이 50기간선 아래'],
@@ -108,6 +115,74 @@ function koText(value){
   ];
   for(const [pattern,replacement] of phrases)text=text.replace(pattern,replacement);
   return text;
+}
+
+function showDivergence(root,x){
+  const names={
+    bullish:'일반 상승',bearish:'일반 하락',
+    hidden_bullish:'히든 상승',hidden_bearish:'히든 하락'
+  };
+  const ds=Array.isArray(x.divergence_details)?x.divergence_details:[];
+  root.append(el('h4','','RSI 다이버전스'));
+  if(!ds.length){
+    root.append(el('p','','최근 확정된 다이버전스 없음'));
+  }else{
+    for(const d of ds){
+      const age=Number.isFinite(Number(d.age_bars))?d.age_bars+'개 봉 전':'시점 확인 필요';
+      root.append(el('p','',
+        (names[d.type]||koText(d.type))+' 다이버전스 · '+age+
+        ' · 가격 변화 '+fmt(d.price_change_pct)+'%'+
+        ' · RSI 변화 '+fmt(d.rsi_change)
+      ));
+    }
+  }
+  if(x.divergence_warning===true){
+    root.append(el('p','','⚠ 우세 방향과 반대되는 다이버전스: 추천 제한'));
+  }
+}
+
+function showTrendline(root,x){
+  root.append(el('h4','','자동 추세선 · 돌파/이탈'));
+  const t=x.trendlines;
+  if(!t||typeof t!=='object'){
+    root.append(el('p','','추세선 분석 데이터 없음'));
+    return;
+  }
+  if(t.support){
+    root.append(el('p','','상승 지지 추세선: '+fmt(t.support.current_level)+' USDT'));
+  }else{
+    root.append(el('p','','상승 지지 추세선: 유효한 선 없음'));
+  }
+  if(t.resistance){
+    root.append(el('p','','하락 저항 추세선: '+fmt(t.resistance.current_level)+' USDT'));
+  }else{
+    root.append(el('p','','하락 저항 추세선: 유효한 선 없음'));
+  }
+  const labels={
+    BREAKOUT_UP:'하락 추세선 상향 돌파',
+    BREAKDOWN_DOWN:'상승 추세선 하향 이탈',
+    POSSIBLE_FALSE_BREAK:'가짜 돌파/이탈 가능성'
+  };
+  const events=Array.isArray(t.events)?t.events:[];
+  if(!events.length){
+    root.append(el('p','','최근 확정봉에서 돌파·이탈 신호 없음'));
+  }
+  for(const e of events){
+    const v=e.volume_confirmed===true?' · 거래량 확인':
+      e.volume_confirmed===false?' · 거래량 미확인':'';
+    root.append(el('p','',
+      (labels[e.type]||koText(e.type))+
+      ' · 기준 '+fmt(e.level)+' USDT'+
+      ' · 거래량 '+fmt(e.volume_ratio)+'배'+v
+    ));
+  }
+  if(t.warning===true){
+    root.append(el('p','','⚠ 돌파·이탈 후보이나 거래량 확인 부족'));
+  }
+  if(x.trendline_warning===true){
+    root.append(el('p','','⚠ 우세 방향과 반대되는 추세선 돌파/이탈: 추천 제한'));
+  }
+  root.append(el('p','','추세선은 확정된 두 고점/저점 기반의 계산값이며, 차트에 실제 선을 그린 것은 아닙니다.'));
 }
 
 const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
@@ -216,6 +291,9 @@ async function start(){
       }else if(!known){
         a.append(el('p','','주의: 시간봉 추세 자료 확인 필요'));
       }
+
+      showDivergence(a,x);
+      showTrendline(a,x);
 
       const waves=Array.isArray(x.wave_candidates)?x.wave_candidates:[];
 
