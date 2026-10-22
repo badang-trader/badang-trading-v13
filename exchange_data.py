@@ -167,6 +167,7 @@ def fastest_candles(symbol, timeframe, limit=230, exchanges=None):
         exchanges = ("bitget", "binance", "okx")
 
     providers = {
+        "bitget": bitget_candles,
         "binance": binance_candles,
         "okx": okx_candles,
     }
