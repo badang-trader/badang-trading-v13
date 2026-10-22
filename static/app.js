@@ -26,7 +26,9 @@ total=j.total||0;
 done+=(j.results||[]).length;
 fail+=(j.errors||[]).length;
 for(const x of (j.results||[])){
-if(x.recommendation==='SHORT'||x.recommendation==='LONG')candidates.push(x);
+
+if(x.symbol==='BTCUSDT'||x.symbol==='ETHUSDT'||x.recommendation==='SHORT'||x.recommendation==='LONG')candidates.push(x);
+
 }
 if(!Number.isInteger(j.next_offset)||j.next_offset<=offset)throw Error('스캔 진행 위치 오류');
 offset=j.next_offset;
