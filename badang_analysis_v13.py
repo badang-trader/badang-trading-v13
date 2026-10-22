@@ -106,25 +106,103 @@ def divergence(points, rsi_series):
     return signals
 
 
+
 def wave_candidates(points):
-    """Tentative geometric patterns, not definitive Elliott labeling."""
-    recent = points[-9:]
+    """Rule-checked Elliott wave candidates, not confirmed wave counts."""
+    recent = points[-12:]
     patterns = []
-    # Three alternating swings can suggest an ABC correction, but not prove it.
-    if len(recent)>=4:
+
+    def add(pattern, direction, confidence, reasons, invalidation=None, ratios=None):
+        patterns.append({
+            'pattern': pattern,
+            'direction': direction,
+            'confidence': confidence,
+            'reasons': reasons,
+            'invalidation_price': invalidation,
+            'ratios': ratios or {}
+        })
+
+    # ABC: three alternating price swings.
+    if len(recent) >= 4:
         p = recent[-4:]
-        moves = [p[i+1][2]-p[i][2] for i in range(3)]
-        if moves[0]*moves[1]<0 and moves[1]*moves[2]<0:
-            patterns.append({'pattern':'ABC candidate','confidence':'low','direction':'up' if moves[-1]>0 else 'down'})
-    if len(recent)>=6:
+        a, b, c = [p[i + 1][2] - p[i][2] for i in range(3)]
+
+        if a * b < 0 and b * c < 0 and abs(a) > 0:
+            b_ratio = abs(b / a)
+            c_ratio = abs(c / a)
+
+            if 0.236 <= b_ratio <= 0.886 and 0.618 <= c_ratio <= 1.618:
+                add(
+                    'ABC correction candidate',
+                    'up' if c > 0 else 'down',
+                    'medium' if 0.382 <= b_ratio <= 0.786 else 'low',
+                    [
+                        'Alternating A-B-C swings',
+                        'B retracement within plausible range',
+                        'C length within Fibonacci range'
+                    ],
+                    p[2][2],
+                    {
+                        'b_to_a': round(b_ratio, 3),
+                        'c_to_a': round(c_ratio, 3)
+                    }
+                )
+
+    # Impulse: six pivot points define five alternating waves.
+    if len(recent) >= 6:
         p = recent[-6:]
-        moves = [p[i+1][2]-p[i][2] for i in range(5)]
-        direction = 1 if moves[0]>0 else -1
-        if all(moves[i]*direction > 0 for i in (0,2,4)) and all(moves[i]*direction < 0 for i in (1,3)):
-            patterns.append({'pattern':'5-swing impulse candidate','confidence':'low','direction':'up' if direction>0 else 'down'})
-    if len(recent)>=7:
-        patterns.append({'pattern':'WXY possible; not confirmed','confidence':'unverified','direction':'unknown'})
+        prices = [x[2] for x in p]
+        moves = [prices[i + 1] - prices[i] for i in range(5)]
+        direction = 1 if moves[0] > 0 else -1
+
+        alternating = (
+            all(moves[i] * direction > 0 for i in (0, 2, 4))
+            and all(moves[i] * direction < 0 for i in (1, 3))
+        )
+
+        if alternating:
+            w1, w2, w3, w4, w5 = [abs(x) for x in moves]
+
+            rule_2 = (prices[2] - prices[0]) * direction > 0
+            rule_3 = w3 >= min(w1, w5)
+
+            # Standard non-diagonal impulse: wave 4 cannot overlap wave 1.
+            rule_4 = (prices[4] - prices[1]) * direction > 0
+
+            ratio_2 = w2 / w1 if w1 else 0
+            ratio_4 = w4 / w3 if w3 else 0
+            ratio_3 = w3 / w1 if w1 else 0
+
+            if rule_2 and rule_3 and rule_4:
+                fib_support = (
+                    0.236 <= ratio_2 <= 0.886
+                    and 0.146 <= ratio_4 <= 0.618
+                )
+
+                add(
+                    '5-wave impulse candidate',
+                    'up' if direction > 0 else 'down',
+                    'medium' if fib_support else 'low',
+                    [
+                        'Wave 2 does not exceed wave 1 origin',
+                        'Wave 3 is not the shortest motive wave',
+                        'Wave 4 does not overlap wave 1 territory',
+                        'Fibonacci retracements checked'
+                    ],
+                    prices[4],
+                    {
+                        'wave2_retracement': round(ratio_2, 3),
+                        'wave3_extension': round(ratio_3, 3),
+                        'wave4_retracement': round(ratio_4, 3)
+                    }
+                )
+
+    # W-X-Y requires identifiable corrective substructures.
+    # Pivot count alone is insufficient, so do not emit an
+    # unverified WXY candidate.
+
     return patterns
+
 
 
 def analyze(candles: list, mode: str='scalp', funding_rate=None, oi_change_pct=None, symbol: str='') -> dict:
