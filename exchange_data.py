@@ -155,3 +155,61 @@ def okx_candles(symbol, timeframe, limit=230):
         after = str(oldest)
 
     return [collected[t] for t in sorted(collected)][-limit:]
+
+
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import time
+
+
+def fastest_candles(symbol, timeframe, limit=230, exchanges=None):
+    """Fetch candles concurrently and use the first valid response."""
+    if exchanges is None:
+        exchanges = ("bitget", "binance", "okx")
+
+    providers = {
+        "binance": binance_candles,
+        "okx": okx_candles,
+    }
+
+    def fetch_one(exchange):
+        if exchange not in providers:
+            raise ValueError("Unsupported provider: " + exchange)
+
+        if exchange == "okx":
+            exchange_symbol = symbol.replace("USDT", "-USDT-SWAP")
+        else:
+            exchange_symbol = symbol
+
+        started = time.monotonic()
+        rows = providers[exchange](exchange_symbol, timeframe, limit)
+
+        if len(rows) < 205:
+            raise ValueError("Insufficient candles")
+
+        return {
+            "exchange": exchange,
+            "symbol": exchange_symbol,
+            "timeframe": timeframe,
+            "candles": rows,
+            "latency_ms": round((time.monotonic() - started) * 1000),
+        }
+
+    selected = [name for name in exchanges if name in providers]
+    if not selected:
+        raise ValueError("No available candle providers")
+
+    errors = {}
+    pool = ThreadPoolExecutor(max_workers=len(selected))
+    futures = {pool.submit(fetch_one, name): name for name in selected}
+
+    try:
+        for future in as_completed(futures):
+            name = futures[future]
+            try:
+                return future.result()
+            except Exception as exc:
+                errors[name] = str(exc)
+    finally:
+        pool.shutdown(wait=False, cancel_futures=True)
+
+    raise ValueError("All exchanges failed: " + str(errors))
