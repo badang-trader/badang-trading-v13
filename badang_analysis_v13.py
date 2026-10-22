@@ -1,7 +1,7 @@
-"""BADANG Trading — technical analysis with RSI divergence.
+"""BADANG Trading 1.3 — technical analysis engine.
 
-Uses confirmed OHLCV candles. Technical signals are heuristic,
-not guaranteed forecasts.
+Divergence, Elliott wave and trendline analysis.
+Use confirmed OHLCV candles.
 """
 from __future__ import annotations
 
@@ -19,7 +19,6 @@ def _num(v: Any) -> float:
 
 
 def normalize(candles: list) -> list[dict]:
-    """Accept exchange OHLCV arrays or dictionaries."""
     out = []
     for c in candles:
         if isinstance(c, dict):
@@ -88,12 +87,15 @@ def rsi(values: list[float], period: int = 14) -> list:
 
     for i in range(period + 1, len(values)):
         change = changes[i - 1]
+
         gains = (
             gains * (period - 1) + max(change, 0)
         ) / period
+
         losses = (
             losses * (period - 1) + max(-change, 0)
         ) / period
+
         result[i] = calc(gains, losses)
 
     return result
@@ -119,7 +121,6 @@ def pivots(
     rows: list[dict],
     radius: int = 3
 ) -> list[tuple[int, str, float]]:
-    """Identify confirmed swing highs and lows."""
     points = []
 
     for i in range(radius, len(rows) - radius):
@@ -147,12 +148,9 @@ def pivots(
 
 
 def divergence_details(
-    points,
-    rsi_series,
-    total_bars,
-    max_age=18
+    points, rsi_series, total_bars, max_age=18
 ):
-    """Find recent confirmed regular and hidden RSI divergences."""
+    """Find recent regular and hidden RSI divergences."""
     found = []
 
     for typ in ('L', 'H'):
@@ -201,9 +199,7 @@ def divergence_details(
                     'age_bars': age,
                     'first_pivot_index': a[0],
                     'second_pivot_index': b[0],
-                    'price_change_pct': round(
-                        price_delta_pct, 3
-                    ),
+                    'price_change_pct': round(price_delta_pct, 3),
                     'rsi_change': round(rsi_delta, 2),
                     'confirmed': True
                 })
@@ -212,6 +208,7 @@ def divergence_details(
 
     for item in found:
         kind = item['type']
+
         if (
             kind not in newest
             or item['age_bars'] < newest[kind]['age_bars']
@@ -225,7 +222,6 @@ def divergence_details(
 
 
 def divergence(points, rsi_series):
-    """Backward-compatible regular divergence labels."""
     details = divergence_details(
         points, rsi_series, len(rsi_series)
     )
@@ -256,6 +252,7 @@ def wave_candidates(points):
 
     if len(recent) >= 4:
         p = recent[-4:]
+
         a, b, c = [
             p[i + 1][2] - p[i][2]
             for i in range(3)
@@ -358,7 +355,144 @@ def wave_candidates(points):
                     }
                 )
 
-    return patterns
+   return patterns
+def trendline_analysis(
+    rows: list[dict],
+    points: list,
+    atr_value: float,
+    volume_ratio: float,
+    lookback: int = 90
+) -> dict:
+    """Detect trendline breaks from confirmed swing pivots."""
+    n = len(rows)
+
+    result = {
+        'support': None,
+        'resistance': None,
+        'events': [],
+        'signal': 'NONE',
+        'warning': False
+    }
+
+    if n < 30 or atr_value <= 0:
+        return result
+
+    buffer = 0.15 * atr_value
+    cutoff = max(0, n - lookback)
+
+    definitions = (
+        ('support', 'L'),
+        ('resistance', 'H')
+    )
+
+    for name, kind in definitions:
+        swings = [
+            p for p in points
+            if p[1] == kind and p[0] >= cutoff
+        ]
+
+        if len(swings) < 2:
+            continue
+
+        a, b = swings[-2:]
+
+        if b[0] <= a[0]:
+            continue
+
+        slope = (
+            (b[2] - a[2]) / (b[0] - a[0])
+        )
+
+        if name == 'support' and slope <= 0:
+            continue
+
+        if name == 'resistance' and slope >= 0:
+            continue
+
+        prev_level = (
+            b[2] + slope * (n - 2 - b[0])
+        )
+
+        level = (
+            b[2] + slope * (n - 1 - b[0])
+        )
+
+        if level <= 0 or prev_level <= 0:
+            continue
+
+        if abs(slope) > 1.5 * atr_value:
+            continue
+
+        info = {
+            'first_pivot_index': a[0],
+            'second_pivot_index': b[0],
+            'first_pivot_price': a[2],
+            'second_pivot_price': b[2],
+            'slope_per_bar': slope,
+            'current_level': level,
+            'previous_level': prev_level,
+            'touches': 2
+        }
+
+        result[name] = info
+
+        prev_close = rows[-2]['close']
+        close = rows[-1]['close']
+
+        if name == 'resistance':
+            crossed = (
+                prev_close <= prev_level + buffer
+                and close > level + buffer
+            )
+
+            event = 'BREAKOUT_UP'
+            direction = 'LONG'
+
+            fake = (
+                close <= level + buffer
+                and rows[-1]['high'] > level + buffer
+            )
+
+        else:
+            crossed = (
+                prev_close >= prev_level - buffer
+                and close < level - buffer
+            )
+
+            event = 'BREAKDOWN_DOWN'
+            direction = 'SHORT'
+
+            fake = (
+                close >= level - buffer
+                and rows[-1]['low'] < level - buffer
+            )
+
+        if fake:
+            result['events'].append({
+                'type': 'POSSIBLE_FALSE_BREAK',
+                'line': name,
+                'level': level,
+                'volume_ratio': volume_ratio
+            })
+
+        if crossed:
+            confirmed_volume = volume_ratio >= 1.2
+
+            result['events'].append({
+                'type': event,
+                'line': name,
+                'direction': direction,
+                'level': level,
+                'volume_ratio': volume_ratio,
+                'volume_confirmed': confirmed_volume
+            })
+
+            if confirmed_volume:
+                result['signal'] = event
+            else:
+                result['warning'] = True
+
+    return result
 
 
 def analyze(
@@ -401,14 +535,17 @@ def analyze(
     p = close[-1]
 
     points = pivots(rows)
+
     div_details = divergence_details(
         points, rs, len(rows)
     )
+
     div = [d['type'] for d in div_details]
 
     vol_avg = mean(
         r['volume'] for r in rows[-21:-1]
     )
+
     vol_ratio = (
         rows[-1]['volume'] / vol_avg
         if vol_avg > 0 else 0
@@ -416,9 +553,14 @@ def analyze(
 
     volatility = atr(rows)
 
+    trendlines = trendline_analysis(
+        rows, points, volatility, vol_ratio
+    )
+
     highs = [
         x[2] for x in points if x[1] == 'H'
     ]
+
     lows = [
         x[2] for x in points if x[1] == 'L'
     ]
@@ -426,6 +568,7 @@ def analyze(
     recent_hi = max(
         r['high'] for r in rows[-60:]
     )
+
     recent_lo = min(
         r['low'] for r in rows[-60:]
     )
@@ -478,6 +621,7 @@ def analyze(
             'long', 8,
             'EMA20 above EMA50'
         )
+
     elif e20 < e50:
         score(
             'short', 8,
@@ -521,13 +665,19 @@ def analyze(
             'bearish RSI divergence candidate'
         )
 
-    if 'hidden_bullish' in div and e20 > e50:
+    if (
+        'hidden_bullish' in div
+        and e20 > e50
+    ):
         score(
             'long', 8,
             'hidden bullish RSI divergence candidate'
         )
 
-    if 'hidden_bearish' in div and e20 < e50:
+    if (
+        'hidden_bearish' in div
+        and e20 < e50
+    ):
         score(
             'short', 8,
             'hidden bearish RSI divergence candidate'
@@ -539,20 +689,35 @@ def analyze(
                 'long', 8,
                 'rising volume with green candle'
             )
+
         elif close[-1] < close[-2]:
             score(
                 'short', 8,
                 'rising volume with red candle'
             )
 
+    if trendlines['signal'] == 'BREAKOUT_UP':
+        score(
+            'long', 12,
+            'confirmed downward trendline breakout'
+        )
+
+    elif trendlines['signal'] == 'BREAKDOWN_DOWN':
+        score(
+            'short', 12,
+            'confirmed upward trendline breakdown'
+        )
+
     f = (
         _num(funding_rate)
-        if funding_rate is not None else None
+        if funding_rate is not None
+        else None
     )
 
     oi = (
         _num(oi_change_pct)
-        if oi_change_pct is not None else None
+        if oi_change_pct is not None
+        else None
     )
 
     if f is not None and math.isfinite(f):
@@ -561,6 +726,7 @@ def analyze(
                 'short', 4,
                 'high positive funding: crowded longs'
             )
+
         elif f < -0.0005:
             score(
                 'long', 4,
@@ -577,6 +743,7 @@ def analyze(
                 'long', 5,
                 'OI rising with price'
             )
+
         elif close[-1] < close[-2]:
             score(
                 'short', 5,
@@ -593,6 +760,7 @@ def analyze(
     )
 
     best = max(long_score, short_score)
+
     direction = 1 if side == 'LONG' else -1
 
     recent_low = (
@@ -610,24 +778,45 @@ def analyze(
     stop = (
         min(recent_low, p - 1.5 * volatility)
         if direction == 1
-        else max(recent_high, p + 1.5 * volatility)
+        else max(
+            recent_high,
+            p + 1.5 * volatility
+        )
     )
 
     risk = abs(p - stop)
+
     target1 = p + direction * 1.5 * risk
     target2 = p + direction * 2.0 * risk
-    rr = abs(target1 - p) / risk if risk > 0 else 0
+
+    rr = (
+        abs(target1 - p) / risk
+        if risk > 0
+        else 0
+    )
 
     opposite_divergence = (
         any(
             d in div
-            for d in ('bearish', 'hidden_bearish')
+            for d in (
+                'bearish',
+                'hidden_bearish'
+            )
         )
         if side == 'LONG'
         else any(
             d in div
-            for d in ('bullish', 'hidden_bullish')
+            for d in (
+                'bullish',
+                'hidden_bullish'
+            )
         )
+    )
+
+    opposite_trendline = (
+        trendlines['signal'] == 'BREAKDOWN_DOWN'
+        if side == 'LONG'
+        else trendlines['signal'] == 'BREAKOUT_UP'
     )
 
     recommended = (
@@ -640,6 +829,7 @@ def analyze(
             else reasons_short
         ) >= 3
         and not opposite_divergence
+        and not opposite_trendline
     )
 
     return {
@@ -667,6 +857,9 @@ def analyze(
         'divergence_details': div_details,
         'divergence_warning':
             opposite_divergence,
+        'trendlines': trendlines,
+        'trendline_warning':
+            opposite_trendline,
         'wave_candidates':
             wave_candidates(points),
         'fibonacci': fib,
@@ -674,28 +867,34 @@ def analyze(
         'oi_change_pct': oi,
         'futures_data_available': {
             'funding':
-                f is not None and math.isfinite(f),
+                f is not None
+                and math.isfinite(f),
             'oi':
-                oi is not None and math.isfinite(oi)
+                oi is not None
+                and math.isfinite(oi)
         },
         'reasons':
             reasons_long
             if side == 'LONG'
             else reasons_short,
         'caveats': [
-            'Single-timeframe only: confirm higher timeframe before acting',
-            'Wave labels are unconfirmed geometric candidates',
-            'Price targets exclude fees, slippage, and funding costs',
-            'Divergence signals are heuristic and may fail without reversal'
+            'Confirm higher timeframe before acting',
+            'Wave labels are unconfirmed candidates',
+            'Targets exclude fees and slippage',
+            'Divergences can fail without reversal',
+            'Trendline breaks require backtesting'
         ]
     }
 
 
-def top_five(analyses: list[dict]) -> list[dict]:
+def top_five(
+    analyses: list[dict]
+) -> list[dict]:
     eligible = [
         a for a in analyses
         if (
-            a.get('recommendation') in ('LONG', 'SHORT')
+            a.get('recommendation')
+            in ('LONG', 'SHORT')
             and a.get('status') == 'ok'
         )
     ]
