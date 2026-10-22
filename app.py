@@ -288,4 +288,29 @@ def recommend_candidates(results, min_score=80, min_rr=1.5):
         key=lambda x: x['recommend_score'],
         reverse=True
     )
+    
+
+@app.route('/api/test-exchanges')
+def test_exchanges():
+    from exchange_data import fastest_candles
+
+    symbol = request.args.get('symbol', 'BTCUSDT')
+    timeframe = request.args.get('timeframe', '5m')
+
+    if timeframe not in ('5m', '15m', '1H', '4H', '1D'):
+        return jsonify(error='Invalid timeframe'), 400
+
+    try:
+        result = fastest_candles(symbol, timeframe)
+        return jsonify(
+            status='ok',
+            exchange=result['exchange'],
+            symbol=result['symbol'],
+            timeframe=result['timeframe'],
+            candle_count=len(result['candles']),
+            latency_ms=result['latency_ms']
+        )
+    except Exception as e:
+        return jsonify(status='error', error=str(e)), 502
+
 if __name__=='__main__': app.run(host='0.0.0.0',port=int(os.environ.get('PORT',5000)))
