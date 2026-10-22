@@ -6,7 +6,7 @@ function choose(m){
   for(const id of ['scalp','swing'])
     document.getElementById(id).classList.toggle('active',id===m);
   document.getElementById('frames').textContent=
-    m==='scalp'?'5분 · 15분 · 1시간봉':'1시간 · 4시간 · 일봉';
+    m==='scalp'?'15분 · 30분 · 1시간봉':'1시간 · 4시간 · 일봉';
 }
 
 function fmt(x){
@@ -319,4 +319,3 @@ async function start(){
     btn.disabled=false;
   }
 }
-
