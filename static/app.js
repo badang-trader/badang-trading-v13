@@ -1,4 +1,3 @@
-
 let mode='scalp',running=false;
 
 function choose(m){
@@ -69,6 +68,36 @@ function card(x){
   if(x.plan)line(details,'신호 무효화',x.plan.invalidation);
   c.append(details);
   return c;
+}
+
+// 화면 표시용 번역: 분석 데이터와 매매 판단은 변경하지 않음.
+function koText(value){
+  if(value==null)return '확인 필요';
+  let text=String(value);
+  const phrases=[
+    [/EMA bearish alignment/gi,'이동평균선 하락 정렬'],
+    [/EMA bullish alignment/gi,'이동평균선 상승 정렬'],
+    [/EMA20 below EMA50/gi,'20기간 이동평균선이 50기간선 아래'],
+    [/EMA20 above EMA50/gi,'20기간 이동평균선이 50기간선 위'],
+    [/MACD histogram falling negative/gi,'MACD 히스토그램 음수 구간에서 하락'],
+    [/MACD histogram rising positive/gi,'MACD 히스토그램 양수 구간에서 상승'],
+    [/RSI bearish range/gi,'RSI 하락 우세 구간'],
+    [/RSI bullish range/gi,'RSI 상승 우세 구간'],
+    [/5-wave impulse candidate/gi,'5파 충격파 후보'],
+    [/bearish divergence/gi,'하락 다이버전스'],
+    [/bullish divergence/gi,'상승 다이버전스'],
+    [/sideways/gi,'횡보'],
+    [/neutral/gi,'중립'],
+    [/medium/gi,'보통'],
+    [/high/gi,'높음'],
+    [/low/gi,'낮음'],
+    [/down/gi,'하락'],
+    [/up/gi,'상승'],
+    [/short/gi,'숏'],
+    [/long/gi,'롱']
+  ];
+  for(const [pattern,replacement] of phrases)text=text.replace(pattern,replacement);
+  return text;
 }
 
 const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
@@ -160,7 +189,7 @@ async function start(){
       const trendText=Object.entries(trends).map(([tf,t])=>{
         const v=typeof t==='string'?t:
           (t?.trend||t?.direction||'확인 필요');
-        return tf+' '+v;
+        return tf+' '+koText(v);
       }).join(' · ');
 
       a.append(el('p','','시간봉 추세: '+(trendText||'데이터 없음')));
@@ -175,9 +204,9 @@ async function start(){
       if(waves.length){
         for(const w of waves){
           a.append(el('p','',
-            '엘리엇 파동: '+w.pattern+
-            ' · '+w.direction+
-            ' · 신뢰 수준 '+w.confidence
+            '엘리엇 파동: '+koText(w.pattern)+
+            ' · '+koText(w.direction)+
+            ' · 신뢰 수준 '+koText(w.confidence)
           ));
           if(w.invalidation_price!=null){
             a.append(el('p','',
@@ -185,7 +214,7 @@ async function start(){
             ));
           }
           if(w.reasons?.length){
-            a.append(el('p','','파동 근거: '+w.reasons.join(' / ')));
+            a.append(el('p','','파동 근거: '+w.reasons.map(koText).join(' / ')));
           }
         }
       }else{
@@ -193,7 +222,7 @@ async function start(){
       }
 
       if(x.reasons?.length){
-        a.append(el('p','','기술적 분석 근거: '+x.reasons.join(' / ')));
+        a.append(el('p','','기술적 분석 근거: '+x.reasons.map(koText).join(' / ')));
       }
 
       majorOut.append(a);
