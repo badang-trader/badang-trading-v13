@@ -250,3 +250,59 @@ def fastest_candles(symbol, timeframe, limit=230, exchanges=None):
         )
 
     return result
+
+def bitget_candles(symbol, timeframe, limit=230):
+    """Fetch completed Bitget USDT futures candles."""
+    interval_ms = {
+        "5m": 300000,
+        "15m": 900000,
+        "1H": 3600000,
+        "4H": 14400000,
+        "1D": 86400000,
+    }[timeframe]
+
+    now_ms = int(time.time() * 1000)
+    end_time = (now_ms // interval_ms) * interval_ms - 1
+    collected = {}
+
+    for _ in range(5):
+        result = get_json(
+            "https://api.bitget.com/api/v2/mix/market/history-candles",
+            {
+                "symbol": symbol,
+                "productType": "USDT-FUTURES",
+                "granularity": timeframe,
+                "endTime": str(end_time),
+                "limit": "100",
+            },
+        )
+
+        if result.get("code") != "00000":
+            raise ValueError(result.get("msg", "Bitget API error"))
+
+        rows = result.get("data") or []
+        if not rows:
+            break
+
+        for row in rows:
+            ts = int(row[0])
+            if ts + interval_ms <= now_ms:
+                collected[ts] = [
+                    ts,
+                    float(row[1]),
+                    float(row[2]),
+                    float(row[3]),
+                    float(row[4]),
+                    float(row[5]),
+                    float(row[6]),
+                ]
+
+        if len(collected) >= limit:
+            break
+
+        oldest = min(int(row[0]) for row in rows)
+        if oldest >= end_time:
+            break
+        end_time = oldest - 1
+
+    return [collected[t] for t in sorted(collected)][-limit:]
