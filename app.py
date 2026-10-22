@@ -60,7 +60,7 @@ def divergence(close,rsis):
 def candles(symbol, gran):
     from exchange_data import fastest_candles
 
-    result = fastest_candles(symbol, gran)
+    result = fastest_candles(symbol, gran, exchanges=['bitget', 'okx'])
     return result['candles']
 def analyze(symbol,gran):
     rows=candles(symbol,gran); c=[float(x[4]) for x in rows]; h=[float(x[2]) for x in rows]; l=[float(x[3]) for x in rows]; v=[float(x[5]) for x in rows]
