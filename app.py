@@ -330,7 +330,7 @@ def v13_scan():
                 trends = {}
                 for tf in frames:
                     rows = frame_data[tf]['candles']
-                    closes = [float(row['close']) for row in rows]
+                    closes = [float(row[4]) for row in rows]
                     from badang_analysis_v13 import ema
                     e20 = ema(closes, 20)[-1]
                     e50 = ema(closes, 50)[-1]
