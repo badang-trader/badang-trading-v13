@@ -36,7 +36,7 @@ if(!total)break;
 if(offset<total)await wait(300);
 }while(offset<total);
 candidates.sort((a,b)=>Math.max(b.long_score||0,b.short_score||0)-Math.max(a.long_score||0,a.short_score||0));
-const top=candidates.slice;
+const top=candidates;
 majorStatus.textContent='전체 종목 분석 완료 · 상위 추천 '+top.length+'개';
 for(const x of top){
 const a=el('article','item','');
@@ -51,6 +51,17 @@ out.textContent='전체 종목 '+done+'개 분석 완료. 추천 상위 5개를 
 }catch(e){
 status.textContent='스캔 중단 ('+offset+'/'+total+'개): '+e.message;
 }finally{
+if(candidates.length && !majorOut.children.length){
+candidates.sort((a,b)=>Math.max(b.long_score||0,b.short_score||0)-Math.max(a.long_score||0,a.short_score||0));
+for(const x of candidates){
+const a=el('article','item','');
+a.append(el('h3','',x.symbol+' · '+x.candidate_side+' · '+Math.max(x.long_score||0,x.short_score||0)+'점'));
+a.append(el('p','','추천: '+x.recommendation+' · 거래소: '+x.exchange));
+a.append(el('p','','진입 '+fmt(x.entry_reference)+' · 손절 '+fmt(x.stop_loss)+' · 목표 '+fmt(x.take_profit_1)));
+majorOut.append(a);
+}
+majorStatus.textContent='검색 중단 · 확보한 추천 후보 '+candidates.length+'개';
+}
 running=false;
 btn.disabled=false;
 }
