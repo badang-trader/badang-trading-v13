@@ -6,4 +6,52 @@ function line(root,k,v){const d=el('div','line');d.append(el('span','',k),el('b'
 function card(x){const a=x.setup,c=el('article','item'),top=el('div','top');top.append(el('div','name',x.symbol));top.append(el('span','tag '+(x.signal==='LONG'?'long':x.signal==='SHORT'?'short':''),x.signal==='LONG'?'롱 후보':x.signal==='SHORT'?'숏 후보':'관망'));c.append(top);const scores=el('div','scores');for(const [name,value,cls] of [['롱 점수',x.long_score,'long-text'],['숏 점수',x.short_score,'short-text']]){const s=el('div','score');s.append(el('span','',name),el('strong',cls,value+'점'));scores.append(s)}c.append(scores);line(c,'기준 종가',fmt(a.price)+' USDT');line(c,'수급 추정',x.flow.state==='BUY'?'매수 우세':x.flow.state==='SELL'?'매도 우세':'중립/확인 불가');line(c,'거래대금 변화',fmt(x.flow.turnover_ratio)+'배');if(x.plan){line(c,'가상 진입가',fmt(x.plan.entry));line(c,'1차 익절가',fmt(x.plan.tp1));line(c,'2차 익절가',fmt(x.plan.tp2));line(c,'손절가',fmt(x.plan.stop));line(c,'목표 손익비','1:'+x.plan.rr1+' / 1:'+x.plan.rr2)}else line(c,'진입·익절·손절','관망 — 제시하지 않음');const details=el('details'),summary=el('summary','','상세 분석 보기');details.append(summary);line(details,'상위봉 추세',x.higher);line(details,'RSI / 거래량',a.rsi+' / '+a.volume_ratio+'배');line(details,'RSI 다이버전스',x.trigger);line(details,'가짜 돌파 경고',a.fake_breakout?'있음':'없음');line(details,'수급 추정 압력',fmt(x.flow.pressure)+'%');line(details,'수급 데이터 설명',x.flow.method);line(details,'OI / 펀딩','미반영 · 미확인');line(details,'판단 근거',x.reason);if(x.plan)line(details,'신호 무효화',x.plan.invalidation);c.append(details);return c}
 const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 async function retryFetch(url,status,offset){let lastError;for(let attempt=1;attempt<=3;attempt++){try{const r=await fetch(url,{cache:'no-store'});if(!r.ok){let msg='HTTP '+r.status;try{const j=await r.json();msg=j.error||msg}catch(_){}if(r.status<500&&r.status!==429)throw Error(msg);throw Error(msg)}return await r.json()}catch(e){lastError=e;if(attempt===3)break;status.textContent=offset+'개 처리 후 연결 문제 · 재시도 '+attempt+'/2';await wait(attempt*2000)}}throw lastError}
-async function start(){if(running)return;running=true;const btn=document.getElementById('scan'),status=document.getElementById('progress'),out=document.getElementById('results'),count=document.getElementById('counts'),majorOut=document.getElementById('majors'),majorStatus=document.getElementById('major-status');btn.disabled=true;out.replaceChildren();majorOut.replaceChildren();majorStatus.textContent='주요 코인 분석 중…';const selectedMode=mode;const majorPromise=fetch('/api/majors?mode='+selectedMode).then(async r=>{const j=await r.json();if(!r.ok)throw Error(j.error||'조회 실패');j.results.forEach(x=>majorOut.append(card(x)));j.errors.forEach(e=>majorOut.append(el('p','muted',e.symbol+': '+e.error)));majorStatus.textContent=j.results.length+'개 분석 완료 · 오류 '+j.errors.length+'개'}).catch(e=>{majorStatus.textContent='주요 코인 오류: '+e.message});let offset=0,total=0,done=0,fail=0,lon=0,sho=0;try{do{const url='/api/scan?mode='+selectedMode+'&min_turnover='+encodeURIComponent(document.getElementById('turn').value)+'&offset='+offset;const j=await retryFetch(url,status,offset);total=j.total;done+=j.results.length;fail+=j.errors.length;for(const x of j.results){if(x.signal==='LONG'){lon++;out.append(card(x))}if(x.signal==='SHORT'){sho++;out.append(card(x))}}if(!Number.isInteger(j.next_offset)||j.next_offset<=offset)throw Error('스캔 진행 위치 오류');offset=j.next_offset;status.textContent=Math.min(offset,total)+' / '+total+'개 처리 · 성공 '+done+' · 실패 '+fail;count.textContent='롱 '+lon+'개 · 숏 '+sho+'개 · 오류 '+fail+'개';if(!total)break;if(offset<total)await wait(300)}while(offset<total);if(!lon&&!sho)out.textContent='현재 수급·추세·손익비 조건을 모두 통과한 후보가 없습니다.'}catch(e){status.textContent='스캔 중단 ('+offset+'/'+total+'개): '+e.message}finally{await majorPromise;running=false;btn.disabled=false}}
+async function start(){
+if(running)return;
+running=true;
+const btn=document.getElementById('scan'),status=document.getElementById('progress'),out=document.getElementById('results'),count=document.getElementById('counts'),majorOut=document.getElementById('majors'),majorStatus=document.getElementById('major-status');
+btn.disabled=true;
+out.replaceChildren();
+majorOut.replaceChildren();
+majorStatus.textContent='새 분석 엔진으로 전체 종목 검색 중';
+const selectedMode=mode;
+let offset=0,total=0,done=0,fail=0;
+const candidates=[];
+try{
+do{
+const url='/api/v13-scan?mode='+selectedMode+'&offset='+offset;
+const j=await retryFetch(url,status,offset);
+if(j.error)throw Error(j.error);
+total=j.total||0;
+done+=(j.results||[]).length;
+fail+=(j.errors||[]).length;
+for(const x of (j.results||[])){
+if(x.recommendation==='SHORT'||x.recommendation==='LONG')candidates.push(x);
+}
+if(!Number.isInteger(j.next_offset)||j.next_offset<=offset)throw Error('스캔 진행 위치 오류');
+offset=j.next_offset;
+status.textContent=Math.min(offset,total)+' / '+total+'개 분석 · 성공 '+done+' · 실패 '+fail;
+count.textContent='추천 후보 '+candidates.length+'개 · 오류 '+fail+'개';
+if(!total)break;
+if(offset<total)await wait(300);
+}while(offset<total);
+candidates.sort((a,b)=>Math.max(b.long_score||0,b.short_score||0)-Math.max(a.long_score||0,a.short_score||0));
+const top=candidates.slice(0,5);
+majorStatus.textContent='전체 종목 분석 완료 · 상위 추천 '+top.length+'개';
+for(const x of top){
+const a=el('article','item','');
+a.append(el('h3','',x.symbol+' · '+x.candidate_side+' · '+Math.max(x.long_score||0,x.short_score||0)+'점'));
+a.append(el('p','', '추천: '+x.recommendation+' · 거래소: '+x.exchange));
+a.append(el('p','', '진입 기준 '+fmt(x.entry_reference)+' · 손절 '+fmt(x.stop_loss)+' · 1차 목표 '+fmt(x.take_profit_1)));
+a.append(el('p','', 'RSI '+fmt(x.rsi)+' · 손익비 '+fmt(x.risk_reward_1)));
+majorOut.append(a);
+}
+if(!top.length)majorOut.textContent='현재 추천 기준을 통과한 코인이 없습니다.';
+out.textContent='전체 종목 '+done+'개 분석 완료. 추천 상위 5개를 위에서 확인하세요.';
+}catch(e){
+status.textContent='스캔 중단 ('+offset+'/'+total+'개): '+e.message;
+}finally{
+running=false;
+btn.disabled=false;
+}
+}
