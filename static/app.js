@@ -46,8 +46,7 @@ for(const x of top){
   const score=Math.max(x.long_score||0,x.short_score||0);
 
   a.append(el('h3','',x.symbol+' · '+x.candidate_side+' · '+score+'점'));
-  a.append(el('p','','추천: '+x.recommendation+' · 거래소: '+x.exchange));
-  a.append(el('p','','진입 기준 '+fmt(x.entry_reference)+' · 손절 '+fmt(x.stop_loss)+' · 1차 목표 '+fmt(x.take_profit_1)+' · 2차 목표 '+fmt(x.take_profit_2)));
+  a.append(el('p','','추천: '+((x.symbol==='BTCUSDT'||x.symbol==='ETHUSDT')?(x.candidate_side==='LONG'?'롱 추천':'숏 추천'):(x.recommendation==='LONG'?'롱 추천':x.recommendation==='SHORT'?'숏 추천':'관망'))+' · 거래소: '+x.exchange));
   a.append(el('p','','RSI '+fmt(x.rsi)+' · 손익비 '+fmt(x.risk_reward_1)+' · 거래량 '+fmt(x.volume_ratio)+'배'));
 
   const trends=x.timeframe_trends||{};
