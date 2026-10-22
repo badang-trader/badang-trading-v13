@@ -289,5 +289,19 @@ def test_exchanges():
         )
     except Exception as e:
         return jsonify(status='error', error=str(e)), 502
+@app.route('/api/v13-test')
+def v13_test():
+    from exchange_data import fastest_candles
+    from badang_analysis_v13 import analyze
+
+    try:
+        symbol = request.args.get('symbol', 'BTCUSDT')
+        result = fastest_candles(symbol, '5m', exchanges=['bitget', 'okx'])
+        analysis = analyze(result['candles'], mode='scalp', symbol=symbol)
+        analysis['exchange'] = result['exchange']
+        return jsonify(analysis)
+    except Exception as e:
+        return jsonify(error=str(e)), 502
+
 
 if __name__=='__main__': app.run(host='0.0.0.0',port=int(os.environ.get('PORT',5000)))
