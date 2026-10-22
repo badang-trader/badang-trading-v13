@@ -321,8 +321,27 @@ def v13_scan():
 
         for symbol in batch:
             try:
-                data = fastest_candles(symbol, timeframe, exchanges=['bitget', 'okx'])
+                frames = ['5m', '15m', '1H'] if mode == 'scalp' else ['1H', '4H', '1D']
+                frame_data = {}
+                for tf in frames:
+                    frame_data[tf] = fastest_candles(symbol, tf, exchanges=['bitget', 'okx'])
+                data = frame_data[frames[0]]
                 item = analyze(data['candles'], mode=mode, symbol=symbol)
+                trends = {}
+                for tf in frames:
+                    rows = frame_data[tf]['candles']
+                    closes = [float(row['close']) for row in rows]
+                    from badang_analysis_v13 import ema
+                    e20 = ema(closes, 20)[-1]
+                    e50 = ema(closes, 50)[-1]
+                    trends[tf] = 'UP' if e20 > e50 else 'DOWN' if e20 < e50 else 'NEUTRAL'
+                item['timeframe_trends'] = trends
+                side = item.get('candidate_side')
+                aligned = all(t == ('UP' if side == 'LONG' else 'DOWN') for t in trends.values())
+                item['trend_aligned'] = aligned
+                if item.get('recommendation') in ('LONG', 'SHORT') and not aligned:
+                    item['recommendation'] = 'WAIT'
+
                 item['exchange'] = data['exchange']
                 results.append(item)
             except Exception as exc:
