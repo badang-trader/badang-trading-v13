@@ -57,39 +57,11 @@ def divergence(close,rsis):
         if low and close[j]<close[i] and rsis[j]>rsis[i]+2: return 'bullish'
         if not low and close[j]>close[i] and rsis[j]<rsis[i]-2: return 'bearish'
     return 'none'
-def candles(symbol,gran):
-    minutes={'5m':5,'15m':15,'1H':60,'4H':240,'1D':1440}[gran]
-    interval=minutes*60000
-    now=int(time.time()*1000)
-    cutoff=(now//interval)*interval
-    collected={}
-    end_time=cutoff-1
+def candles(symbol, gran):
+    from exchange_data import fastest_candles
 
-    for _ in range(5):
-        data=api('/api/v2/mix/market/history-candles',{
-            'symbol':symbol,
-            'productType':'USDT-FUTURES',
-            'granularity':gran,
-            'endTime':str(end_time),
-            'limit':'100'
-        })
-        if not data:
-            break
-        oldest=None
-        for r in data:
-            ts=int(r[0])
-            if ts+interval<=now:
-                collected[ts]=r
-            if oldest is None or ts<oldest:
-                oldest=ts
-        if len(collected)>=205 or oldest is None:
-            break
-        end_time=oldest-1
-
-    rows=[collected[k] for k in sorted(collected)]
-    if len(rows)<205:
-        raise ValueError(f'{gran} 확정봉 부족: {len(rows)}개 / 최소 205개')
-    return rows[-230:]
+    result = fastest_candles(symbol, gran)
+    return result['candles']
 def analyze(symbol,gran):
     rows=candles(symbol,gran); c=[float(x[4]) for x in rows]; h=[float(x[2]) for x in rows]; l=[float(x[3]) for x in rows]; v=[float(x[5]) for x in rows]
     e20=ema(c,20);e50=ema(c,50);e200=ema(c,200)
