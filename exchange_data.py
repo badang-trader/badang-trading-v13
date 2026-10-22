@@ -213,3 +213,40 @@ def fastest_candles(symbol, timeframe, limit=230, exchanges=None):
         pool.shutdown(wait=False, cancel_futures=True)
 
     raise ValueError("All exchanges failed: " + str(errors))
+   
+    
+    def validate_candles(rows, timeframe, minimum=205):
+    """Keep only completed candles and validate OHLCV data."""
+    minutes = {
+        "5m": 5, "15m": 15, "1H": 60,
+        "4H": 240, "1D": 1440,
+    }
+    interval_ms = minutes[timeframe] * 60000
+    now_ms = int(time.time() * 1000)
+    valid = {}
+
+    for row in rows:
+        try:
+            ts = int(row[0])
+            op, hi, lo, cl = map(float, row[1:5])
+            volume = float(row[5])
+
+            if ts + interval_ms > now_ms:
+                continue
+            if min(op, hi, lo, cl) <= 0 or volume < 0:
+                continue
+            if hi < max(op, cl) or lo > min(op, cl):
+                continue
+
+            valid[ts] = row
+        except (ValueError, TypeError, IndexError):
+            continue
+
+    result = [valid[t] for t in sorted(valid)]
+
+    if len(result) < minimum:
+        raise ValueError(
+            f"Completed candles insufficient: {len(result)}/{minimum}"
+        )
+
+    return result
