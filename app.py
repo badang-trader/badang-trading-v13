@@ -300,8 +300,8 @@ def test_exchanges():
     if timeframe not in ('5m', '15m', '1H', '4H', '1D'):
         return jsonify(error='Invalid timeframe'), 400
 
-     exchange = request.args.get('exchange', 'auto').lower()
-     exchanges = None if exchange == 'auto' else (exchange,)
+    exchange = request.args.get('exchange', 'auto').lower()
+    exchanges = None if exchange == 'auto' else (exchange,)
     if exchange not in ('auto', 'bitget', 'binance', 'okx'):
         return jsonify(error='Invalid exchange'), 400
 
