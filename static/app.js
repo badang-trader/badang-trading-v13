@@ -36,7 +36,7 @@ if(!total)break;
 if(offset<total)await wait(300);
 }while(offset<total);
 candidates.sort((a,b)=>Math.max(b.long_score||0,b.short_score||0)-Math.max(a.long_score||0,a.short_score||0));
-const top=candidates.slice(0,5);
+const top=candidates.slice;
 majorStatus.textContent='전체 종목 분석 완료 · 상위 추천 '+top.length+'개';
 for(const x of top){
 const a=el('article','item','');
