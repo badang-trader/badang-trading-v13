@@ -303,5 +303,37 @@ def v13_test():
     except Exception as e:
         return jsonify(error=str(e)), 502
 
+@app.route('/api/v13-scan')
+def v13_scan():
+    from exchange_data import fastest_candles
+    from badang_analysis_v13 import analyze, top_five
+
+    mode = request.args.get('mode', 'scalp')
+    if mode not in ('scalp', 'swing'):
+        return jsonify(error='Invalid mode'), 400
+
+    try:
+        offset = max(0, int(request.args.get('offset', 0)))
+        universe = [s for s, _ in symbols(1000000)]
+        batch = universe[offset:offset + 5]
+        results, errors = [], []
+        timeframe = '5m' if mode == 'scalp' else '1H'
+
+        for symbol in batch:
+            try:
+                data = fastest_candles(symbol, timeframe, exchanges=['bitget', 'okx'])
+                item = analyze(data['candles'], mode=mode, symbol=symbol)
+                item['exchange'] = data['exchange']
+                results.append(item)
+            except Exception as exc:
+                errors.append({'symbol': symbol, 'error': str(exc)})
+
+        return jsonify(total=len(universe), offset=offset,
+                       next_offset=offset + len(batch),
+                       results=results, recommendations=top_five(results),
+                       errors=errors)
+    except Exception as exc:
+        return jsonify(error=str(exc)), 502
+
 
 if __name__=='__main__': app.run(host='0.0.0.0',port=int(os.environ.get('PORT',5000)))
