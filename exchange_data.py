@@ -216,7 +216,7 @@ def fastest_candles(symbol, timeframe, limit=230, exchanges=None):
     raise ValueError("All exchanges failed: " + str(errors))
    
     
-    def validate_candles(rows, timeframe, minimum=205):
+def validate_candles(rows, timeframe, minimum=205):
     """Keep only completed candles and validate OHLCV data."""
     minutes = {
         "5m": 5, "15m": 15, "1H": 60,
