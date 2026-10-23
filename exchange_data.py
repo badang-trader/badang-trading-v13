@@ -1,11 +1,19 @@
 import requests
+import time
+
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
 
 SESSION = requests.Session()
 TIMEOUT = 15
 
 
 def get_json(url, params=None):
-    response = SESSION.get(url, params=params, timeout=TIMEOUT)
+    response = SESSION.get(
+        url,
+        params=params,
+        timeout=TIMEOUT
+    )
     response.raise_for_status()
     return response.json()
 
@@ -13,8 +21,14 @@ def get_json(url, params=None):
 def binance_symbols(min_turnover=1000000):
     """Binance USDT perpetual futures symbols."""
     base = "https://fapi.binance.com"
-    info = get_json(base + "/fapi/v1/exchangeInfo")
-    tickers = get_json(base + "/fapi/v1/ticker/24hr")
+
+    info = get_json(
+        base + "/fapi/v1/exchangeInfo"
+    )
+
+    tickers = get_json(
+        base + "/fapi/v1/ticker/24hr"
+    )
 
     allowed = {
         item["symbol"]
@@ -25,22 +39,37 @@ def binance_symbols(min_turnover=1000000):
     }
 
     result = []
+
     for item in tickers:
         symbol = item.get("symbol", "")
-        turnover = float(item.get("quoteVolume", 0))
-        if symbol in allowed and turnover >= min_turnover:
-            result.append((symbol, turnover))
+        turnover = float(
+            item.get("quoteVolume", 0)
+        )
 
-    return sorted(result, key=lambda x: x[1], reverse=True)
+        if (
+            symbol in allowed
+            and turnover >= min_turnover
+        ):
+            result.append(
+                (symbol, turnover)
+            )
+
+    return sorted(
+        result,
+        key=lambda x: x[1],
+        reverse=True
+    )
 
 
 def okx_symbols(min_turnover=1000000):
     """OKX USDT perpetual swap symbols."""
     base = "https://www.okx.com"
+
     instruments = get_json(
         base + "/api/v5/public/instruments",
         {"instType": "SWAP"}
     )
+
     tickers = get_json(
         base + "/api/v5/market/tickers",
         {"instType": "SWAP"}
@@ -55,33 +84,59 @@ def okx_symbols(min_turnover=1000000):
     }
 
     result = []
+
     for item in tickers.get("data", []):
         symbol = item.get("instId", "")
+
         if symbol not in allowed:
             continue
 
-        # OKX volCcy24h is base-currency volume for these swaps.
-        volume = float(item.get("volCcy24h") or 0)
-        price = float(item.get("last") or 0)
+        volume = float(
+            item.get("volCcy24h") or 0
+        )
+
+        price = float(
+            item.get("last") or 0
+        )
+
         turnover = volume * price
 
         if turnover >= min_turnover:
-            result.append((symbol, turnover))
+            result.append(
+                (symbol, turnover)
+            )
 
-    return sorted(result, key=lambda x: x[1], reverse=True)
+    return sorted(
+        result,
+        key=lambda x: x[1],
+        reverse=True
+    )
 
+
+# Supported timeframes
 TIMEFRAMES = {
     "5m": "5m",
     "15m": "15m",
+    "30m": "30m",
     "1H": "1h",
     "4H": "4h",
     "1D": "1d",
 }
 
 
-def binance_candles(symbol, timeframe, limit=230):
-    """Return [timestamp, open, high, low, close, base_volume, quote_volume]."""
+def binance_candles(
+    symbol,
+    timeframe,
+    limit=230
+):
+    """
+    Return:
+    [timestamp, open, high, low,
+     close, base_volume, quote_volume]
+    """
+
     interval = TIMEFRAMES[timeframe]
+
     data = get_json(
         "https://fapi.binance.com/fapi/v1/klines",
         {
@@ -90,6 +145,7 @@ def binance_candles(symbol, timeframe, limit=230):
             "limit": limit,
         },
     )
+
     return [
         [
             int(row[0]),
@@ -104,11 +160,21 @@ def binance_candles(symbol, timeframe, limit=230):
     ]
 
 
-def okx_candles(symbol, timeframe, limit=230):
-    """Return [timestamp, open, high, low, close, base_volume, quote_volume]."""
+def okx_candles(
+    symbol,
+    timeframe,
+    limit=230
+):
+    """
+    Return:
+    [timestamp, open, high, low,
+     close, base_volume, quote_volume]
+    """
+
     bar = {
         "5m": "5m",
         "15m": "15m",
+        "30m": "30m",
         "1H": "1H",
         "4H": "4H",
         "1D": "1D",
@@ -121,8 +187,12 @@ def okx_candles(symbol, timeframe, limit=230):
         params = {
             "instId": symbol,
             "bar": bar,
-            "limit": min(100, limit - len(collected)),
+            "limit": min(
+                100,
+                limit - len(collected)
+            ),
         }
+
         if after is not None:
             params["after"] = after
 
@@ -130,10 +200,17 @@ def okx_candles(symbol, timeframe, limit=230):
             "https://www.okx.com/api/v5/market/history-candles",
             params,
         )
+
         if result.get("code") != "0":
-            raise ValueError(result.get("msg", "OKX candle error"))
+            raise ValueError(
+                result.get(
+                    "msg",
+                    "OKX candle error"
+                )
+            )
 
         rows = result.get("data", [])
+
         if not rows:
             break
 
@@ -149,22 +226,42 @@ def okx_candles(symbol, timeframe, limit=230):
                     float(row[7]),
                 ]
 
-        oldest = min(int(row[0]) for row in rows)
-        if after is not None and oldest >= int(after):
+        oldest = min(
+            int(row[0])
+            for row in rows
+        )
+
+        if (
+            after is not None
+            and oldest >= int(after)
+        ):
             break
+
         after = str(oldest)
 
-    return [collected[t] for t in sorted(collected)][-limit:]
+    return [
+        collected[t]
+        for t in sorted(collected)
+    ][-limit:]
 
 
-from concurrent.futures import ThreadPoolExecutor, as_completed
-import time
+def fastest_candles(
+    symbol,
+    timeframe,
+    limit=230,
+    exchanges=None
+):
+    """
+    Fetch candles concurrently
+    and use the first valid response.
+    """
 
-
-def fastest_candles(symbol, timeframe, limit=230, exchanges=None):
-    """Fetch candles concurrently and use the first valid response."""
     if exchanges is None:
-        exchanges = ("bitget", "binance", "okx")
+        exchanges = (
+            "bitget",
+            "binance",
+            "okx"
+        )
 
     providers = {
         "bitget": bitget_candles,
@@ -174,96 +271,202 @@ def fastest_candles(symbol, timeframe, limit=230, exchanges=None):
 
     def fetch_one(exchange):
         if exchange not in providers:
-            raise ValueError("Unsupported provider: " + exchange)
+            raise ValueError(
+                "Unsupported provider: "
+                + exchange
+            )
 
         if exchange == "okx":
-            exchange_symbol = symbol.replace("USDT", "-USDT-SWAP")
+            exchange_symbol = symbol.replace(
+                "USDT",
+                "-USDT-SWAP"
+            )
         else:
             exchange_symbol = symbol
 
         started = time.monotonic()
-        rows = providers[exchange](exchange_symbol, timeframe, limit)
-        rows = validate_candles(rows, timeframe)
+
+        rows = providers[exchange](
+            exchange_symbol,
+            timeframe,
+            limit
+        )
+
+        rows = validate_candles(
+            rows,
+            timeframe
+        )
+
         if len(rows) < 205:
-            raise ValueError("Insufficient candles")
+            raise ValueError(
+                "Insufficient candles"
+            )
 
         return {
             "exchange": exchange,
             "symbol": exchange_symbol,
             "timeframe": timeframe,
             "candles": rows,
-            "latency_ms": round((time.monotonic() - started) * 1000),
+            "latency_ms": round(
+                (
+                    time.monotonic()
+                    - started
+                ) * 1000
+            ),
         }
 
-    selected = [name for name in exchanges if name in providers]
+    selected = [
+        name
+        for name in exchanges
+        if name in providers
+    ]
+
     if not selected:
-        raise ValueError("No available candle providers")
+        raise ValueError(
+            "No available candle providers"
+        )
 
     errors = {}
-    pool = ThreadPoolExecutor(max_workers=len(selected))
-    futures = {pool.submit(fetch_one, name): name for name in selected}
+
+    pool = ThreadPoolExecutor(
+        max_workers=len(selected)
+    )
+
+    futures = {
+        pool.submit(
+            fetch_one,
+            name
+        ): name
+        for name in selected
+    }
 
     try:
         for future in as_completed(futures):
             name = futures[future]
+
             try:
                 return future.result()
             except Exception as exc:
                 errors[name] = str(exc)
-    finally:
-        pool.shutdown(wait=False, cancel_futures=True)
 
-    raise ValueError("All exchanges failed: " + str(errors))
-   
-    
-def validate_candles(rows, timeframe, minimum=205):
-    """Keep only completed candles and validate OHLCV data."""
+    finally:
+        pool.shutdown(
+            wait=False,
+            cancel_futures=True
+        )
+
+    raise ValueError(
+        "All exchanges failed: "
+        + str(errors)
+    )
+
+
+def validate_candles(
+    rows,
+    timeframe,
+    minimum=205
+):
+    """
+    Keep only completed candles
+    and validate OHLCV data.
+    """
+
     minutes = {
-        "5m": 5, "15m": 15, "1H": 60,
-        "4H": 240, "1D": 1440,
+        "5m": 5,
+        "15m": 15,
+        "30m": 30,
+        "1H": 60,
+        "4H": 240,
+        "1D": 1440,
     }
-    interval_ms = minutes[timeframe] * 60000
-    now_ms = int(time.time() * 1000)
+
+    interval_ms = (
+        minutes[timeframe] * 60000
+    )
+
+    now_ms = int(
+        time.time() * 1000
+    )
+
     valid = {}
 
     for row in rows:
         try:
             ts = int(row[0])
-            op, hi, lo, cl = map(float, row[1:5])
+
+            op, hi, lo, cl = map(
+                float,
+                row[1:5]
+            )
+
             volume = float(row[5])
 
             if ts + interval_ms > now_ms:
                 continue
-            if min(op, hi, lo, cl) <= 0 or volume < 0:
+
+            if (
+                min(op, hi, lo, cl) <= 0
+                or volume < 0
+            ):
                 continue
-            if hi < max(op, cl) or lo > min(op, cl):
+
+            if (
+                hi < max(op, cl)
+                or lo > min(op, cl)
+            ):
                 continue
 
             valid[ts] = row
-        except (ValueError, TypeError, IndexError):
+
+        except (
+            ValueError,
+            TypeError,
+            IndexError
+        ):
             continue
 
-    result = [valid[t] for t in sorted(valid)]
+    result = [
+        valid[t]
+        for t in sorted(valid)
+    ]
 
     if len(result) < minimum:
         raise ValueError(
-            f"Completed candles insufficient: {len(result)}/{minimum}"
+            f"Completed candles insufficient: "
+            f"{len(result)}/{minimum}"
         )
 
     return result
 
-def bitget_candles(symbol, timeframe, limit=230):
-    """Fetch completed Bitget USDT futures candles."""
+
+def bitget_candles(
+    symbol,
+    timeframe,
+    limit=230
+):
+    """
+    Fetch completed Bitget
+    USDT futures candles.
+    """
+
     interval_ms = {
         "5m": 300000,
         "15m": 900000,
+        "30m": 1800000,
         "1H": 3600000,
         "4H": 14400000,
         "1D": 86400000,
     }[timeframe]
 
-    now_ms = int(time.time() * 1000)
-    end_time = (now_ms // interval_ms) * interval_ms - 1
+    now_ms = int(
+        time.time() * 1000
+    )
+
+    end_time = (
+        (now_ms // interval_ms)
+        * interval_ms - 1
+    )
+
     collected = {}
 
     for _ in range(5):
@@ -279,14 +482,21 @@ def bitget_candles(symbol, timeframe, limit=230):
         )
 
         if result.get("code") != "00000":
-            raise ValueError(result.get("msg", "Bitget API error"))
+            raise ValueError(
+                result.get(
+                    "msg",
+                    "Bitget API error"
+                )
+            )
 
         rows = result.get("data") or []
+
         if not rows:
             break
 
         for row in rows:
             ts = int(row[0])
+
             if ts + interval_ms <= now_ms:
                 collected[ts] = [
                     ts,
@@ -301,9 +511,17 @@ def bitget_candles(symbol, timeframe, limit=230):
         if len(collected) >= limit:
             break
 
-        oldest = min(int(row[0]) for row in rows)
+        oldest = min(
+            int(row[0])
+            for row in rows
+        )
+
         if oldest >= end_time:
             break
+
         end_time = oldest - 1
 
-    return [collected[t] for t in sorted(collected)][-limit:]
+    return [
+        collected[t]
+        for t in sorted(collected)
+    ][-limit:]
