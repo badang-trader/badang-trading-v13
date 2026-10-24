@@ -1387,6 +1387,22 @@ def v13_scan():
                     item['recommendation'] = 'WAIT'
 
                 item['exchange'] = data['exchange']
+                # BADANG 1.5: supplementary research only. Fail-open for 1.4 scanner.
+                # The OKX derivative sample is independent of candle exchange;
+                # do not present it as the candle venue's order flow.
+                try:
+                    from badang_derivatives_v15 import derivatives_snapshot, evaluate_high_confidence
+                    derivatives = derivatives_snapshot(symbol)
+                    item['v15_research'] = evaluate_high_confidence(
+                        item, data['candles'], derivatives
+                    )
+                except Exception as v15_exc:
+                    logger.warning('v1.5 supplemental analysis unavailable for %s: %s', symbol, v15_exc)
+                    item['v15_research'] = {
+                        'status': 'UNAVAILABLE', 'eligible_for_alert': False,
+                        'reason': '추가 분석 데이터 조회 실패'
+                    }
+
 
                 # Keep the exact confirmed candle reference
                 # for 1.4 signal history.
