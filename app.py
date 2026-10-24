@@ -10,6 +10,10 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from flask import Flask, jsonify, render_template, request
 
 app = Flask(__name__)
+
+# BADANG 1.7.2: standalone read-only dashboard route
+from badang_dashboard import badang_dashboard
+app.register_blueprint(badang_dashboard)
 BASE = 'https://api.bitget.com'
 S = requests.Session()
 API_LOCK = threading.Lock()
