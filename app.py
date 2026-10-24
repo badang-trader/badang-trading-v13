@@ -1283,6 +1283,46 @@ def v13_test():
         ), 502
 
 
+def stabilize_trade_plan(item):
+    """Reject impossible prices; never turn a malformed plan into a signal."""
+    if item.get('status') != 'ok':
+        return item
+    entry = finite_number(item.get('entry_reference'))
+    stop = finite_number(item.get('stop_loss'))
+    tp1 = finite_number(item.get('take_profit_1'))
+    tp2 = finite_number(item.get('take_profit_2'))
+    side = item.get('candidate_side')
+    valid = (all(v is not None and v > 0 for v in (entry, stop, tp1, tp2))
+             and ((side == 'LONG' and stop < entry < tp1 < tp2)
+                  or (side == 'SHORT' and tp2 < tp1 < entry < stop)))
+    if not valid:
+        item['recommendation'] = 'WAIT'
+        item['take_profit_1'] = None
+        item['take_profit_2'] = None
+        item['risk_reward_1'] = None
+        item.setdefault('stability_warnings', []).append('INVALID_TRADE_PLAN')
+    return item
+
+
+def check_flow_conflict(item):
+    """Strong opposing *sample* flow vetoes a directional suggestion."""
+    research = item.get('v17_research') or {}
+    imbalance = finite_number(research.get('sample_imbalance'))
+    count = research.get('trade_sample_count') or 0
+    side = item.get('recommendation')
+    if (research.get('data_status') != 'OK' or imbalance is None
+            or count < 40 or side not in ('LONG', 'SHORT')):
+        return item
+    conflict = (side == 'LONG' and imbalance <= -0.12) or (side == 'SHORT' and imbalance >= 0.12)
+    if conflict:
+        item['recommendation'] = 'WAIT'
+        item.setdefault('stability_warnings', []).append('OPPOSING_RECENT_TRADE_SAMPLE')
+        research.setdefault('checks', {})['recent_trade_sample_conflicts'] = True
+    else:
+        research.setdefault('checks', {})['recent_trade_sample_conflicts'] = False
+    return item
+
+
 @app.route('/api/v13-scan')
 def v13_scan():
     from exchange_data import fastest_candles
@@ -1386,23 +1426,10 @@ def v13_scan():
                 ):
                     item['recommendation'] = 'WAIT'
 
+                stabilize_trade_plan(item)
                 item['exchange'] = data['exchange']
-                # BADANG 1.5: supplementary research only. Fail-open for 1.4 scanner.
-                # The OKX derivative sample is independent of candle exchange;
-                # do not present it as the candle venue's order flow.
-                try:
-                    from badang_derivatives_v15 import derivatives_snapshot, evaluate_high_confidence
-                    derivatives = derivatives_snapshot(symbol)
-                    item['v15_research'] = evaluate_high_confidence(
-                        item, data['candles'], derivatives
-                    )
-                except Exception as v15_exc:
-                    logger.warning('v1.5 supplemental analysis unavailable for %s: %s', symbol, v15_exc)
-                    item['v15_research'] = {
-                        'status': 'UNAVAILABLE', 'eligible_for_alert': False,
-                        'reason': '추가 분석 데이터 조회 실패'
-                    }
-
+                # v1.7.1: avoid duplicate OKX network calls from legacy v1.5.
+                # Keep the v1.5 module as a local utility dependency of v1.7.
 
                 # BADANG 1.7: stateless, on-demand research only. No database calls.
                 try:
@@ -1414,6 +1441,8 @@ def v13_scan():
                         'status': 'UNAVAILABLE', 'eligible_for_alert': False,
                         'reason': '1.7 보조 분석 조회 실패'
                     }
+
+                check_flow_conflict(item)
 
                 # Keep the exact confirmed candle reference
                 # for 1.4 signal history.
@@ -1429,7 +1458,7 @@ def v13_scan():
 
         # BADANG 1.7: persistence intentionally disabled (free stateless mode).
         storage = {'saved': 0, 'duplicates': 0, 'skipped': 0,
-                   'storage': 'disabled_stateless_v17'}
+                   'storage': 'disabled_stateless_v171'}
 
         return jsonify(
             total=len(universe),

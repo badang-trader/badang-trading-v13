@@ -13,7 +13,7 @@ def research_v17(item, candles, session=None):
     inst = okx_symbol(symbol)
     vwap = vwap_from_candles(candles)
     result = {
-        'version': '1.7', 'status': 'RESEARCH_ONLY', 'eligible_for_alert': False,
+        'version': '1.7.1', 'status': 'RESEARCH_ONLY', 'eligible_for_alert': False,
         'source_exchange': 'okx', 'instrument': inst, 'vwap': vwap,
         'collection': 'ON_DEMAND', 'database_required': False,
         'oi_change_15m_pct': None, 'oi_change_1h_pct': None,
