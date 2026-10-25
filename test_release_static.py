@@ -9,11 +9,11 @@ class ReleaseTests(unittest.TestCase):
                 ast.parse(path.read_text(encoding='utf-8'))
     def test_modes_and_guard(self):
         source=(ROOT/'app.py').read_text(encoding='utf-8')
-        self.assertIn("['5m', '15m', '1H']",source)
+        self.assertIn("['15m', '30m', '1H']",source)
         self.assertIn("['1H', '4H', '1D']",source)
-        self.assertIn('FLOW_NOT_FULLY_VERIFIED_RESEARCH_ONLY',source)
+        self.assertIn('TECHNICAL_CANDIDATE_NOT_EXECUTION_ORDER',source)
         self.assertIn('coverage_confirmed',source)
     def test_ui_matches(self):
         source=(ROOT/'app.py').read_text(encoding='utf-8')
-        self.assertIn('단타 · 5분 / 15분 / 1시간',source)
+        self.assertIn('단타 · 15분 / 30분 / 1시간',source)
 if __name__=='__main__': unittest.main()
