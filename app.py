@@ -1049,7 +1049,7 @@ def majors():
 
 @app.route('/')
 def home():
-    return render_template_string(BADANG_ORIGINAL_HTML)
+    return render_template('index_final.html')
 
 
 @app.route('/api/scan')

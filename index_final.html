@@ -1,0 +1,82 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#0c1424"><title>BADANG Trading · 원래 화면</title><style>:root{font-family:system-ui,-apple-system,'Noto Sans KR',sans-serif;color:#edf3fb;background:#0c1424}*{box-sizing:border-box}body{margin:0}main{max-width:720px;margin:auto;padding:18px 14px 42px}header{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:20px}.brand{font-size:19px;font-weight:800;white-space:nowrap}.brand span{font-weight:400;color:#9ab1d3}small{font-size:11px;color:#9baec9}h1{font-size:25px;margin:0 0 8px}h2{font-size:18px;margin:0}.hero,.item{background:#16243a;border:1px solid #2a3b54;border-radius:18px;padding:18px;margin-bottom:13px}.hero p{color:#9db0c8;font-size:13px;line-height:1.6}.controls{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:20px 0}label{font-size:12px;color:#a6b8d0}select{display:block;width:100%;background:#0c192c;color:#f2f6fc;border:1px solid #364b67;border-radius:10px;padding:11px 8px;margin-top:6px;font-size:13px}button{border:0;border-radius:12px;padding:15px;background:#40bcae;color:#071a23;font-size:15px;font-weight:800;width:100%;cursor:pointer}button:disabled{opacity:.5;cursor:wait}.status{min-height:20px}.progress{height:5px;background:#293a52;border-radius:8px;overflow:hidden}.progress>div{height:100%;width:0;background:#40bcae;transition:width .3s}.summary{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:15px 0 26px}.summary>div{padding:14px 10px;background:#152237;border-radius:12px}.summary span{display:block;color:#9eb0c9;font-size:11px}.summary strong{display:block;font-size:19px;margin-top:6px}.heading{display:flex;justify-content:space-between;align-items:center;margin-bottom:13px}.heading select{width:115px;margin:0}.top{display:flex;justify-content:space-between;gap:10px;align-items:start}.top strong{font-size:17px}.top small{display:block;margin-top:5px}.signal{font-size:12px;font-weight:800;border-radius:8px;padding:8px;white-space:nowrap}.long{color:#63d9bc;background:#124b43}.short{color:#ff9b9b;background:#572d3b}.wait{color:#c4cbd4;background:#344156}.metrics{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin:18px 0}.metrics div{font-size:11px;color:#9eafc8}.metrics strong{display:block;font-size:15px;color:#eaf1fa;margin-top:5px}details{border-top:1px solid #34455d;padding-top:10px;font-size:12px;color:#c3d2e6}summary{cursor:pointer}details p{line-height:1.7}.empty{padding:32px 10px;text-align:center;color:#9cacc1;border:1px dashed #42536b;border-radius:14px}footer{font-size:11px;color:#90a4be;line-height:1.7;margin-top:25px}@media(max-width:390px){header{display:block}header small{display:block;margin-top:5px}.controls{grid-template-columns:1fr}}
+</style></head><body><main><header><div class="brand">🌊 BADANG <span>Trading</span></div><small>BADANG 2.0.5 개인용 분석 화면 · 공개 데이터</small></header><section class="hero"><h1>롱·숏 신호 스캐너</h1><p>기존 화면 구성 그대로 · 최신 분석 엔진으로 종목을 분석합니다.</p><div class="controls"><label>분석 모드<select id="interval"><option value="scalp">단타 · 15분 / 30분 / 1시간</option><option value="swing">스윙 · 1시간 / 4시간 / 일봉</option></select></label><label>분석 범위<select id="minVolume"><option value="5">상위 5종목</option><option value="20" selected>상위 20종목</option><option value="50">상위 50종목</option><option value="0">전체 종목 (시간 소요)</option></select></label></div><button id="scan">종목 스캔 시작 →</button><p class="status" id="status">아직 분석하지 않았습니다.</p><div class="progress"><div id="bar"></div></div></section><section class="summary"><div><span>분석 완료</span><strong id="count">—</strong></div><div><span>롱 후보</span><strong id="longCount">—</strong></div><div><span>숏 후보</span><strong id="shortCount">—</strong></div></section><section><div class="heading"><h2>신호 후보</h2><select id="filter"><option value="ALL">전체</option><option value="LONG">롱만</option><option value="SHORT">숏만</option><option value="WAIT">관망</option></select></div><div id="results" class="results"><div class="empty">스캔 버튼을 눌러 시작하세요.</div></div></section><footer>⚠️ OI·펀딩비·체결 CVD·VWAP 분석은 자료 범위에 따라 제한되며 연구용이며 수익 확률이나 투자 권유가 아닙니다. 시세 지연·API 오류·급변동에 주의하세요. 자동 주문 기능은 없습니다.</footer></main><script>const $=id=>document.getElementById(id);
+let current=[],running=false,abort=false,allTotal=0;
+const num=(n,d=4)=>n==null||!Number.isFinite(Number(n))?'—':Number(n).toLocaleString('ko-KR',{maximumFractionDigits:d});
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[c]));
+const reasonMap={
+'EMA bearish alignment':'이동평균선 하락 정렬','EMA bullish alignment':'이동평균선 상승 정렬',
+'EMA20 below EMA50':'EMA20이 EMA50 아래','EMA20 above EMA50':'EMA20이 EMA50 위',
+'MACD histogram falling negative':'MACD 하락세','MACD histogram rising positive':'MACD 상승세',
+'RSI bearish range':'RSI 하락 우세','RSI bullish range':'RSI 상승 우세',
+'hidden bearish RSI divergence candidate':'숨은 하락 다이버전스 후보',
+'hidden bullish RSI divergence candidate':'숨은 상승 다이버전스 후보',
+'rising volume with red candle':'음봉 거래량 증가','rising volume with green candle':'양봉 거래량 증가'
+};
+function korean(s){return reasonMap[s]||String(s||'확인 필요')}
+function signal(x){return ['LONG','SHORT'].includes(x.recommendation)?x.recommendation:'WAIT'}
+
+const blockMap={TIMEFRAMES_NOT_ALIGNED:'시간봉 방향이 일치하지 않음',INVALID_TRADE_PLAN:'진입·손절·목표가 조건 미충족',OPPOSING_RECENT_TRADE_SAMPLE:'최근 체결 흐름이 반대 방향',INSUFFICIENT_SCORE:'기술적 점수 부족',LOW_RISK_REWARD:'손익비 기준 미충족'};
+const gradeMap={STRONG_CANDIDATE:'강력 후보',GOOD_CANDIDATE:'우수 후보',WATCHLIST:'관심 종목',WAIT:'관망'};
+function translateCode(s){return blockMap[s]||gradeMap[s]||String(s||'확인 필요').replace(/_/g,' ')}
+function listInfo(data,format,empty){return Array.isArray(data)&&data.length?data.slice(0,5).map(format).join('<br>'):empty}
+function divergenceInfo(x){const ds=x.divergence_details||x.divergences||[];return listInfo(ds,d=>{
+ const types={bullish:'일반 상승',bearish:'일반 하락',hidden_bullish:'히든 상승',hidden_bearish:'히든 하락'};
+ return esc((types[d.type]||translateCode(d.type))+' 다이버전스 · '+(d.age_bars==null?'발생 시점 미확인':num(d.age_bars,0)+'개 봉 전')+' · '+(d.confirmed?'확인됨':'후보'));
+},'최근 확인된 다이버전스 없음')}
+function waveInfo(x){return listInfo(x.wave_candidates||[],w=>{
+ const types={abc:'ABC 조정파',impulse:'5파 충격파'};
+ const title=types[w.type]||types[w.pattern]||String(w.pattern||w.type||'파동 후보').replace(/_/g,' ');
+ const confidence={low:'낮음',medium:'보통',high:'높음'}[w.confidence]||'미확인';
+ const direction={up:'상승',down:'하락'}[w.direction]||'방향 미확인';
+ return esc(title+' · '+direction+' · 신뢰도 '+confidence+' · 확정 아님');
+},'현재 탐지된 파동 후보 없음')}
+function fibonacciInfo(x){const f=x.fibonacci||{};const entries=Object.entries(f).filter(([k,v])=>typeof v==='number'&&Number.isFinite(v));return entries.length?entries.slice(0,10).map(([k,v])=>esc(k.replace(/extension_/g,'확장 ').replace(/retracement_/g,'되돌림 ').replace(/_/g,' '))+' '+num(v,6)+' USDT').join('<br>'):'피보나치 가격 정보 없음'}
+function blockersInfo(x){const b=x.entry_blockers||[];return b.length?b.map(translateCode).map(esc).join(' · '):signal(x)==='WAIT'?'진입 기준 미충족 (세부 사유 미제공)':'별도 보류 조건 없음'}
+function rrInfo(x){const e=Number(x.entry_reference),s=Number(x.stop_loss),t=Number(x.take_profit_1);const risk=Math.abs(e-s);return [e,s,t].every(Number.isFinite)&&risk>0?'1 : '+num(Math.abs(t-e)/risk,2):'산출 불가'}
+
+function render(){
+  const filter=$('filter').value;
+  const data=current.filter(x=>filter==='ALL'||signal(x)===filter);
+  data.sort((a,b)=>Math.max(b.long_score||0,b.short_score||0)-Math.max(a.long_score||0,a.short_score||0));
+  $('results').innerHTML=data.length?data.map(x=>{
+    const dir=signal(x), score=dir==='LONG'?x.long_score:dir==='SHORT'?x.short_score:Math.max(x.long_score||0,x.short_score||0);
+    const v=x.v17_research||{}, tw=v.trade_window||{}, oh=v.oi_history||{}, trends=x.timeframe_trends||{}, price=x.entry_reference;
+    const labels=Object.entries(trends).map(([k,t])=>k+' '+(t==='UP'?'상승':t==='DOWN'?'하락':'중립')).join(' · ');
+    const warns=(x.stability_warnings||[]).map(w=>w==='OPPOSING_RECENT_TRADE_SAMPLE'?'최근 체결 방향 충돌':w==='INVALID_TRADE_PLAN'?'가격 시나리오 부적합':w).join(' · ');
+    const plan=dir==='WAIT'?'관망 · 진입 신호 없음':`진입 참고 ${num(price,8)} · 손절 ${num(x.stop_loss,8)} · 1차 목표 ${num(x.take_profit_1,8)} · 2차 목표 ${num(x.take_profit_2,8)}`;
+    return `<article class="item"><div class="top"><div><strong>${esc(x.symbol)}</strong><small>${esc(x.exchange||'')} · ${esc(labels)}</small></div><div class="signal ${dir==='LONG'?'long':dir==='SHORT'?'short':'wait'}">${dir==='LONG'?'롱 후보':dir==='SHORT'?'숏 후보':'관망'} · ${num(score,0)}점</div></div><div class="metrics"><div>기준 가격<strong>${num(price,8)} USDT</strong></div><div>RSI<strong>${num(x.rsi,2)}</strong></div><div>롱 / 숏 점수<strong>${num(x.long_score,0)} / ${num(x.short_score,0)}</strong></div><div>펀딩비 (OKX)<strong>${num(v.funding_rate==null?null:v.funding_rate*100,4)}%</strong></div></div><details><summary>분석 근거 및 가격 구간</summary><p>${esc((x.reasons||[]).map(korean).join(' · ')||'뚜렷한 방향성 신호 없음')}</p><p><b>최종 판단:</b> ${esc(plan)}</p><p><b>1차 목표 손익비:</b> ${rrInfo(x)}</p><p><b>기술적 강도 / 실행 가능성:</b> ${num(x.technical_score,0)}점 (${esc(x.technical_side||'미확인')}) · ${esc(translateCode(x.signal_grade||'검증 전'))} · 점수는 승률이 아닙니다.</p><p><b>진입 조건 확인:</b> ${blockersInfo(x)}</p><p><b>다이버전스:</b> ${divergenceInfo(x)}</p><p><b>엘리엇파동 후보 (확정 아님):</b> ${waveInfo(x)}</p><p><b>피보나치:</b> ${fibonacciInfo(x)}</p><p><b>데이터 출처:</b> 캔들 ${esc(x.exchange||'미확인')} / 파생상품 ${esc(x.derivatives_source_exchange||'미확인')} · ${x.derivatives_same_exchange?'동일 거래소':'거래소 혼합 참고값'}</p><p><b>OI · 펀딩비</b> 현재 OI ${num(v.oi_contracts,2)} 계약 · 15분 변화 ${num(v.oi_change_15m_pct,3)}% · 1시간 변화 ${num(v.oi_change_1h_pct,3)}% · 펀딩 ${num(v.funding_rate==null?null:v.funding_rate*100,4)}%</p><p><b>체결 CVD (15분)</b> ${tw.coverage_confirmed?num(v.cvd_15m_contracts,4)+' 계약':'전체 체결 검증 불가 · 참고용 표본 '+num(tw.cvd_contracts,4)+' 계약'} · 수집 ${num(tw.count,0)}건 · 불균형 ${num(tw.imbalance,3)}</p><p><b>거래 기반 VWAP (15분)</b> ${tw.coverage_confirmed?num(v.trade_vwap_15m,8):'전체 체결 검증 불가'} · 수집된 체결 VWAP ${num(tw.vwap,8)}</p><p><b>참고용 캔들 VWAP 근사</b> ${num(v.vwap?.value,8)} · OI 이력 ${esc(oh.status||'미확인')}</p>${warns?`<p class="warning">⚠ ${esc(warns)}</p>`:''}<p>점수는 승률이 아니며, 개인 판단용 기술적 후보입니다. 자동 주문 기능은 없습니다.</p></details></article>`;
+  }).join(''):'<div class="empty">해당 조건의 종목이 없습니다.</div>';
+}
+async function begin(){
+ if(running)return;
+ running=true;abort=false;current=[];allTotal=0;
+ $('scan').disabled=true;$('bar').style.width='0%';render();
+ const mode=$('interval').value, limit=Number($('minVolume').value);
+ let offset=0,errors=0;
+ try{
+  while(!abort){
+   $('status').textContent=`분석 중… ${offset}종목 완료`;
+   const res=await fetch(`/api/v13-scan?mode=${encodeURIComponent(mode)}&offset=${offset}`,{cache:'no-store'});
+   const j=await res.json();
+   if(!res.ok||j.error)throw Error(j.error||`HTTP ${res.status}`);
+   allTotal=Number(j.total)||0;
+   current.push(...(j.results||[]));errors+=(j.errors||[]).length;
+   const next=Number(j.next_offset);
+   if(!Number.isFinite(next)||next<=offset)throw Error('분석 진행 위치 오류');
+   offset=next;
+   $('count').textContent=current.length+' / '+(limit||allTotal);
+   $('longCount').textContent=current.filter(x=>signal(x)==='LONG').length;
+   $('shortCount').textContent=current.filter(x=>signal(x)==='SHORT').length;
+   const target=limit?Math.min(limit,allTotal):allTotal;
+   $('bar').style.width=(target?Math.min(100,Math.round(offset/target*100)):100)+'%';
+   $('status').textContent=`${Math.min(offset,target)} / ${target}종목 확인 · 분석 실패 ${errors}건`;
+   render();
+   if(!j.results?.length&&!j.errors?.length || offset>=target || offset>=allTotal)break;
+  }
+  $('status').textContent+=` · 완료 (${new Date().toLocaleTimeString('ko-KR')})`;
+ }catch(e){$('status').textContent='오류: '+e.message}
+ finally{running=false;$('scan').disabled=false}
+}
+$('scan').addEventListener('click',begin);
+$('filter').addEventListener('change',render);
+</script></body></html>
