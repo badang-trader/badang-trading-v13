@@ -1445,6 +1445,24 @@ def v13_scan():
                         'reason': '1.7 보조 분석 조회 실패'
                     }
 
+                # Populate the primary analysis fields with *sourced* OKX values.
+                # They are cross-exchange context if candle source is Bitget.
+                research = item.get('v17_research') or {}
+                item['funding_rate'] = research.get('funding_rate')
+                item['oi_change_pct'] = research.get('oi_change_1h_pct')
+                item['futures_data_available'] = {
+                    'funding': research.get('funding_rate') is not None,
+                    'oi': research.get('oi_contracts') is not None,
+                    'oi_history': research.get('oi_change_1h_pct') is not None
+                }
+                item['derivatives_source_exchange'] = research.get('source_exchange')
+                item['derivatives_same_exchange'] = item.get('exchange') == research.get('source_exchange')
+                item['cvd_quality'] = 'CONTINUOUS_POLL_UNVERIFIED' if research.get('collection') == 'CONTINUOUS_REST_POLL_BTC_ETH' else 'SAMPLE_ONLY'
+                item['vwap_quality'] = 'CANDLE_APPROX_AND_TRADE_SAMPLE'
+                # No direction should be promoted using partial flow or mixed-exchange data.
+                if item.get('recommendation') in ('LONG', 'SHORT'):
+                    item['recommendation'] = 'WAIT'
+                    item.setdefault('stability_warnings', []).append('FLOW_NOT_FULLY_VERIFIED_RESEARCH_ONLY')
                 check_flow_conflict(item)
 
                 # Keep the exact confirmed candle reference
@@ -1494,7 +1512,7 @@ def v14_db_status():
                    reason='BADANG 1.7 does not use PostgreSQL')
 
 
-BADANG_ORIGINAL_HTML = '<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#0c1424"><title>BADANG Trading · 원래 화면</title><style>:root{font-family:system-ui,-apple-system,\'Noto Sans KR\',sans-serif;color:#edf3fb;background:#0c1424}*{box-sizing:border-box}body{margin:0}main{max-width:720px;margin:auto;padding:18px 14px 42px}header{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:20px}.brand{font-size:19px;font-weight:800;white-space:nowrap}.brand span{font-weight:400;color:#9ab1d3}small{font-size:11px;color:#9baec9}h1{font-size:25px;margin:0 0 8px}h2{font-size:18px;margin:0}.hero,.item{background:#16243a;border:1px solid #2a3b54;border-radius:18px;padding:18px;margin-bottom:13px}.hero p{color:#9db0c8;font-size:13px;line-height:1.6}.controls{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:20px 0}label{font-size:12px;color:#a6b8d0}select{display:block;width:100%;background:#0c192c;color:#f2f6fc;border:1px solid #364b67;border-radius:10px;padding:11px 8px;margin-top:6px;font-size:13px}button{border:0;border-radius:12px;padding:15px;background:#40bcae;color:#071a23;font-size:15px;font-weight:800;width:100%;cursor:pointer}button:disabled{opacity:.5;cursor:wait}.status{min-height:20px}.progress{height:5px;background:#293a52;border-radius:8px;overflow:hidden}.progress>div{height:100%;width:0;background:#40bcae;transition:width .3s}.summary{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:15px 0 26px}.summary>div{padding:14px 10px;background:#152237;border-radius:12px}.summary span{display:block;color:#9eb0c9;font-size:11px}.summary strong{display:block;font-size:19px;margin-top:6px}.heading{display:flex;justify-content:space-between;align-items:center;margin-bottom:13px}.heading select{width:115px;margin:0}.top{display:flex;justify-content:space-between;gap:10px;align-items:start}.top strong{font-size:17px}.top small{display:block;margin-top:5px}.signal{font-size:12px;font-weight:800;border-radius:8px;padding:8px;white-space:nowrap}.long{color:#63d9bc;background:#124b43}.short{color:#ff9b9b;background:#572d3b}.wait{color:#c4cbd4;background:#344156}.metrics{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin:18px 0}.metrics div{font-size:11px;color:#9eafc8}.metrics strong{display:block;font-size:15px;color:#eaf1fa;margin-top:5px}details{border-top:1px solid #34455d;padding-top:10px;font-size:12px;color:#c3d2e6}summary{cursor:pointer}details p{line-height:1.7}.empty{padding:32px 10px;text-align:center;color:#9cacc1;border:1px dashed #42536b;border-radius:14px}footer{font-size:11px;color:#90a4be;line-height:1.7;margin-top:25px}@media(max-width:390px){header{display:block}header small{display:block;margin-top:5px}.controls{grid-template-columns:1fr}}\n</style></head><body><main><header><div class="brand">🌊 BADANG <span>Trading</span></div><small>BADANG 1.8 분석 엔진 · 공개 데이터</small></header><section class="hero"><h1>롱·숏 신호 스캐너</h1><p>기존 화면 구성 그대로 · 최신 분석 엔진으로 종목을 분석합니다.</p><div class="controls"><label>분석 모드<select id="interval"><option value="scalp">단타 · 15분 / 30분 / 1시간</option><option value="swing">스윙 · 1시간 / 4시간 / 일봉</option></select></label><label>분석 범위<select id="minVolume"><option value="5">상위 5종목</option><option value="20" selected>상위 20종목</option><option value="50">상위 50종목</option><option value="0">전체 종목 (시간 소요)</option></select></label></div><button id="scan">종목 스캔 시작 →</button><p class="status" id="status">아직 분석하지 않았습니다.</p><div class="progress"><div id="bar"></div></div></section><section class="summary"><div><span>분석 완료</span><strong id="count">—</strong></div><div><span>롱 후보</span><strong id="longCount">—</strong></div><div><span>숏 후보</span><strong id="shortCount">—</strong></div></section><section><div class="heading"><h2>신호 후보</h2><select id="filter"><option value="ALL">전체</option><option value="LONG">롱만</option><option value="SHORT">숏만</option><option value="WAIT">관망</option></select></div><div id="results" class="results"><div class="empty">스캔 버튼을 눌러 시작하세요.</div></div></section><footer>⚠️ OI·펀딩비·체결 CVD·VWAP 분석은 자료 범위에 따라 제한되며 연구용이며 수익 확률이나 투자 권유가 아닙니다. 시세 지연·API 오류·급변동에 주의하세요. 자동 주문 기능은 없습니다.</footer></main><script>const $=id=>document.getElementById(id);\nlet current=[],running=false,abort=false,allTotal=0;\nconst num=(n,d=4)=>n==null||!Number.isFinite(Number(n))?\'—\':Number(n).toLocaleString(\'ko-KR\',{maximumFractionDigits:d});\nconst esc=s=>String(s??\'\').replace(/[&<>"\']/g,c=>({\'&\':\'&amp;\',\'<\':\'&lt;\',\'>\':\'&gt;\',\'"\':\'&quot;\',\'\\\'\':\'&#39;\'}[c]));\nconst reasonMap={\n\'EMA bearish alignment\':\'이동평균선 하락 정렬\',\'EMA bullish alignment\':\'이동평균선 상승 정렬\',\n\'EMA20 below EMA50\':\'EMA20이 EMA50 아래\',\'EMA20 above EMA50\':\'EMA20이 EMA50 위\',\n\'MACD histogram falling negative\':\'MACD 하락세\',\'MACD histogram rising positive\':\'MACD 상승세\',\n\'RSI bearish range\':\'RSI 하락 우세\',\'RSI bullish range\':\'RSI 상승 우세\',\n\'hidden bearish RSI divergence candidate\':\'숨은 하락 다이버전스 후보\',\n\'hidden bullish RSI divergence candidate\':\'숨은 상승 다이버전스 후보\',\n\'rising volume with red candle\':\'음봉 거래량 증가\',\'rising volume with green candle\':\'양봉 거래량 증가\'\n};\nfunction korean(s){return reasonMap[s]||String(s||\'확인 필요\')}\nfunction signal(x){return [\'LONG\',\'SHORT\'].includes(x.recommendation)?x.recommendation:\'WAIT\'}\nfunction render(){\n  const filter=$(\'filter\').value;\n  const data=current.filter(x=>filter===\'ALL\'||signal(x)===filter);\n  data.sort((a,b)=>Math.max(b.long_score||0,b.short_score||0)-Math.max(a.long_score||0,a.short_score||0));\n  $(\'results\').innerHTML=data.length?data.map(x=>{\n    const dir=signal(x), score=dir===\'LONG\'?x.long_score:dir===\'SHORT\'?x.short_score:Math.max(x.long_score||0,x.short_score||0);\n    const v=x.v17_research||{}, tw=v.trade_window||{}, oh=v.oi_history||{}, trends=x.timeframe_trends||{}, price=x.entry_reference;\n    const labels=Object.entries(trends).map(([k,t])=>k+\' \'+(t===\'UP\'?\'상승\':t===\'DOWN\'?\'하락\':\'중립\')).join(\' · \');\n    const warns=(x.stability_warnings||[]).map(w=>w===\'OPPOSING_RECENT_TRADE_SAMPLE\'?\'최근 체결 방향 충돌\':w===\'INVALID_TRADE_PLAN\'?\'가격 시나리오 부적합\':w).join(\' · \');\n    const plan=dir===\'WAIT\'?\'관망 · 진입 신호 없음\':`진입 참고 ${num(price,8)} · 손절 ${num(x.stop_loss,8)} · 1차 목표 ${num(x.take_profit_1,8)} · 2차 목표 ${num(x.take_profit_2,8)}`;\n    return `<article class="item"><div class="top"><div><strong>${esc(x.symbol)}</strong><small>${esc(x.exchange||\'\')} · ${esc(labels)}</small></div><div class="signal ${dir===\'LONG\'?\'long\':dir===\'SHORT\'?\'short\':\'wait\'}">${dir===\'LONG\'?\'롱 후보\':dir===\'SHORT\'?\'숏 후보\':\'관망\'} · ${num(score,0)}점</div></div><div class="metrics"><div>기준 가격<strong>${num(price,8)} USDT</strong></div><div>RSI<strong>${num(x.rsi,2)}</strong></div><div>롱 / 숏 점수<strong>${num(x.long_score,0)} / ${num(x.short_score,0)}</strong></div><div>펀딩비 (OKX)<strong>${num(v.funding_rate==null?null:v.funding_rate*100,4)}%</strong></div></div><details><summary>분석 근거 및 가격 구간</summary><p>${esc((x.reasons||[]).map(korean).join(\' · \')||\'뚜렷한 방향성 신호 없음\')}</p><p><b>최종 판단:</b> ${esc(plan)}</p><p><b>OI · 펀딩비</b> 현재 OI ${num(v.oi_contracts,2)} 계약 · 15분 변화 ${num(v.oi_change_15m_pct,3)}% · 1시간 변화 ${num(v.oi_change_1h_pct,3)}% · 펀딩 ${num(v.funding_rate==null?null:v.funding_rate*100,4)}%</p><p><b>체결 CVD (15분)</b> ${tw.coverage_confirmed?num(v.cvd_15m_contracts,4)+\' 계약\':\'수집 미완료 · 참고용 표본 \'+num(tw.cvd_contracts,4)+\' 계약\'} · 수집 ${num(tw.count,0)}건 · 불균형 ${num(tw.imbalance,3)}</p><p><b>거래 기반 VWAP (15분)</b> ${tw.coverage_confirmed?num(v.trade_vwap_15m,8):\'15분 구간 미확보\'} · 수집된 체결 VWAP ${num(tw.vwap,8)}</p><p><b>참고용 캔들 VWAP 근사</b> ${num(v.vwap?.value,8)} · OI 이력 ${esc(oh.status||\'미확인\')}</p>${warns?`<p class="warning">⚠ ${esc(warns)}</p>`:\'\'}<p>이 결과는 연구용이며 자동 매매 신호가 아닙니다.</p></details></article>`;\n  }).join(\'\'):\'<div class="empty">해당 조건의 종목이 없습니다.</div>\';\n}\nasync function begin(){\n if(running)return;\n running=true;abort=false;current=[];allTotal=0;\n $(\'scan\').disabled=true;$(\'bar\').style.width=\'0%\';render();\n const mode=$(\'interval\').value, limit=Number($(\'minVolume\').value);\n let offset=0,errors=0;\n try{\n  while(!abort){\n   $(\'status\').textContent=`분석 중… ${offset}종목 완료`;\n   const res=await fetch(`/api/v13-scan?mode=${encodeURIComponent(mode)}&offset=${offset}`,{cache:\'no-store\'});\n   const j=await res.json();\n   if(!res.ok||j.error)throw Error(j.error||`HTTP ${res.status}`);\n   allTotal=Number(j.total)||0;\n   current.push(...(j.results||[]));errors+=(j.errors||[]).length;\n   const next=Number(j.next_offset);\n   if(!Number.isFinite(next)||next<=offset)throw Error(\'분석 진행 위치 오류\');\n   offset=next;\n   $(\'count\').textContent=current.length+\' / \'+(limit||allTotal);\n   $(\'longCount\').textContent=current.filter(x=>signal(x)===\'LONG\').length;\n   $(\'shortCount\').textContent=current.filter(x=>signal(x)===\'SHORT\').length;\n   const target=limit?Math.min(limit,allTotal):allTotal;\n   $(\'bar\').style.width=(target?Math.min(100,Math.round(offset/target*100)):100)+\'%\';\n   $(\'status\').textContent=`${Math.min(offset,target)} / ${target}종목 확인 · 분석 실패 ${errors}건`;\n   render();\n   if(!j.results?.length&&!j.errors?.length || offset>=target || offset>=allTotal)break;\n  }\n  $(\'status\').textContent+=` · 완료 (${new Date().toLocaleTimeString(\'ko-KR\')})`;\n }catch(e){$(\'status\').textContent=\'오류: \'+e.message}\n finally{running=false;$(\'scan\').disabled=false}\n}\n$(\'scan\').addEventListener(\'click\',begin);\n$(\'filter\').addEventListener(\'change\',render);\n</script></body></html>\n'
+BADANG_ORIGINAL_HTML = '<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#0c1424"><title>BADANG Trading · 원래 화면</title><style>:root{font-family:system-ui,-apple-system,\'Noto Sans KR\',sans-serif;color:#edf3fb;background:#0c1424}*{box-sizing:border-box}body{margin:0}main{max-width:720px;margin:auto;padding:18px 14px 42px}header{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:20px}.brand{font-size:19px;font-weight:800;white-space:nowrap}.brand span{font-weight:400;color:#9ab1d3}small{font-size:11px;color:#9baec9}h1{font-size:25px;margin:0 0 8px}h2{font-size:18px;margin:0}.hero,.item{background:#16243a;border:1px solid #2a3b54;border-radius:18px;padding:18px;margin-bottom:13px}.hero p{color:#9db0c8;font-size:13px;line-height:1.6}.controls{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:20px 0}label{font-size:12px;color:#a6b8d0}select{display:block;width:100%;background:#0c192c;color:#f2f6fc;border:1px solid #364b67;border-radius:10px;padding:11px 8px;margin-top:6px;font-size:13px}button{border:0;border-radius:12px;padding:15px;background:#40bcae;color:#071a23;font-size:15px;font-weight:800;width:100%;cursor:pointer}button:disabled{opacity:.5;cursor:wait}.status{min-height:20px}.progress{height:5px;background:#293a52;border-radius:8px;overflow:hidden}.progress>div{height:100%;width:0;background:#40bcae;transition:width .3s}.summary{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:15px 0 26px}.summary>div{padding:14px 10px;background:#152237;border-radius:12px}.summary span{display:block;color:#9eb0c9;font-size:11px}.summary strong{display:block;font-size:19px;margin-top:6px}.heading{display:flex;justify-content:space-between;align-items:center;margin-bottom:13px}.heading select{width:115px;margin:0}.top{display:flex;justify-content:space-between;gap:10px;align-items:start}.top strong{font-size:17px}.top small{display:block;margin-top:5px}.signal{font-size:12px;font-weight:800;border-radius:8px;padding:8px;white-space:nowrap}.long{color:#63d9bc;background:#124b43}.short{color:#ff9b9b;background:#572d3b}.wait{color:#c4cbd4;background:#344156}.metrics{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin:18px 0}.metrics div{font-size:11px;color:#9eafc8}.metrics strong{display:block;font-size:15px;color:#eaf1fa;margin-top:5px}details{border-top:1px solid #34455d;padding-top:10px;font-size:12px;color:#c3d2e6}summary{cursor:pointer}details p{line-height:1.7}.empty{padding:32px 10px;text-align:center;color:#9cacc1;border:1px dashed #42536b;border-radius:14px}footer{font-size:11px;color:#90a4be;line-height:1.7;margin-top:25px}@media(max-width:390px){header{display:block}header small{display:block;margin-top:5px}.controls{grid-template-columns:1fr}}\n</style></head><body><main><header><div class="brand">🌊 BADANG <span>Trading</span></div><small>BADANG 2.0 BTC·ETH 연속 관측 엔진 · 공개 데이터</small></header><section class="hero"><h1>롱·숏 신호 스캐너</h1><p>기존 화면 구성 그대로 · 최신 분석 엔진으로 종목을 분석합니다.</p><div class="controls"><label>분석 모드<select id="interval"><option value="scalp">단타 · 15분 / 30분 / 1시간</option><option value="swing">스윙 · 1시간 / 4시간 / 일봉</option></select></label><label>분석 범위<select id="minVolume"><option value="5">상위 5종목</option><option value="20" selected>상위 20종목</option><option value="50">상위 50종목</option><option value="0">전체 종목 (시간 소요)</option></select></label></div><button id="scan">종목 스캔 시작 →</button><p class="status" id="status">아직 분석하지 않았습니다.</p><div class="progress"><div id="bar"></div></div></section><section class="summary"><div><span>분석 완료</span><strong id="count">—</strong></div><div><span>롱 후보</span><strong id="longCount">—</strong></div><div><span>숏 후보</span><strong id="shortCount">—</strong></div></section><section><div class="heading"><h2>신호 후보</h2><select id="filter"><option value="ALL">전체</option><option value="LONG">롱만</option><option value="SHORT">숏만</option><option value="WAIT">관망</option></select></div><div id="results" class="results"><div class="empty">스캔 버튼을 눌러 시작하세요.</div></div></section><footer>⚠️ OI·펀딩비·체결 CVD·VWAP 분석은 자료 범위에 따라 제한되며 연구용이며 수익 확률이나 투자 권유가 아닙니다. 시세 지연·API 오류·급변동에 주의하세요. 자동 주문 기능은 없습니다.</footer></main><script>const $=id=>document.getElementById(id);\nlet current=[],running=false,abort=false,allTotal=0;\nconst num=(n,d=4)=>n==null||!Number.isFinite(Number(n))?\'—\':Number(n).toLocaleString(\'ko-KR\',{maximumFractionDigits:d});\nconst esc=s=>String(s??\'\').replace(/[&<>"\']/g,c=>({\'&\':\'&amp;\',\'<\':\'&lt;\',\'>\':\'&gt;\',\'"\':\'&quot;\',\'\\\'\':\'&#39;\'}[c]));\nconst reasonMap={\n\'EMA bearish alignment\':\'이동평균선 하락 정렬\',\'EMA bullish alignment\':\'이동평균선 상승 정렬\',\n\'EMA20 below EMA50\':\'EMA20이 EMA50 아래\',\'EMA20 above EMA50\':\'EMA20이 EMA50 위\',\n\'MACD histogram falling negative\':\'MACD 하락세\',\'MACD histogram rising positive\':\'MACD 상승세\',\n\'RSI bearish range\':\'RSI 하락 우세\',\'RSI bullish range\':\'RSI 상승 우세\',\n\'hidden bearish RSI divergence candidate\':\'숨은 하락 다이버전스 후보\',\n\'hidden bullish RSI divergence candidate\':\'숨은 상승 다이버전스 후보\',\n\'rising volume with red candle\':\'음봉 거래량 증가\',\'rising volume with green candle\':\'양봉 거래량 증가\'\n};\nfunction korean(s){return reasonMap[s]||String(s||\'확인 필요\')}\nfunction signal(x){return [\'LONG\',\'SHORT\'].includes(x.recommendation)?x.recommendation:\'WAIT\'}\nfunction render(){\n  const filter=$(\'filter\').value;\n  const data=current.filter(x=>filter===\'ALL\'||signal(x)===filter);\n  data.sort((a,b)=>Math.max(b.long_score||0,b.short_score||0)-Math.max(a.long_score||0,a.short_score||0));\n  $(\'results\').innerHTML=data.length?data.map(x=>{\n    const dir=signal(x), score=dir===\'LONG\'?x.long_score:dir===\'SHORT\'?x.short_score:Math.max(x.long_score||0,x.short_score||0);\n    const v=x.v17_research||{}, tw=v.trade_window||{}, oh=v.oi_history||{}, trends=x.timeframe_trends||{}, price=x.entry_reference;\n    const labels=Object.entries(trends).map(([k,t])=>k+\' \'+(t===\'UP\'?\'상승\':t===\'DOWN\'?\'하락\':\'중립\')).join(\' · \');\n    const warns=(x.stability_warnings||[]).map(w=>w===\'OPPOSING_RECENT_TRADE_SAMPLE\'?\'최근 체결 방향 충돌\':w===\'INVALID_TRADE_PLAN\'?\'가격 시나리오 부적합\':w).join(\' · \');\n    const plan=dir===\'WAIT\'?\'관망 · 진입 신호 없음\':`진입 참고 ${num(price,8)} · 손절 ${num(x.stop_loss,8)} · 1차 목표 ${num(x.take_profit_1,8)} · 2차 목표 ${num(x.take_profit_2,8)}`;\n    return `<article class="item"><div class="top"><div><strong>${esc(x.symbol)}</strong><small>${esc(x.exchange||\'\')} · ${esc(labels)}</small></div><div class="signal ${dir===\'LONG\'?\'long\':dir===\'SHORT\'?\'short\':\'wait\'}">${dir===\'LONG\'?\'롱 후보\':dir===\'SHORT\'?\'숏 후보\':\'관망\'} · ${num(score,0)}점</div></div><div class="metrics"><div>기준 가격<strong>${num(price,8)} USDT</strong></div><div>RSI<strong>${num(x.rsi,2)}</strong></div><div>롱 / 숏 점수<strong>${num(x.long_score,0)} / ${num(x.short_score,0)}</strong></div><div>펀딩비 (OKX)<strong>${num(v.funding_rate==null?null:v.funding_rate*100,4)}%</strong></div></div><details><summary>분석 근거 및 가격 구간</summary><p>${esc((x.reasons||[]).map(korean).join(\' · \')||\'뚜렷한 방향성 신호 없음\')}</p><p><b>최종 판단:</b> ${esc(plan)}</p><p><b>OI · 펀딩비</b> 현재 OI ${num(v.oi_contracts,2)} 계약 · 15분 변화 ${num(v.oi_change_15m_pct,3)}% · 1시간 변화 ${num(v.oi_change_1h_pct,3)}% · 펀딩 ${num(v.funding_rate==null?null:v.funding_rate*100,4)}%</p><p><b>체결 CVD (15분)</b> ${tw.coverage_confirmed?num(v.cvd_15m_contracts,4)+\' 계약\':\'전체 체결 검증 불가 · 참고용 표본 \'+num(tw.cvd_contracts,4)+\' 계약\'} · 수집 ${num(tw.count,0)}건 · 불균형 ${num(tw.imbalance,3)}</p><p><b>거래 기반 VWAP (15분)</b> ${tw.coverage_confirmed?num(v.trade_vwap_15m,8):\'전체 체결 검증 불가\'} · 수집된 체결 VWAP ${num(tw.vwap,8)}</p><p><b>참고용 캔들 VWAP 근사</b> ${num(v.vwap?.value,8)} · OI 이력 ${esc(oh.status||\'미확인\')}</p>${warns?`<p class="warning">⚠ ${esc(warns)}</p>`:\'\'}<p>이 결과는 연구용이며 자동 매매 신호가 아닙니다.</p></details></article>`;\n  }).join(\'\'):\'<div class="empty">해당 조건의 종목이 없습니다.</div>\';\n}\nasync function begin(){\n if(running)return;\n running=true;abort=false;current=[];allTotal=0;\n $(\'scan\').disabled=true;$(\'bar\').style.width=\'0%\';render();\n const mode=$(\'interval\').value, limit=Number($(\'minVolume\').value);\n let offset=0,errors=0;\n try{\n  while(!abort){\n   $(\'status\').textContent=`분석 중… ${offset}종목 완료`;\n   const res=await fetch(`/api/v13-scan?mode=${encodeURIComponent(mode)}&offset=${offset}`,{cache:\'no-store\'});\n   const j=await res.json();\n   if(!res.ok||j.error)throw Error(j.error||`HTTP ${res.status}`);\n   allTotal=Number(j.total)||0;\n   current.push(...(j.results||[]));errors+=(j.errors||[]).length;\n   const next=Number(j.next_offset);\n   if(!Number.isFinite(next)||next<=offset)throw Error(\'분석 진행 위치 오류\');\n   offset=next;\n   $(\'count\').textContent=current.length+\' / \'+(limit||allTotal);\n   $(\'longCount\').textContent=current.filter(x=>signal(x)===\'LONG\').length;\n   $(\'shortCount\').textContent=current.filter(x=>signal(x)===\'SHORT\').length;\n   const target=limit?Math.min(limit,allTotal):allTotal;\n   $(\'bar\').style.width=(target?Math.min(100,Math.round(offset/target*100)):100)+\'%\';\n   $(\'status\').textContent=`${Math.min(offset,target)} / ${target}종목 확인 · 분석 실패 ${errors}건`;\n   render();\n   if(!j.results?.length&&!j.errors?.length || offset>=target || offset>=allTotal)break;\n  }\n  $(\'status\').textContent+=` · 완료 (${new Date().toLocaleTimeString(\'ko-KR\')})`;\n }catch(e){$(\'status\').textContent=\'오류: \'+e.message}\n finally{running=false;$(\'scan\').disabled=false}\n}\n$(\'scan\').addEventListener(\'click\',begin);\n$(\'filter\').addEventListener(\'change\',render);\n</script></body></html>\n'
 
 """BADANG 1.8: on-demand OKX OI history, timestamp-window trade CVD and trade VWAP.
 
@@ -1539,78 +1557,169 @@ def oi_history(inst, now_ms, session=None):
     except Exception as exc:
         return {'status': 'UNAVAILABLE', 'reason': type(exc).__name__}
 
-def trade_window(inst, now_ms, session=None, pages=MAX_TRADE_PAGES):
-    """Use OKX historical trades pagination, bounded to 15 minutes.
-
-Coverage means retrieved oldest trade reaches cutoff; gaps/outages cannot be ruled out.
-"""
+def trade_window(inst, now_ms, session=None, pages=None):
+    """Bounded OKX history traversal; coverage means timestamp reach, not full exchange feed."""
+    import os
     cutoff = now_ms - WINDOW_MS
-    seen, records, cursor = set(), [], None
-    reached = False
-    errors = []
-    for _ in range(pages):
-        params = {'instId': inst, 'limit': '100', 'type': '1'}
-        if cursor is not None:
-            params['after'] = cursor
-        try:
-            batch = fetch('/api/v5/market/history-trades', params, session)
+    try:
+        limit_pages = min(120, max(3, int(os.environ.get('BADANG_TRADE_PAGES', '24')))) if pages is None else pages
+    except (ValueError, TypeError):
+        limit_pages = 24
+    seen, records, cursor, reached, errors = set(), [], None, False, []
+    last_oldest = None
+    for page in range(limit_pages):
+        params = {'instId':inst, 'limit':'100', 'type':'1'}
+        if cursor is not None: params['after'] = cursor
+        try: batch = fetch('/api/v5/market/history-trades',params,session)
         except Exception as exc:
-            errors.append(type(exc).__name__)
-            break
-        if not batch:
-            break
-        ids = []
+            errors.append(type(exc).__name__);break
+        if not batch: break
+        ids=[]
         for row in batch:
             try:
-                tid = str(row['tradeId']); ts = int(row['ts'])
-                px = number(row.get('px')); sz = number(row.get('sz'))
-                side = row.get('side')
-            except (KeyError, ValueError, TypeError, OverflowError):
-                continue
-            if not tid.isdigit():
-                continue
+                tid=str(row['tradeId']);ts=int(row['ts']);px=number(row.get('px'));sz=number(row.get('sz'));side=row.get('side')
+            except (KeyError,ValueError,TypeError,OverflowError): continue
+            if not tid.isdigit():continue
             ids.append(int(tid))
-            if ts < cutoff:
-                reached = True
-                continue
-            if ts > now_ms + 60000 or tid in seen or px is None or px <= 0 or sz is None or sz <= 0 or side not in ('buy', 'sell'):
-                continue
-            seen.add(tid); records.append((ts, px, sz, side))
-        if not ids:
-            break
-        next_cursor = min(ids)
-        if cursor is not None and next_cursor >= int(cursor):
-            errors.append('PAGINATION_STALLED');break
-        cursor = str(next_cursor)
-        if reached or len(batch) < 100:
-            break
+            if ts<cutoff:reached=True;continue
+            if ts>now_ms+60000 or tid in seen or px is None or px<=0 or sz is None or sz<=0 or side not in ('buy','sell'):continue
+            seen.add(tid);records.append((ts,px,sz,side))
+        if not ids:break
+        nxt=min(ids)
+        if cursor is not None and nxt>=int(cursor):errors.append('PAGINATION_STALLED');break
+        cursor=str(nxt)
+        if reached:break
+        if len(batch)<100:break
     records.sort()
-    buy = sum(sz for _, _, sz, side in records if side == 'buy')
-    sell = sum(sz for _, _, sz, side in records if side == 'sell')
-    vol = buy + sell
-    vwap = sum(px * sz for _, px, sz, _ in records) / vol if vol else None
-    coverage = bool(reached and not errors)
-    return {
-        'status': 'COMPLETE_WINDOW_RETRIEVED' if coverage else 'PARTIAL_WINDOW',
-        'window_minutes': 15, 'coverage_confirmed': coverage,
-        'count': len(records), 'oldest_ts_ms': records[0][0] if records else None,
-        'newest_ts_ms': records[-1][0] if records else None,
-        'cvd_contracts': round(buy - sell, 8) if vol else None,
-        'buy_contracts': round(buy, 8), 'sell_contracts': round(sell, 8),
-        'imbalance': round((buy-sell)/vol, 6) if vol else None,
-        'vwap': round(vwap, 10) if vwap is not None else None,
-        'vwap_exact_for_retrieved_trades': bool(vol),
-        'full_market_completeness_guaranteed': False,
-        'errors': errors,
-    }
+    buy=sum(sz for _,_,sz,side in records if side=='buy')
+    sell=sum(sz for _,_,sz,side in records if side=='sell')
+    vol=buy+sell
+    vwap=sum(px*sz for _,px,sz,_ in records)/vol if vol else None
+    timestamp_reached=bool(reached and not errors)
+    return {'status':'TIMESTAMP_REACHED_UNVERIFIED' if timestamp_reached else 'PARTIAL_WINDOW',
+      'window_minutes':15,'coverage_confirmed':False,'timestamp_boundary_reached':timestamp_reached,
+      'exchange_wide_completeness_verified':False,'count':len(records),'pages_requested':page+1,
+      'oldest_ts_ms':records[0][0] if records else None,'newest_ts_ms':records[-1][0] if records else None,
+      'cvd_contracts':round(buy-sell,8) if vol else None,'buy_contracts':round(buy,8),
+      'sell_contracts':round(sell,8),'imbalance':round((buy-sell)/vol,6) if vol else None,
+      'vwap':round(vwap,10) if vwap is not None else None,
+      'vwap_exact_for_retrieved_trades':bool(vol),'full_market_completeness_guaranteed':False,
+      'errors':errors}
+
+
+# BADANG 2.0: durable rolling trade observer, BTC/ETH first.
+# Polling cannot prove exchange-wide completeness; strict quality gate remains.
+import sqlite3
+from collections import deque
+
+BADANG_DB = os.environ.get('BADANG_DB_PATH', '/tmp/badang_trades_v20.sqlite3')
+BADANG_POLL_SECONDS = max(1.0, float(os.environ.get('BADANG_POLL_SECONDS','2.0')))
+BADANG_COLLECTOR = {'started':False,'last_error':None,'last_success':{},'last_poll':{},'gap_count':{},'lock':threading.RLock()}
+BADANG_SYMBOLS = ('BTC-USDT-SWAP','ETH-USDT-SWAP')
+
+def badang_db():
+    db=sqlite3.connect(BADANG_DB, timeout=10)
+    db.execute('PRAGMA busy_timeout=10000')
+    db.execute('CREATE TABLE IF NOT EXISTS trades (inst TEXT NOT NULL, trade_id TEXT NOT NULL, ts INTEGER NOT NULL, px REAL NOT NULL, sz REAL NOT NULL, side TEXT NOT NULL, PRIMARY KEY(inst,trade_id))')
+    db.execute('CREATE INDEX IF NOT EXISTS trades_inst_ts ON trades(inst,ts)')
+    db.execute('CREATE TABLE IF NOT EXISTS intervals (inst TEXT NOT NULL, ts INTEGER NOT NULL, ok INTEGER NOT NULL, reason TEXT, PRIMARY KEY(inst,ts))')
+    db.commit()
+    return db
+
+def badang_poll_once(inst):
+    # Latest trades from exchange; every cycle must complete before the next.
+    # API limit 100; if throughput exceeds polling capacity, explicitly mark a gap.
+    from badang_derivatives_v15 import fetch
+    now=int(time.time()*1000)
+    try:
+        batch=fetch('/api/v5/market/trades', {'instId':inst,'limit':'100'})
+        valid=[]
+        for x in batch:
+            try:
+                tid=str(x['tradeId']);ts=int(x['ts']);px=float(x['px']);sz=float(x['sz']);side=x['side']
+                if tid.isdigit() and 0<px and 0<sz and side in ('buy','sell') and ts<=now+60000:
+                    valid.append((inst,tid,ts,px,sz,side))
+            except (ValueError,TypeError,KeyError):continue
+        if not valid: raise ValueError('EMPTY_TRADE_RESPONSE')
+        oldest=min(r[2] for r in valid)
+        with BADANG_COLLECTOR['lock']:
+            previous=BADANG_COLLECTOR['last_poll'].get(inst)
+            BADANG_COLLECTOR['last_poll'][inst]=now
+            BADANG_COLLECTOR['last_success'][inst]=now
+            # A 100-trade cap and nonoverlapping time windows are data-quality warnings.
+            suspect=bool(previous is not None and oldest>previous+2000)
+            if suspect: BADANG_COLLECTOR['gap_count'][inst]=BADANG_COLLECTOR['gap_count'].get(inst,0)+1
+        with badang_db() as db:
+            db.executemany('INSERT OR IGNORE INTO trades VALUES (?,?,?,?,?,?)',valid)
+            db.execute('INSERT OR REPLACE INTO intervals VALUES (?,?,?,?)',(inst,now,0 if suspect else 1,'POSSIBLE_MISSED_TRADES' if suspect else 'OBSERVED'))
+            db.execute('DELETE FROM trades WHERE ts < ?', (now-2*3600*1000,))
+            db.execute('DELETE FROM intervals WHERE ts < ?', (now-2*3600*1000,))
+        return len(valid)
+    except Exception as exc:
+        with BADANG_COLLECTOR['lock']:
+            BADANG_COLLECTOR['last_error']=f'{inst}: {type(exc).__name__}'
+            BADANG_COLLECTOR['last_poll'][inst]=now
+            BADANG_COLLECTOR['gap_count'][inst]=BADANG_COLLECTOR['gap_count'].get(inst,0)+1
+        try:
+            with badang_db() as db:db.execute('INSERT OR REPLACE INTO intervals VALUES (?,?,?,?)',(inst,now,0,type(exc).__name__))
+        except Exception:pass
+        return 0
+
+def badang_observed_window(inst):
+    now=int(time.time()*1000);cutoff=now-15*60000
+    with badang_db() as db:
+        rows=db.execute('SELECT ts,px,sz,side FROM trades WHERE inst=? AND ts>=? AND ts<=?',(inst,cutoff,now)).fetchall()
+        intervals=db.execute('SELECT ts,ok FROM intervals WHERE inst=? AND ts>=? ORDER BY ts',(inst,cutoff)).fetchall()
+    buy=sum(r[2] for r in rows if r[3]=='buy');sell=sum(r[2] for r in rows if r[3]=='sell');vol=buy+sell
+    first=min((r[0] for r in rows),default=None);last=max((r[0] for r in rows),default=None)
+    # Strictly disallow certified full market feed: REST polling cannot prove every trade.
+    continuous=bool(intervals and intervals[0][0]-cutoff<=15000 and now-intervals[-1][0]<=15000 and all(r[1] for r in intervals) and all(b[0]-a[0]<=15000 for a,b in zip(intervals,intervals[1:])))
+    return {'source':'OKX_PUBLIC_TRADES_CONTINUOUS_POLL','count':len(rows),'window_minutes':15,
+      'oldest_ts_ms':first,'newest_ts_ms':last,'observed_seconds':round((last-first)/1000,1) if first and last else 0,
+      'buy_contracts':round(buy,8),'sell_contracts':round(sell,8),'cvd_contracts':round(buy-sell,8) if vol else None,
+      'imbalance':round((buy-sell)/vol,6) if vol else None,
+      'vwap':round(sum(r[1]*r[2] for r in rows)/vol,10) if vol else None,
+      'poll_continuity':continuous,'coverage_confirmed':False,
+      'full_market_completeness_guaranteed':False,
+      'status':'CONTINUOUS_POLL_UNVERIFIED' if continuous else 'WARMING_OR_GAPS',
+      'intervals':len(intervals),'gaps':sum(1 for r in intervals if not r[1])}
+
+def badang_collector_loop():
+    while True:
+        for inst in BADANG_SYMBOLS:badang_poll_once(inst)
+        time.sleep(BADANG_POLL_SECONDS)
+
+def badang_start_collector():
+    if os.environ.get('BADANG_DISABLE_COLLECTOR')=='1':return
+    # A local lock prevents duplicate pollers across gunicorn workers on one machine.
+    try:
+        import fcntl
+        lockfile=open('/tmp/badang_collector_v20.lock','w')
+        fcntl.flock(lockfile,fcntl.LOCK_EX|fcntl.LOCK_NB)
+        BADANG_COLLECTOR['lockfile']=lockfile
+    except (ImportError,OSError):return
+    BADANG_COLLECTOR['started']=True
+    threading.Thread(target=badang_collector_loop,name='badang-collector',daemon=True).start()
+
+@app.route('/api/badang-collector')
+def badang_collector_status():
+    output={}
+    for inst in BADANG_SYMBOLS:
+        try:output[inst]=badang_observed_window(inst)
+        except Exception as exc:output[inst]={'status':'ERROR','reason':type(exc).__name__}
+    return jsonify(version='2.0.0',collector_running=BADANG_COLLECTOR['started'],
+                   last_success=BADANG_COLLECTOR['last_success'],last_error=BADANG_COLLECTOR['last_error'],
+                   instruments=output,note='REST polling cannot certify exchange-wide completeness; read-only research.')
+
+badang_start_collector()
 
 def research_v18(item, candles, session=None):
     """Integrate the new indicators without misrepresenting partial data as certainty."""
     inst = okx_symbol(item.get('symbol', ''))
     now = int(time.time() * 1000)
-    result = {'version': '1.8.1', 'status': 'RESEARCH_ONLY', 'eligible_for_alert': False,
+    result = {'version': '2.0.0', 'status': 'RESEARCH_ONLY', 'eligible_for_alert': False,
               'source_exchange': 'okx', 'instrument': inst, 'observed_at_ms': now,
-              'collection': 'ON_DEMAND', 'database_required': False,
+              'collection': 'CONTINUOUS_REST_POLL_BTC_ETH' if inst in BADANG_SYMBOLS else 'ON_DEMAND', 'database_required': True,
               'vwap': vwap_from_candles(candles), 'complete_hour_cvd': False,
               'oi_change_15m_pct': None, 'oi_change_1h_pct': None,
               'oi_change_status': 'UNAVAILABLE', 'checks': {}, 'errors': {},
@@ -1636,7 +1745,7 @@ def research_v18(item, candles, session=None):
     result['oi_change_status'] = history['status']
     result['oi_change_15m_pct'] = history.get('change_15m_pct')
     result['oi_change_1h_pct'] = history.get('change_1h_pct')
-    trades = trade_window(inst,now,session, pages=MAX_TRADE_PAGES if item.get('symbol') in ('BTCUSDT','ETHUSDT') else 3)
+    trades = badang_observed_window(inst) if inst in BADANG_SYMBOLS else trade_window(inst,now,session,pages=4)
     result['trade_window'] = trades
     result['trade_sample_count'] = trades['count']
     result['sample_delta_contracts'] = trades['cvd_contracts']
@@ -1658,10 +1767,18 @@ def research_v18(item, candles, session=None):
               item.get('entry_reference') is not None and
               (float(item['entry_reference']) > trades['vwap'] if side=='LONG' else float(item['entry_reference']) < trades['vwap'])
     }
-    result['data_status'] = 'OK' if trades['coverage_confirmed'] and history['status']=='OK' else 'PARTIAL'
+    result['data_status'] = 'OI_OK_TRADES_UNVERIFIED' if history['status']=='OK' else 'PARTIAL'
     return result
 
 
+
+@app.route('/api/badang-version')
+def badang_version():
+    return jsonify(version='2.0.0', mode='READ_ONLY',
+        trades='BTC/ETH: continuously polled public trades in SQLite, completeness unverified',
+        cvd='OBSERVED_15M_UNCERTIFIED', vwap='OBSERVED_TRADES_AND_CANDLE_APPROX',
+        signals='WAIT_WHEN_FLOW_NOT_FULLY_VERIFIED',
+        note='A complete historical tick feed cannot be guaranteed by bounded public REST calls.')
 
 @app.route('/api/badang-health')
 def badang_health():
@@ -1683,7 +1800,7 @@ def badang_health():
             checks[name]={'status':'OK' if rows else 'EMPTY','count':len(rows)}
         except Exception as exc:
             checks[name]={'status':'ERROR','error_type':type(exc).__name__}
-    return jsonify(version='1.8.1', live_test=True,
+    return jsonify(version='2.0.0', live_test=True,
                    all_ok=all(v['status']=='OK' for v in checks.values()), checks=checks,
                    note='Data API diagnostics only. Complete 15m CVD is not guaranteed.')
 
