@@ -1,95 +1,192 @@
-import os
-import re
-import time
-import math
-import json
-import logging
-import requests
-import threading
-from datetime import datetime, timezone
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from flask import Flask, jsonify, render_template, render_template_string, request
-
-app = Flask(__name__)
-
-# BADANG 1.7.2: standalone read-only dashboard route
-from badang_dashboard import badang_dashboard
-app.register_blueprint(badang_dashboard)
-BASE = 'https://api.bitget.com'
-S = requests.Session()
-API_LOCK = threading.Lock()
-LAST_API_CALL = [0.0]
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger('badang')
-
-# ============================================================
-# BADANG Trading 1.4
-# PostgreSQL recommendation signal history
-# Existing 1.3 endpoints and analysis preserved
-# ============================================================
-
-DB_INIT_LOCK = threading.Lock()
-DB_INITIALIZED = False
-
-CREATE_SIGNALS_TABLE = """
-CREATE TABLE IF NOT EXISTS badang_signals (
-    id BIGSERIAL PRIMARY KEY,
-    symbol VARCHAR(40) NOT NULL,
-    mode VARCHAR(12) NOT NULL,
-    direction VARCHAR(8) NOT NULL,
-    score INTEGER NOT NULL,
-    exchange VARCHAR(30),
-    reference_time BIGINT NOT NULL,
-    detected_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    entry_price DOUBLE PRECISION NOT NULL,
-    stop_price DOUBLE PRECISION NOT NULL,
-    tp1_price DOUBLE PRECISION NOT NULL,
-    tp2_price DOUBLE PRECISION,
-    risk_reward DOUBLE PRECISION,
-    status VARCHAR(24) NOT NULL DEFAULT 'PENDING',
-    analysis_json JSONB,
-    CONSTRAINT badang_signals_unique
-        UNIQUE (symbol, mode, direction, reference_time)
-)
-"""
 
 
-def database_url():
-    url = os.environ.get('DATABASE_URL', '').strip()
-    if url.startswith('postgres://'):
-        url = 'postgresql://' + url[len('postgres://'):]
-    return url
+def extract_v13_signal(item, mode, candles_data=None):
+    """
+    Return a validated signal or None.
 
+    Records only the final recommendation, never candidate_side
+    alone. Missing price fields are not guessed.
+    """
+    if not isinstance(item, dict):
+        return None
 
-def db_connect():
-    url = database_url()
-    if not url:
-        raise RuntimeError('DATABASE_URL 환경변수가 설정되지 않았습니다.')
+    direction = item.get('recommendation')
+    if direction not in ('LONG', 'SHORT'):
+        return None
 
-    import psycopg2
-    return psycopg2.connect(
-        url,
-        connect_timeout=5,
-        application_name='badang-trading-v14'
+    if item.get('trend_aligned') is False:
+        return None
+
+    symbol = str(item.get('symbol', '')).upper().strip()
+    if not symbol or len(symbol) > 40:
+        return None
+
+    score_key = (
+        'long_score' if direction == 'LONG'
+        else 'short_score'
+    )
+    score = finite_number(item.get(score_key))
+    if score is None or not 0 <= score <= 100:
+        return None
+
+    plan = first_dict(
+        item,
+        ('plan', 'trade_plan', 'scenario', 'trade_setup')
     )
 
+    entry_keys = (
+        'entry_reference', 'entry_price',
+        'entry', 'suggested_entry'
+    )
+    stop_keys = (
+        'stop_loss', 'stop_price',
+        'stop', 'sl'
+    )
+    tp1_keys = (
+        'take_profit_1', 'take_profit1',
+        'tp1', 'target_1', 'target1'
+    )
+    tp2_keys = (
+        'take_profit_2', 'take_profit2',
+        'tp2', 'target_2', 'target2'
+    )
 
-def ensure_database():
-    global DB_INITIALIZED
+    entry = first_number(item, entry_keys)
+    stop = first_number(item, stop_keys)
+    tp1 = first_number(item, tp1_keys)
+    tp2 = first_number(item, tp2_keys)
 
-    if DB_INITIALIZED:
-        return
+    if entry is None:
+        entry = first_number(plan, entry_keys)
+    if stop is None:
+        stop = first_number(plan, stop_keys)
+    if tp1 is None:
+        tp1 = first_number(plan, tp1_keys)
+    if tp2 is None:
+        tp2 = first_number(plan, tp2_keys)
 
-    with DB_INIT_LOCK:
-        if DB_INITIALIZED:
-            return
+    if None in (entry, stop, tp1):
+        return None
+
+    if min(entry, stop, tp1) <= 0:
+        return None
+
+    if direction == 'LONG':
+        valid_prices = stop < entry < tp1
+        if tp2 is not None and tp2 <= entry:
+            tp2 = None
+    else:
+        valid_prices = tp1 < entry < stop
+        if tp2 is not None and tp2 >= entry:
+            tp2 = None
+
+    if not valid_prices:
+        return None
+
+    risk = abs(entry - stop)
+    if risk <= 0:
+        return None
+
+    rr = abs(tp1 - entry) / risk
+    reference_time = get_reference_time(item, candles_data)
+    if reference_time is None:
+        return None
+
+    # Normalize seconds to milliseconds when necessary.
+    if reference_time < 100000000000:
+        reference_time *= 1000
+
+    if reference_time <= 0:
+        return None
+
+    return {
+        'symbol': symbol,
+        'mode': mode,
+        'direction': direction,
+        'score': int(round(score)),
+        'exchange': str(item.get('exchange') or ''),
+        'reference_time': reference_time,
+        'entry_price': entry,
+        'stop_price': stop,
+        'tp1_price': tp1,
+        'tp2_price': tp2,
+        'risk_reward': round(rr, 4),
+        'analysis_json': json.dumps(
+            item, ensure_ascii=False, default=str
+        )
+    }
+
+
+def save_signals(signals):
+    """
+    Best-effort persistence.
+    Database errors must never break the market scanner.
+    """
+    if not signals:
+        return {
+            'saved': 0,
+            'duplicates': 0,
+            'skipped': 0,
+            'storage': 'no_eligible_signals'
+        }
+
+    if not database_url():
+        return {
+            'saved': 0,
+            'duplicates': 0,
+            'skipped': len(signals),
+            'storage': 'not_configured'
+        }
+
+    try:
+        ensure_database()
 
         conn = db_connect()
+        saved = 0
+
         try:
             with conn:
                 with conn.cursor() as cur:
-                    cur.execute(CREATE_SIGNALS_TABLE)
-            DB_INITIALIZED = True
-        finally:
-            conn.close()
+                    for signal in signals:
+                        cur.execute(
+                            """
+                            INSERT INTO badang_signals (
+                                symbol, mode, direction, score,
+                                exchange, reference_time,
+                                entry_price, stop_price,
+                                tp1_price, tp2_price,
+                                risk_reward, analysis_json
+                            )
+                            VALUES (
+                                %s, %s, %s, %s,
+                                %s, %s,
+                                %s, %s,
+                                %s, %s,
+                                %s, %s::jsonb
+                            )
+                            ON CONFLICT (
+                                symbol, mode, direction,
+                                reference_time
+                            )
+                            DO NOTHING
+                            RETURNING id
+                            """,
+                            (
+                                signal['symbol'],
+                                signal['mode'],
+                                signal['direction'],
+                                signal['score'],
+                                signal['exchange'],
+                                signal['reference_time'],
+                                signal['entry_price'],
+                                signal['stop_price'],
+                                signal['tp1_price'],
+                                signal['tp2_price'],
+                                signal['risk_reward'],
+                                signal['analysis_json']
+                            )
+                        )
+                        if cur.fetchone() is not None:
+                            saved += 1
+
+            return {
