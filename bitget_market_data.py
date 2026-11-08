@@ -96,8 +96,18 @@ def fastest_candles(symbol,timeframe,exchanges=None):
                 stamp=int(item[0]); stamp=stamp*1000 if stamp<100000000000 else stamp
             except (TypeError,ValueError,OverflowError):
                 raise ValueError('Bitget 잘못된 캔들 시각 감지')
-            if stamp in seen and list(seen[stamp])!=list(item):
-                raise ValueError('Conflicting Bitget candle timestamp: '+str(stamp))
+            # The same candle may be represented with equivalent numeric
+            # strings across current and historical endpoints.
+            if stamp in seen:
+                prior=seen[stamp]
+                try:
+                    same=(len(prior)>=6 and
+                          all(float(a)==float(b) for a,b in zip(prior[1:6],item[1:6])))
+                except (TypeError,ValueError,OverflowError):
+                    same=False
+                if not same:
+                    raise ValueError('Conflicting Bitget candle timestamp: '+str(stamp))
+                continue
             seen[stamp]=item
     ingest(raw)
     cursor=None
