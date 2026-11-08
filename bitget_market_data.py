@@ -97,8 +97,8 @@ def fastest_candles(symbol,timeframe,exchanges=None):
             history_stop_reason='no_initial_candles'
             break
         oldest=min(seen)
-        # Bitget endTime is an exclusive upper bound; use the oldest
-        # observed candle timestamp to avoid skipping an older interval.
+        # Query at the oldest observed timestamp to test the history
+        # boundary without skipping an entire candle interval.
         next_cursor=oldest
         if cursor is not None and next_cursor>=cursor:
             raise ValueError('Bitget history pagination did not advance')
