@@ -1158,19 +1158,9 @@ def scan():
         else 'scalp'
     )
 
-    try:
-        minimum = max(
-            0,
-            float(
-                request.args.get(
-                    'min_turnover', 1000000
-                )
-            )
-        )
-    except ValueError:
-        return jsonify(
-            error='거래대금 설정 오류'
-        ), 400
+    minimum = finite_number(request.args.get('min_turnover', 1000000))
+    if minimum is None or minimum < 0:
+        return jsonify(error='거래대금 설정 오류'), 400
 
     try:
         syms = symbols(minimum)
