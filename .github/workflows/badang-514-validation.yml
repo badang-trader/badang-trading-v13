@@ -77,6 +77,8 @@ jobs:
         run: python -m unittest -v test_bitget_transport_retry_539.py
       - name: Future-dated Bitget candle rejection regression tests
         run: python -m unittest -v test_future_candle_safety_540.py
+      - name: Numeric-equivalent duplicate candle regression tests
+        run: python -m unittest -v test_candle_duplicate_format_541.py
       - name: Bounded live read-only memory benchmark
         timeout-minutes: 8
         run: python badang_live_benchmark_517.py
