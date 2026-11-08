@@ -21,7 +21,7 @@ def cost_sensitivity(trades,scenarios=None):
         for trade in records:
             if not isinstance(trade,dict):
                 raise ValueError("Invalid trade")
-            result=net_round_trip(trade["actual_entry"],trade["actual_exit"],trade["direction"],fee,slippage)
+            result=net_round_trip(trade["raw_entry"],trade["raw_exit"],trade["direction"],fee,slippage)
             returns.append(result["net_return"])
         results[name]={"fee_per_side":fee,"slippage_per_side":slippage,
                        "metrics":summarize_net_returns(returns) if returns else None}
