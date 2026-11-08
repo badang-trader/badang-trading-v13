@@ -160,7 +160,8 @@ def fastest_candles(symbol,timeframe,exchanges=None):
     now=int(time.time()*1000)
     rows=[]
     for r in raw:
-        if not isinstance(r,(list,tuple)) or len(r)<6: continue
+        if not isinstance(r,(list,tuple)) or len(r)<6:
+            raise ValueError('Bitget 잘못된 캔들 구조 감지')
         try:
             t=int(r[0]); t=t*1000 if t<100000000000 else t
             o,h,l,c,v=map(float,r[1:6])
