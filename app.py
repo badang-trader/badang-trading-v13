@@ -849,7 +849,7 @@ def scenario(setup, direction, mode):
         if up else stop - entry
     )
 
-    if risk <= 0 or risk / entry > 0.2:
+    if not math.isfinite(risk) or risk <= 0 or risk / entry > 0.2:
         return None
 
     minimum = 1.5 if mode == 'scalp' else 2.0
@@ -861,7 +861,9 @@ def scenario(setup, direction, mode):
         entry + (risk if up else -risk) * (minimum + 1)
     )
 
-    if min(stop, tp1, tp2) <= 0:
+    if not all(math.isfinite(v) and v > 0 for v in (entry, stop, tp1, tp2)):
+        return None
+    if not ((stop < entry < tp1 < tp2) if up else (tp2 < tp1 < entry < stop)):
         return None
 
     return {
@@ -1253,7 +1255,10 @@ def recommend_candidates(
         reward = abs(tp1 - entry)
 
         if (
-            risk <= 0
+            not math.isfinite(risk)
+            or not math.isfinite(reward)
+            or risk <= 0
+            or not math.isfinite(reward / risk)
             or reward / risk < minimum_rr
         ):
             continue
