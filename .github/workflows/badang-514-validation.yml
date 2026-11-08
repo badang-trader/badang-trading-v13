@@ -113,6 +113,8 @@ jobs:
         run: python -m unittest -v test_research_execution_timing_558.py
       - name: Historical adverse gap entry price stress regression
         run: python -m unittest -v test_research_gap_stress_559.py
+      - name: Research execution cost sensitivity regression
+        run: python -m unittest -v test_research_cost_sensitivity_560.py
       - name: Live public Bitget historical research BTC ETH
         run: python badang_live_historical_research_551.py
       - name: Bounded live read-only memory benchmark
