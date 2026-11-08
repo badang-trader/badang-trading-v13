@@ -25,7 +25,7 @@ def one(offset, mode):
         "errors":len(payload.get("errors",[])),
         "insufficient_history":sum("연속 확정봉 부족" in x.get("error","") or "확정봉 부족" in x.get("error","") for x in payload.get("errors",[])),
         "total":payload.get("total"),
-        "error_samples":[x.get("error","")[:100] for x in payload.get("errors",[])[:3]],
+        "error_samples":[{"symbol":x.get("symbol"),"reason":x.get("error","")[:180]} for x in payload.get("errors",[])[:5]],
         "rss_mb":round(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss/1024,2),
     }
 start=time.monotonic()
