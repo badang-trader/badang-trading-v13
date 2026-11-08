@@ -6,6 +6,7 @@ asserting profitability. Live API failures fail this validation step.
 import json
 from bitget_market_data import fastest_candles
 from badang_engine_research_549 import research_engine_backtest
+from badang_research_sample_554 import assess_sample
 
 def convert_closed_candles(snapshot):
     """Convert confirmed Bitget rows to named OHLCV values."""
@@ -27,6 +28,7 @@ def main():
                         "confirmed_bars":len(closed),
                         "trades":len(result["trades"]),
                         "skipped_overlaps":result["skipped_overlaps"],
+                        "sample_assessment":assess_sample(len(result["trades"]),len(closed)),
                         "win_rate":metrics["win_rate"] if metrics else None,
                         "compounded_net_return":metrics["compounded_net_return"] if metrics else None,
                         "max_drawdown":metrics["max_drawdown"] if metrics else None,
