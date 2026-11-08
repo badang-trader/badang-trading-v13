@@ -47,6 +47,10 @@ jobs:
         run: python -m unittest -v test_scenario_invariants_522.py
       - name: Divergence and history diagnostic regression tests
         run: python -m unittest -v test_divergence_and_history_523.py
+      - name: New candle freshness and finite scenario regression tests
+        run: python -m unittest -v test_candle_freshness_524.py test_scenario_finite_525.py
+      - name: Elliott pivot and impulse rule regression tests
+        run: python -m unittest -v test_wave_pivot_plateau_526.py test_wave_rules_527.py
       - name: Bounded live read-only memory benchmark
         timeout-minutes: 8
         run: python badang_live_benchmark_517.py
