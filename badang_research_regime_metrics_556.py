@@ -4,6 +4,7 @@ Grouped compounded returns are diagnostic only, NOT portfolio equity curves.
 """
 from badang_research_regimes_555 import regime_at
 from badang_research_metrics_546 import summarize_net_returns
+from badang_research_ledger_547 import summarize_nonoverlapping_trades
 
 def summarize_by_regime(candles,trades,lookback=20,threshold=0.03):
     records=list(trades)
