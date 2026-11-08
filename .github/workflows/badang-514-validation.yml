@@ -37,6 +37,16 @@ jobs:
         run: python -m unittest -v test_optional_research_515.py
       - name: Market data provenance regression tests
         run: python -m unittest -v test_market_provenance_516.py
+      - name: Bounded live read-only memory benchmark
+        timeout-minutes: 8
+        run: python badang_live_benchmark_517.py
+      - name: Upload live benchmark report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: badang-517-live-memory-benchmark
+          path: badang-live-benchmark.json
+          if-no-files-found: ignore
       - name: Upload test report
         if: always()
         uses: actions/upload-artifact@v4
