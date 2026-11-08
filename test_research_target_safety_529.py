@@ -16,7 +16,9 @@ class ResearchTargetSafetyTests(unittest.TestCase):
             levels=[result["entry_reference"],result["stop_loss"],result["take_profit_1"],result["take_profit_2"]]
             self.assertTrue(all(x>0 for x in levels))
     def test_no_recommendation_from_flat_zero_atr_market(self):
-        rows=[[i,100,101,99,100,1000] for i in range(205)]
-        self.assertEqual(analyze(rows)["recommendation"],"WAIT")
+        rows=[[i,100,100,100,100,1000] for i in range(205)]
+        result=analyze(rows)
+        self.assertEqual(result["recommendation"],"WAIT")
+        self.assertEqual(result["status"],"ok")
 
 if __name__=="__main__":unittest.main()
