@@ -81,6 +81,8 @@ jobs:
         run: python -m unittest -v test_candle_duplicate_format_541.py
       - name: Bitget response envelope regression tests
         run: python -m unittest -v test_bitget_envelope_542.py
+      - name: Research no-lookahead causality regression tests
+        run: python -m unittest -v test_research_causality_543.py
       - name: Bounded live read-only memory benchmark
         timeout-minutes: 8
         run: python badang_live_benchmark_517.py
