@@ -19,4 +19,16 @@ class TransportRetryTests(unittest.TestCase):
                 m._get("/test",{})
             self.assertEqual(get.call_count,3)
 
+    def test_connection_error_then_success(self):
+        good=Mock(status_code=200)
+        good.json.return_value={"code":"00000","data":[["1","2"]]}
+        with patch.object(m.SESSION,"get",side_effect=[requests.exceptions.ConnectionError("disconnect"),good]) as get,patch.object(m.time,"sleep"):
+            self.assertEqual(m._get("/test",{}),[["1","2"]])
+            self.assertEqual(get.call_count,2)
+    def test_permanent_connection_error_fails_closed(self):
+        with patch.object(m.SESSION,"get",side_effect=requests.exceptions.ConnectionError("disconnect")) as get,patch.object(m.time,"sleep"):
+            with self.assertRaises(requests.exceptions.ConnectionError):
+                m._get("/test",{})
+            self.assertEqual(get.call_count,3)
+
 if __name__=="__main__":unittest.main()
