@@ -135,11 +135,14 @@ def get_reference_time(item, candles_data=None):
     Prefer last confirmed candle timestamp.
     No fabricated reference timestamp is allowed.
     """
-    if candles_data:
+    if candles_data is not None:
+        # A supplied candle history is authoritative: never fall back to an
+        # unrelated timestamp if its final confirmed candle is malformed.
         try:
-            return int(float(candles_data[-1][0]))
-        except (IndexError, ValueError, TypeError):
-            pass
+            stamp = finite_number(candles_data[-1][0])
+            return int(stamp) if stamp is not None and stamp > 0 else None
+        except (IndexError, KeyError, TypeError):
+            return None
 
     for source in (
         item,
