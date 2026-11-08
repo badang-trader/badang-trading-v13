@@ -35,6 +35,8 @@ jobs:
         run: python badang_test_audit_508.py --report badang-ci-audit.json
       - name: Optional research regression tests
         run: python -m unittest -v test_optional_research_515.py
+      - name: Market data provenance regression tests
+        run: python -m unittest -v test_market_provenance_516.py
       - name: Upload test report
         if: always()
         uses: actions/upload-artifact@v4
