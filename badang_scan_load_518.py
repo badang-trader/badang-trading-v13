@@ -29,14 +29,17 @@ def one(offset, mode):
     }
 start=time.monotonic()
 # Production route uses 2 internal workers per request. Keep external load bounded.
-for offset,mode in ((0,"scalp"),(5,"scalp")):
-    row=one(offset,mode)
-    records.append(row)
-    print("SCAN_SAMPLE",json.dumps(row),flush=True)
-with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
-    for row in pool.map(lambda args:one(*args),[(0,"scalp"),(5,"scalp")]):
+for cycle in range(3):
+    for offset,mode in ((0,"scalp"),(5,"scalp")):
+        row=one(offset,mode)
+        row["cycle"]=cycle+1
         records.append(row)
         print("SCAN_SAMPLE",json.dumps(row),flush=True)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+        for row in pool.map(lambda args:one(*args),[(0,"scalp"),(5,"scalp")]):
+            row["cycle"]=cycle+1
+            records.append(row)
+            print("SCAN_SAMPLE",json.dumps(row),flush=True)
 current,peak=tracemalloc.get_traced_memory()
 summary={
     "scope":"isolated_GitHub_Actions_real_public_API_scan_route",
