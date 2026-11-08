@@ -140,6 +140,8 @@ jobs:
         run: python -m unittest -v test_research_exchange_timestamp_570.py
       - name: Research future-leakage and executable-tail regression
         run: python -m unittest -v test_research_future_leakage_571.py
+      - name: Exchange historical OHLCV corruption regression
+        run: python -m unittest -v test_research_exchange_ohlcv_572.py
       - name: Live public Bitget historical research BTC ETH
         run: python badang_live_historical_research_551.py
       - name: Bounded live read-only memory benchmark
