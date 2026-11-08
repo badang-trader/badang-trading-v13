@@ -1208,21 +1208,23 @@ def recommend_candidates(
     results, min_score=80, min_rr=1.5
 ):
     candidates = []
+    threshold = finite_number(min_score)
+    minimum_rr = finite_number(min_rr)
+    if threshold is None or minimum_rr is None or threshold < 0 or minimum_rr <= 0:
+        return []
 
     for item in results:
+        if not isinstance(item, dict):
+            continue
         direction = item.get('signal')
 
         if direction not in ('LONG', 'SHORT'):
             continue
 
-        score = item.get(
-            'long_score'
-            if direction == 'LONG'
-            else 'short_score',
-            0
-        )
-
-        if score < min_score:
+        score = finite_number(item.get(
+            'long_score' if direction == 'LONG' else 'short_score'
+        ))
+        if score is None or not 0 <= score <= 100 or score < threshold:
             continue
 
         plan = item.get('plan')
@@ -1230,14 +1232,8 @@ def recommend_candidates(
         if not isinstance(plan, dict):
             continue
 
-        entry = plan.get('entry')
-        stop = plan.get('stop')
-        tp1 = plan.get('tp1')
-
-        if any(
-            v is None
-            for v in (entry, stop, tp1)
-        ):
+        entry, stop, tp1 = (finite_number(plan.get(k)) for k in ('entry', 'stop', 'tp1'))
+        if any(v is None or v <= 0 for v in (entry, stop, tp1)):
             continue
 
         risk = abs(entry - stop)
@@ -1245,7 +1241,7 @@ def recommend_candidates(
 
         if (
             risk <= 0
-            or reward / risk < min_rr
+            or reward / risk < minimum_rr
         ):
             continue
 
