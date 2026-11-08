@@ -512,6 +512,17 @@ def analyze(
 ) -> dict:
     rows = normalize(candles)
 
+    # Do not silently bridge an invalid candle: this would make non-adjacent
+    # bars appear adjacent and corrupt RSI, ATR, pivots and wave counts.
+    if len(rows) != len(candles):
+        return {
+            'symbol': symbol,
+            'status': 'invalid_data',
+            'count': len(rows),
+            'rejected_candles': len(candles) - len(rows),
+            'recommendation': 'WAIT'
+        }
+
     if len(rows) < 205:
         return {
             'symbol': symbol,
