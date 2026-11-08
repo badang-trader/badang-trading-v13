@@ -6,6 +6,7 @@ import time
 import re
 import math
 import requests
+import threading
 
 API='https://api.bitget.com'
 FRAMES={'5m':('5m',300000),'15m':('15m',900000),'30m':('30m',1800000),
@@ -13,13 +14,36 @@ FRAMES={'5m':('5m',300000),'15m':('15m',900000),'30m':('30m',1800000),
         '6H':('6H',21600000),'8H':('8H',28800000),'1D':('1Dutc',86400000)}
 SESSION=requests.Session()
 
+_REQUEST_LOCK=threading.Lock()
+_LAST_REQUEST=[0.0]
+
 def _get(path, params):
-    r=SESSION.get(API+path,params=params,timeout=12)
-    r.raise_for_status()
-    j=r.json()
-    if str(j.get('code'))!='00000':
+    """Bounded retries for rate limits; never substitute stale candles."""
+    for attempt in range(3):
+        with _REQUEST_LOCK:
+            wait=max(0.0, 0.16-(time.monotonic()-_LAST_REQUEST[0]))
+            if wait: time.sleep(wait)
+            _LAST_REQUEST[0]=time.monotonic()
+            r=SESSION.get(API+path,params=params,timeout=12)
+        if r.status_code==429:
+            if attempt==2:
+                raise ValueError('Bitget 요청 제한(HTTP 429): 재시도 3회 실패')
+            retry_after=r.headers.get('Retry-After','')
+            try: delay=max(0.5,min(float(retry_after),4.0))
+            except (ValueError,TypeError): delay=0.8*(attempt+1)
+            time.sleep(delay)
+            continue
+        r.raise_for_status()
+        j=r.json()
+        if str(j.get('code'))=='00000':
+            return j.get('data') or []
+        if str(j.get('code')) in ('429','40015','40017'):
+            if attempt==2:
+                raise ValueError('Bitget API 요청 제한: 재시도 3회 실패')
+            time.sleep(0.8*(attempt+1))
+            continue
         raise ValueError('Bitget API error: '+str(j.get('msg','unknown'))[:100])
-    return j.get('data') or []
+    raise ValueError('Bitget API 재시도 실패')
 
 def fastest_candles(symbol,timeframe,exchanges=None):
     if exchanges and any(str(x).lower()!='bitget' for x in exchanges):
