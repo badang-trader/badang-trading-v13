@@ -6,8 +6,10 @@ No live exchange connectivity or order execution.
 """
 from badang_research_backtest_545 import evaluate_signal
 from badang_research_ledger_547 import summarize_nonoverlapping_trades
+from badang_research_candle_validation_568 import validate_research_candles
 
 def evaluate_signals(candles,signals,horizon=4,fee_per_side=0.0006,slippage_per_side=0.0005):
+    validate_research_candles(candles)
     trades=[]
     skipped=0
     previous_signal=-1
