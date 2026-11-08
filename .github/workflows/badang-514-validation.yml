@@ -67,6 +67,8 @@ jobs:
         run: python -m unittest -v test_price_arithmetic_safety_534.py
       - name: Scan API turnover input safety regression tests
         run: python -m unittest -v test_scan_input_safety_535.py
+      - name: Scan pagination offset safety regression tests
+        run: python -m unittest -v test_scan_offset_safety_536.py
       - name: Bounded live read-only memory benchmark
         timeout-minutes: 8
         run: python badang_live_benchmark_517.py
