@@ -810,9 +810,11 @@ def analyze(
 
     rr = (
         abs(target1 - p) / risk
-        if risk > 0
+        if math.isfinite(risk) and risk > 0
         else 0
     )
+    if not math.isfinite(rr):
+        rr = 0
 
     opposite_divergence = (
         any(
