@@ -29,7 +29,7 @@ def parse_exchange_timestamp(value):
 def _exchange_number(value,field,allow_zero=False):
     if isinstance(value,bool) or not isinstance(value,(str,int,float)):
         raise ValueError("Invalid exchange "+field)
-    if isinstance(value,str) and not re.fullmatch(r"(?:[0-9]+(?:\\.[0-9]+)?|\\.[0-9]+)",value):
+    if isinstance(value,str) and not re.fullmatch(r"(?:[0-9]+(?:\.[0-9]+)?|\.[0-9]+)",value):
         raise ValueError("Invalid exchange "+field)
     number=float(value)
     if not math.isfinite(number) or number<0 or (number==0 and not allow_zero):
