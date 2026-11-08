@@ -95,6 +95,8 @@ jobs:
         run: python -m unittest -v test_research_runner_548.py
       - name: Historical real-engine signal backtest adapter tests
         run: python -m unittest -v test_engine_research_549.py
+      - name: Unmocked historical analysis engine research smoke tests
+        run: python -m unittest -v test_engine_research_smoke_550.py
       - name: Bounded live read-only memory benchmark
         timeout-minutes: 8
         run: python badang_live_benchmark_517.py
