@@ -4,6 +4,7 @@ Only the exchange's confirmed candles are used. Reports results without
 asserting profitability. Live API failures fail this validation step.
 """
 import json
+import math
 import re
 from bitget_market_data import fastest_candles
 from badang_engine_research_549 import research_engine_backtest
@@ -25,12 +26,32 @@ def parse_exchange_timestamp(value):
         raise ValueError("Exchange timestamp must be epoch milliseconds")
     return timestamp
 
+def _exchange_number(value,field,allow_zero=False):
+    if isinstance(value,bool) or not isinstance(value,(str,int,float)):
+        raise ValueError("Invalid exchange "+field)
+    if isinstance(value,str) and not re.fullmatch(r"(?:[0-9]+(?:\\.[0-9]+)?|\\.[0-9]+)",value):
+        raise ValueError("Invalid exchange "+field)
+    number=float(value)
+    if not math.isfinite(number) or number<0 or (number==0 and not allow_zero):
+        raise ValueError("Invalid exchange "+field)
+    return number
+
 def convert_closed_candles(snapshot):
-    """Convert confirmed Bitget rows to named OHLCV values."""
-    return [{"timestamp":parse_exchange_timestamp(row[0]),"open":float(row[1]),
-             "high":float(row[2]),"low":float(row[3]),
-             "close":float(row[4]),"volume":float(row[5])}
-            for row in snapshot["candles"][:-1]]
+    """Validate and convert confirmed Bitget rows; exclude newest open bar."""
+    rows=[]
+    for row in snapshot["candles"][:-1]:
+        if not isinstance(row,(list,tuple)) or len(row)<6:
+            raise ValueError("Invalid exchange OHLCV row")
+        op=_exchange_number(row[1],"open")
+        hi=_exchange_number(row[2],"high")
+        lo=_exchange_number(row[3],"low")
+        cl=_exchange_number(row[4],"close")
+        vol=_exchange_number(row[5],"volume",allow_zero=True)
+        if hi<max(op,lo,cl) or lo>min(op,hi,cl):
+            raise ValueError("Inconsistent exchange OHLC")
+        rows.append({"timestamp":parse_exchange_timestamp(row[0]),
+                     "open":op,"high":hi,"low":lo,"close":cl,"volume":vol})
+    return rows
 
 def main():
     reports=[]
