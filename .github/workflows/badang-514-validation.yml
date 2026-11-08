@@ -152,6 +152,8 @@ jobs:
         run: python -m unittest -v test_research_drawdown_accounting_576.py
       - name: Research chronological holdout and boundary embargo regression
         run: python -m unittest -v test_research_holdout_partition_577.py
+      - name: Research separate development holdout metrics regression
+        run: python -m unittest -v test_research_holdout_metrics_578.py
       - name: Live public Bitget historical research BTC ETH
         run: python badang_live_historical_research_551.py
       - name: Bounded live read-only memory benchmark
