@@ -7,6 +7,7 @@ import json
 from bitget_market_data import fastest_candles
 from badang_engine_research_549 import research_engine_backtest
 from badang_research_sample_554 import assess_sample
+from badang_research_regimes_555 import regime_at
 
 def convert_closed_candles(snapshot):
     """Convert confirmed Bitget rows to named OHLCV values."""
@@ -24,10 +25,14 @@ def main():
             raise ValueError("Too few confirmed historical bars: "+symbol+" "+frame)
         result=research_engine_backtest(closed,mode=mode,horizon=3)
         metrics=result["summary"]
+        regime_counts={"up":0,"down":0,"sideways":0}
+        for trade in result["trades"]:
+            regime_counts[regime_at(closed,trade["signal_index"])]+=1
         reports.append({"symbol":symbol,"frame":frame,"mode":mode,
                         "confirmed_bars":len(closed),
                         "trades":len(result["trades"]),
                         "skipped_overlaps":result["skipped_overlaps"],
+                        "trade_regime_counts":regime_counts,
                         "sample_assessment":assess_sample(len(result["trades"]),len(closed)),
                         "win_rate":metrics["win_rate"] if metrics else None,
                         "compounded_net_return":metrics["compounded_net_return"] if metrics else None,
