@@ -54,8 +54,8 @@ def _get(path, params):
             raise ValueError('Bitget API 응답 구조 오류')
         if str(j.get('code'))=='00000':
             data=j.get('data')
-            if not isinstance(data,list):
-                raise ValueError('Bitget API 캔들 데이터 구조 오류')
+            if data is None:
+                raise ValueError('Bitget API 응답 데이터 누락')
             return data
         if str(j.get('code')) in ('429','40015','40017'):
             if attempt==2:
