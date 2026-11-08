@@ -1,0 +1,43 @@
+name: BADANG offline tests (no deployment)
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  unittest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      DATABASE_URL: ''
+      BADANG_OI_COLLECTOR_TOKEN: ''
+      BADANG_TRADING_ENABLED: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install declared dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Verify required integration dependencies
+        run: |
+          python - <<'PYDEPS'
+          import importlib
+          for name in ('flask', 'requests', 'psycopg2'):
+              importlib.import_module(name)
+              print(f'{name}: available')
+          PYDEPS
+      - name: Check syntax
+        run: python -m compileall -q .
+      - name: Run offline audit (must pass fully)
+        run: python badang_test_audit_508.py --report badang-ci-audit.json
+      - name: Upload sanitized test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: badang-offline-test-audit
+          path: badang-ci-audit.json
+          if-no-files-found: warn
+          retention-days: 14
