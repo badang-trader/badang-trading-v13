@@ -322,6 +322,8 @@ def wave_candidates(points):
                 (prices[2] - prices[0]) * direction > 0
             )
             rule_3 = w3 >= min(w1, w5)
+            # Wave 4 must stay outside the price territory of wave 1.
+            # For bullish impulses, wave 4 low > wave 1 high; reverse for bearish.
             rule_4 = (
                 (prices[4] - prices[1]) * direction > 0
             )
