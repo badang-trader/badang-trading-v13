@@ -33,6 +33,8 @@ jobs:
         run: python -m compileall -q .
       - name: Run 5.14 offline audit
         run: python badang_test_audit_508.py --report badang-ci-audit.json
+      - name: Optional research regression tests
+        run: python -m unittest -v test_optional_research_515.py
       - name: Upload test report
         if: always()
         uses: actions/upload-artifact@v4
