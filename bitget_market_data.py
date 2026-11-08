@@ -180,9 +180,11 @@ def fastest_candles(symbol,timeframe,exchanges=None):
             t=int(r[0]); t=t*1000 if t<100000000000 else t
             o,h,l,c,v=map(float,r[1:6])
             if not (all(math.isfinite(z) for z in (o,h,l,c,v)) and min(o,h,l,c)>0
-                    and h>=max(o,l,c) and l<=min(o,c) and v>=0): continue
+                    and h>=max(o,l,c) and l<=min(o,c) and v>=0):
+                raise ValueError('Bitget 잘못된 OHLCV 값 감지')
             rows.append([str(t),str(o),str(h),str(l),str(c),str(v)])
-        except (ValueError,TypeError,OverflowError): continue
+        except (TypeError,OverflowError) as exc:
+            raise ValueError('Bitget 잘못된 OHLCV 값 감지') from exc
     rows.sort(key=lambda x:int(x[0]))
     # Reject exchange timestamps beyond the current candle's opening slot.
     # Otherwise a future-dated row can be mistaken for the disposable
