@@ -9,6 +9,7 @@ class ScanOffsetSafetyTests(unittest.TestCase):
             with self.subTest(value=value),patch("app.symbols",return_value=[]) as symbols,patch("app.scan_one") as scan_one:
                 response=app.test_client().get("/api/scan",query_string={"offset":value})
                 self.assertEqual(response.status_code,400)
+                symbols.assert_not_called()
                 scan_one.assert_not_called()
     def test_valid_offset_kept(self):
         with patch("app.symbols",return_value=[]) as symbols:
