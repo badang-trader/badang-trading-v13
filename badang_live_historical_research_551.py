@@ -11,10 +11,11 @@ from badang_research_regime_metrics_556 import summarize_by_regime
 from badang_research_cost_sensitivity_560 import cost_sensitivity
 from badang_research_regime_sample_563 import regime_sample_review
 from badang_research_regime_exposure_564 import regime_exposure
+from badang_research_timestamp_validation_569 import validate_research_timestamps
 
 def convert_closed_candles(snapshot):
     """Convert confirmed Bitget rows to named OHLCV values."""
-    return [{"timestamp":row[0],"open":float(row[1]),
+    return [{"timestamp":int(row[0]),"open":float(row[1]),
              "high":float(row[2]),"low":float(row[3]),
              "close":float(row[4]),"volume":float(row[5])}
             for row in snapshot["candles"][:-1]]
@@ -24,6 +25,7 @@ def main():
     for symbol,frame,mode in (("BTCUSDT","15m","scalp"),("ETHUSDT","1D","swing")):
         snapshot=fastest_candles(symbol,frame)
         closed=convert_closed_candles(snapshot)
+        validate_research_timestamps(closed,{"15m":900000,"1D":86400000}[frame])
         if len(closed)<210:
             raise ValueError("Too few confirmed historical bars: "+symbol+" "+frame)
         result=research_engine_backtest(closed,mode=mode,horizon=3)
