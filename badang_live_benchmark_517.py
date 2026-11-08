@@ -18,7 +18,7 @@ samples = []
 started = time.monotonic()
 symbols = ("BTCUSDT", "ETHUSDT")
 frames = ("15m", "1H")
-for cycle in range(3):
+for cycle in range(20):
     for symbol in symbols:
         for frame in frames:
             t0 = time.monotonic()
@@ -39,12 +39,12 @@ for cycle in range(3):
             row["rss_mb"] = round(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss/1024, 2)
             samples.append(row)
             print("SAMPLE", json.dumps(row, ensure_ascii=False), flush=True)
-    time.sleep(2)
+    time.sleep(1)
 current, peak = tracemalloc.get_traced_memory()
 ok = [s for s in samples if s["ok"]]
 report = {
     "scope": "isolated_GitHub_Actions_read_only_public_Bitget",
-    "trading_enabled": False, "cycles": 3, "requests": len(samples),
+    "trading_enabled": False, "cycles": 20, "requests": len(samples),
     "successes": len(ok), "failures": len(samples)-len(ok),
     "total_elapsed_s": round(time.monotonic()-started, 2),
     "mean_success_elapsed_s": round(statistics.mean(s["elapsed_s"] for s in ok), 3) if ok else None,
