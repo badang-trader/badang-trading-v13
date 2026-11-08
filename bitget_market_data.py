@@ -24,7 +24,15 @@ def _get(path, params):
             wait=max(0.0, 0.16-(time.monotonic()-_LAST_REQUEST[0]))
             if wait: time.sleep(wait)
             _LAST_REQUEST[0]=time.monotonic()
-            r=SESSION.get(API+path,params=params,timeout=12)
+            try:
+                r=SESSION.get(API+path,params=params,timeout=12)
+            except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
+                if attempt==2:
+                    raise
+                # Retry transient transport failures with bounded backoff.
+                # Never return cached or unconfirmed market data.
+                time.sleep(0.8*(attempt+1))
+                continue
         if r.status_code==429:
             if attempt==2:
                 raise ValueError('Bitget 요청 제한(HTTP 429): 재시도 3회 실패')
