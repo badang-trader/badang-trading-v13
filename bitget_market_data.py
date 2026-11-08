@@ -46,9 +46,17 @@ def _get(path, params):
             time.sleep(delay)
             continue
         r.raise_for_status()
-        j=r.json()
+        try:
+            j=r.json()
+        except ValueError as exc:
+            raise ValueError('Bitget API JSON 응답 오류') from exc
+        if not isinstance(j,dict):
+            raise ValueError('Bitget API 응답 구조 오류')
         if str(j.get('code'))=='00000':
-            return j.get('data') or []
+            data=j.get('data')
+            if not isinstance(data,list):
+                raise ValueError('Bitget API 캔들 데이터 구조 오류')
+            return data
         if str(j.get('code')) in ('429','40015','40017'):
             if attempt==2:
                 raise ValueError('Bitget API 요청 제한: 재시도 3회 실패')
