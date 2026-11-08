@@ -115,6 +115,11 @@ def fastest_candles(symbol,timeframe,exchanges=None):
         if len(seen)==before:
             history_stop_reason='no_new_history_candles'
             break
+    if history_pages==12 and history_stop_reason=='enough_closed_bars':
+        # The loop can exhaust its request budget without enough candles.
+        now_ms=int(time.time()*1000)
+        if sum(1 for t in seen if t+step<=now_ms)<220:
+            history_stop_reason='pagination_budget_exhausted'
     # Detect missing bars in the most recent 260 slots. Re-query the exact
     # surrounding window; only accept real exchange candles (never interpolate).
     # Include a buffer because the final row may still be forming.
