@@ -1202,7 +1202,7 @@ def scan():
     return jsonify(
         total=len(syms),
         offset=offset,
-        next_offset=offset+len(batch),
+        next_offset=min(len(syms), offset+len(batch)),
         results=results,
         errors=errors,
         server_time=int(time.time()),
