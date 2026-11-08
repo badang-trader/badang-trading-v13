@@ -30,7 +30,7 @@ def one(offset, mode):
 start=time.monotonic()
 # Production route uses 2 internal workers per request. Keep external load bounded.
 for cycle in range(3):
-    for offset,mode in ((0,"scalp"),(5,"scalp")):
+    for offset,mode in ((0,"scalp"),(5,"scalp"),(0,"swing")):
         row=one(offset,mode)
         row["cycle"]=cycle+1
         records.append(row)
@@ -47,6 +47,8 @@ summary={
     "http_200":sum(r["http"]==200 for r in records),
     "symbol_results":sum(r["results"] for r in records),
     "symbol_errors":sum(r["errors"] for r in records),
+    "empty_results":sum(r["results"]==0 for r in records),
+    "modes_tested":sorted(set(r["mode"] for r in records)),
     "peak_rss_mb":round(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss/1024,2),
     "tracemalloc_peak_mb":round(peak/1048576,2),
     "elapsed_s":round(time.monotonic()-start,2),
@@ -54,5 +56,5 @@ summary={
 }
 with open("badang-scan-load.json","w") as f:json.dump(summary,f,indent=2)
 print("SCAN_SUMMARY",json.dumps({k:v for k,v in summary.items() if k!="records"}),flush=True)
-if summary["http_200"]!=len(records) or summary["symbol_errors"]:
+if summary["http_200"]!=len(records) or summary["symbol_errors"] or summary["empty_results"]:
     raise SystemExit("Scan route failed or produced symbol errors")
