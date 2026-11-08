@@ -144,6 +144,8 @@ jobs:
         run: python -m unittest -v test_research_exchange_ohlcv_572.py
       - name: Live research timestamp ordering integration regression
         run: python -m unittest -v test_live_research_ordering_573.py
+      - name: Live research malformed snapshot shape regression
+        run: python -m unittest -v test_live_research_snapshot_shape_574.py
       - name: Live public Bitget historical research BTC ETH
         run: python badang_live_historical_research_551.py
       - name: Bounded live read-only memory benchmark
