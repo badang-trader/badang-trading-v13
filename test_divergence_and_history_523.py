@@ -18,6 +18,21 @@ class DivergenceTests(unittest.TestCase):
             self.assertEqual(app.divergence(p,r),"bearish")
     def test_no_divergence_on_flat(self):
         self.assertEqual(app.divergence([10]*35,[50]*35),"none")
+    def test_flat_rsi_is_neutral(self):
+        self.assertEqual(app.rsi([100.0]*30),50.0)
+    def test_rising_rsi_is_100(self):
+        self.assertEqual(app.rsi(list(range(1,31))),100.0)
+    def test_falling_rsi_is_zero(self):
+        self.assertEqual(app.rsi(list(range(31,1,-1))),0.0)
+    def test_plateau_does_not_create_false_pivots(self):
+        self.assertEqual(app.pivots([10.0]*35,low=True),[])
+        self.assertEqual(app.pivots([10.0]*35,low=False),[])
+    def test_unique_swing_pivot_is_detected(self):
+        values=[10.0]*35
+        values[16]=4.0
+        self.assertEqual(app.pivots(values,low=True),[16])
+    def test_divergence_on_flat_market_is_none(self):
+        self.assertEqual(app.divergence([10.0]*35,[50.0]*35),"none")
     def test_insufficient_history_names_symbol_and_frame(self):
         def analyze(symbol,frame):
             if frame=="1D":
