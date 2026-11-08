@@ -803,23 +803,30 @@ def score_direction(
 
 
 def scenario(setup, direction, mode):
-    price = setup['price']
-    atr = setup['atr']
-    up = direction == 'LONG'
-
-    if price <= 0 or atr <= 0:
+    # Never publish a trading scenario from NaN/Inf or malformed levels.
+    if direction not in ('LONG', 'SHORT') or mode not in ('scalp', 'swing'):
         return None
+    values = {key: finite_number(setup.get(key))
+              for key in ('price', 'atr', 'swing_low', 'swing_high')}
+    if any(value is None for value in values.values()):
+        return None
+    price, atr = values['price'], values['atr']
+    if price <= 0 or atr <= 0 or values['swing_low'] <= 0 or values['swing_high'] <= 0:
+        return None
+    if values['swing_low'] > values['swing_high']:
+        return None
+    up = direction == 'LONG'
 
     entry = price
 
     stop = (
         min(
-            setup['swing_low'],
+            values['swing_low'],
             entry - 1.2 * atr
         )
         if up
         else max(
-            setup['swing_high'],
+            values['swing_high'],
             entry + 1.2 * atr
         )
     )
