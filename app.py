@@ -247,11 +247,21 @@ def extract_v13_signal(item, mode, candles_data=None):
     if not valid_prices:
         return None
 
+    # Prevent impossible second targets and arithmetic overflow from reaching
+    # persistent signals. TP2 remains optional, but cannot be contradictory.
+    if tp2 is not None:
+        if direction == 'LONG' and tp2 <= tp1:
+            tp2 = None
+        elif direction == 'SHORT' and tp2 >= tp1:
+            tp2 = None
+
     risk = abs(entry - stop)
-    if risk <= 0:
+    if not math.isfinite(risk) or risk <= 0:
         return None
 
     rr = abs(tp1 - entry) / risk
+    if not math.isfinite(rr) or rr <= 0:
+        return None
     reference_time = get_reference_time(item, candles_data)
     if reference_time is None:
         return None
