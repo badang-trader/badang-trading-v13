@@ -59,6 +59,8 @@ jobs:
         run: python -m unittest -v test_research_gap_safety_530.py
       - name: Candidate ranking finite-value safety regression tests
         run: python -m unittest -v test_candidate_safety_531.py
+      - name: Signal reference timestamp safety regression tests
+        run: python -m unittest -v test_reference_time_safety_532.py
       - name: Bounded live read-only memory benchmark
         timeout-minutes: 8
         run: python badang_live_benchmark_517.py
