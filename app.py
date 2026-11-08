@@ -1162,6 +1162,15 @@ def scan():
     if minimum is None or minimum < 0:
         return jsonify(error='거래대금 설정 오류'), 400
 
+    offset_raw = request.args.get('offset', '0')
+    try:
+        offset = int(offset_raw)
+        if offset < 0:
+            raise ValueError('negative offset')
+    except (ValueError, TypeError):
+        return jsonify(error='스캔 시작 위치 설정 오류'), 400
+
+    # Validate all request parameters before making a public exchange call.
     try:
         syms = symbols(minimum)
     except Exception as e:
@@ -1171,14 +1180,6 @@ def scan():
                 + str(e)
             )
         ), 502
-
-    offset_raw = request.args.get('offset', '0')
-    try:
-        offset = int(offset_raw)
-        if offset < 0:
-            raise ValueError('negative offset')
-    except (ValueError, TypeError):
-        return jsonify(error='스캔 시작 위치 설정 오류'), 400
 
     batch = syms[offset:offset+5]
     results, errors = [], []
