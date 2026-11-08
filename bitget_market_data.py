@@ -175,6 +175,8 @@ def fastest_candles(symbol,timeframe,exchanges=None):
     current_open=(now//step)*step
     if any(int(r[0])>current_open for r in rows):
         raise ValueError('Bitget 미래 시각 캔들 감지: 시계 또는 거래소 데이터 오류')
+    if any(int(r[0])%step != 0 for r in rows):
+        raise ValueError('Bitget 캔들 시각 정렬 오류: 봉 간격 경계와 불일치')
     # Duplicate timestamps must not be silently reconciled.
     if len(set(r[0] for r in rows)) != len(rows):
         raise ValueError('Bitget duplicate candle timestamps')
