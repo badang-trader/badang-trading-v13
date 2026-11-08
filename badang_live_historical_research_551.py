@@ -38,6 +38,10 @@ def _exchange_number(value,field,allow_zero=False):
 
 def convert_closed_candles(snapshot):
     """Validate and convert confirmed Bitget rows; exclude newest open bar."""
+    if not isinstance(snapshot,dict) or not isinstance(snapshot.get("candles"),list):
+        raise ValueError("Invalid exchange candle snapshot")
+    if len(snapshot["candles"])<2:
+        raise ValueError("Insufficient exchange candles to confirm a closed bar")
     rows=[]
     for row in snapshot["candles"][:-1]:
         if not isinstance(row,(list,tuple)) or len(row)<6:
