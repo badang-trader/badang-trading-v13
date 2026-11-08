@@ -126,10 +126,13 @@ def pivots(
     for i in range(radius, len(rows) - radius):
         segment = rows[i-radius:i+radius+1]
 
-        if rows[i]['high'] == max(r['high'] for r in segment):
+        highs = [r['high'] for r in segment]
+        lows = [r['low'] for r in segment]
+        # Equal-high/equal-low plateaus are not confirmed swing extrema.
+        if rows[i]['high'] == max(highs) and highs.count(rows[i]['high']) == 1:
             points.append((i, 'H', rows[i]['high']))
 
-        if rows[i]['low'] == min(r['low'] for r in segment):
+        if rows[i]['low'] == min(lows) and lows.count(rows[i]['low']) == 1:
             points.append((i, 'L', rows[i]['low']))
 
     result = []
