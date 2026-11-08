@@ -827,8 +827,15 @@ def analyze(
         else trendlines['signal'] == 'BREAKOUT_UP'
     )
 
+    # Reject impossible stop/target geometry before labeling a trade candidate.
+    valid_levels = (
+        all(math.isfinite(x) and x > 0 for x in (p, stop, target1, target2))
+        and ((stop < p < target1 < target2) if side == 'LONG'
+             else (target2 < target1 < p < stop))
+    )
     recommended = (
-        best >= 80
+        valid_levels
+        and best >= 80
         and rr >= 1.5
         and volatility > 0
         and len(
