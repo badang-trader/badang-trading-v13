@@ -127,6 +127,8 @@ jobs:
         run: python -m unittest -v test_research_regime_exposure_adequacy_565.py
       - name: Research chronological signal and overlap regression
         run: python -m unittest -v test_research_chronology_566.py
+      - name: Research malformed execution cost and fill regression
+        run: python -m unittest -v test_research_cost_input_safety_567.py
       - name: Live public Bitget historical research BTC ETH
         run: python badang_live_historical_research_551.py
       - name: Bounded live read-only memory benchmark
