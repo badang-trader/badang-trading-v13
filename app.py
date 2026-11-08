@@ -513,7 +513,12 @@ def candles(symbol, gran):
         gran,
         exchanges=['bitget']
     )
-    return result['candles']
+    # Adapter contract: the last candle is always disposable (forming
+    # candle or placeholder). Only confirmed bars may drive signals.
+    closed = result['candles'][:-1]
+    if len(closed) < 205:
+        raise ValueError('확정봉 부족: ' + str(len(closed)) + '개 / 최소 205개')
+    return closed
 
 
 def analyze(symbol, gran):
