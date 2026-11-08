@@ -1172,13 +1172,13 @@ def scan():
             )
         ), 502
 
+    offset_raw = request.args.get('offset', '0')
     try:
-        offset = max(
-            0,
-            int(request.args.get('offset', 0))
-        )
-    except ValueError:
-        offset = 0
+        offset = int(offset_raw)
+        if offset < 0:
+            raise ValueError('negative offset')
+    except (ValueError, TypeError):
+        return jsonify(error='스캔 시작 위치 설정 오류'), 400
 
     batch = syms[offset:offset+5]
     results, errors = [], []
