@@ -22,7 +22,8 @@ class NormalizeSafetyTests(unittest.TestCase):
     def test_invalid_bar_cannot_satisfy_minimum_history(self):
         rows=[bar() for _ in range(204)]+[bar(o=-1)]
         result=analyze(rows)
-        self.assertEqual(result["status"],"insufficient_data")
+        self.assertEqual(result["status"],"invalid_data")
+        self.assertEqual(result["rejected_candles"],1)
         self.assertEqual(result["recommendation"],"WAIT")
 
 if __name__=="__main__":unittest.main()
