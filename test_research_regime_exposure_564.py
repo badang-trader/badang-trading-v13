@@ -21,7 +21,8 @@ class RegimeExposureTests(unittest.TestCase):
         bars=[{"close":100+i} for i in range(40)]
         a=regime_exposure(bars)
         b=regime_exposure(bars+[{"close":1}])
-        self.assertEqual(a["regime_bars"]["up"],b["regime_bars"]["up"]-int(b["regime_bars"]["up"]>a["regime_bars"]["up"])) if False else None
+        self.assertEqual(sum(a["regime_bars"].values()),sum(b["regime_bars"].values())-1)
+        self.assertEqual(a["regime_bars"]["up"],b["regime_bars"]["up"])
         self.assertEqual(a["classified_bars"]+1,b["classified_bars"])
     def test_invalid_lookback_rejected(self):
         with self.assertRaises(ValueError):
