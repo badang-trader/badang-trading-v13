@@ -8,12 +8,14 @@ class DivergenceTests(unittest.TestCase):
         p=[12]*35;r=[50]*35
         p[9]=5;p[24]=4
         r[9]=25;r[24]=38
-        self.assertEqual(app.divergence(p,r),"bullish")
+        with patch.object(app,"pivots",side_effect=lambda values,low=True,w=3:[9,24] if low else []):
+            self.assertEqual(app.divergence(p,r),"bullish")
     def test_bearish_higher_high_lower_rsi(self):
         p=[10]*35;r=[50]*35
         p[9]=18;p[24]=20
         r[9]=75;r[24]=60
-        self.assertEqual(app.divergence(p,r),"bearish")
+        with patch.object(app,"pivots",side_effect=lambda values,low=True,w=3:[] if low else [9,24]):
+            self.assertEqual(app.divergence(p,r),"bearish")
     def test_no_divergence_on_flat(self):
         self.assertEqual(app.divergence([10]*35,[50]*35),"none")
     def test_insufficient_history_names_symbol_and_frame(self):
