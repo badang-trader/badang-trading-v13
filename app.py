@@ -921,9 +921,15 @@ def scan_one(sym, mode):
         else ['1H', '4H', '1D']
     )
 
-    lower, setup, higher = [
-        analyze(sym, f) for f in frames
-    ]
+    analyses = []
+    for frame in frames:
+        try:
+            analyses.append(analyze(sym, frame))
+        except Exception as exc:
+            # Preserve the original failure, but identify the exact
+            # symbol/timeframe for incomplete historical data diagnosis.
+            raise ValueError(f'{sym} {frame}: {exc}') from exc
+    lower, setup, higher = analyses
 
     lower.pop('rows', None)
     higher.pop('rows', None)
