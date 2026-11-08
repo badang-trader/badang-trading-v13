@@ -464,16 +464,21 @@ def rsi(a, n=14):
         g = (g * (n - 1) + gains[i]) / n
         l = (l * (n - 1) + losses[i]) / n
 
-    return 100 if l == 0 else 100 - 100 / (1 + g / l)
+    # Flat prices have neither buying nor selling momentum: RSI is neutral.
+    if l == 0:
+        return 50.0 if g == 0 else 100.0
+    return 100 - 100 / (1 + g / l)
 
 
 def pivots(a, low=True, w=3):
-    return [
-        i for i in range(w, len(a) - w)
-        if a[i] == (
-            min if low else max
-        )(a[i-w:i+w+1])
-    ]
+    """Require a unique local extreme; flat plateaus are not swing pivots."""
+    result = []
+    for i in range(w, len(a) - w):
+        window = a[i-w:i+w+1]
+        extreme = min(window) if low else max(window)
+        if a[i] == extreme and window.count(extreme) == 1:
+            result.append(i)
+    return result
 
 
 def divergence(close, rsis):
