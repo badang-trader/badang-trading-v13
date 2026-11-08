@@ -87,11 +87,15 @@ def fastest_candles(symbol,timeframe,exchanges=None):
             seen[stamp]=item
     ingest(raw)
     cursor=None
+    history_pages=0
+    history_stop_reason='enough_closed_bars'
     for _ in range(12):
         now_ms=int(time.time()*1000)
         closed=sum(1 for t in seen if t+step<=now_ms)
         if closed>=220: break
-        if not seen: break
+        if not seen:
+            history_stop_reason='no_initial_candles'
+            break
         oldest=min(seen)
         next_cursor=oldest-step
         if cursor is not None and next_cursor>=cursor:
@@ -100,12 +104,17 @@ def fastest_candles(symbol,timeframe,exchanges=None):
         page=_get('/api/v2/mix/market/history-candles',
                   {'symbol':symbol,'productType':'USDT-FUTURES',
                    'granularity':gran,'endTime':str(cursor),'limit':'200'})
+        history_pages+=1
         if not isinstance(page,list):
             raise ValueError('Unexpected Bitget historical candle response')
-        if not page: break
+        if not page:
+            history_stop_reason='empty_history_page'
+            break
         before=len(seen)
         ingest(page)
-        if len(seen)==before: break
+        if len(seen)==before:
+            history_stop_reason='no_new_history_candles'
+            break
     # Detect missing bars in the most recent 260 slots. Re-query the exact
     # surrounding window; only accept real exchange candles (never interpolate).
     # Include a buffer because the final row may still be forming.
@@ -160,7 +169,10 @@ def fastest_candles(symbol,timeframe,exchanges=None):
             contiguous.append(r)
         if len(contiguous)<205:
             raise ValueError('Bitget 연속 확정봉 부족: '+str(len(contiguous))+
-                             '개 / 최소 205개 (과거 누락 또는 페이지 조회 문제)')
+                             '개 / 최소 205개 (과거 누락 또는 페이지 조회 문제)'+
+                             '; history_pages='+str(history_pages)+
+                             '; history_stop='+history_stop_reason+
+                             '; total_timestamps='+str(len(seen)))
         # Keep only the contiguous history and an existing unfinished candle.
         rows=list(reversed(contiguous)) + [r for r in rows if int(r[0])>int(complete[-1][0])]
     else:
