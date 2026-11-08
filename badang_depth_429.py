@@ -67,12 +67,28 @@ def atr14(bars):
     return sum(tr[-14:])/14
 
 
-def fetch_candles(symbol,frame,limit=200):
+def fetch_candles(symbol,frame,limit=320):
+    """Page backward by candle start timestamp; do not treat missing history as zero."""
     if frame not in FRAMES:raise ValueError('Unsupported timeframe')
-    raw=get('/api/v2/mix/market/candles',{'symbol':symbol,'productType':'USDT-FUTURES',
-        'granularity': '1Dutc' if frame=='1D' else frame,'limit':str(limit)})
-    if not isinstance(raw,list):raise ValueError('Candles missing')
-    return raw
+    result={}
+    end=None
+    for _ in range(4):
+        params={'symbol':symbol,'productType':'USDT-FUTURES',
+                'granularity':'1Dutc' if frame=='1D' else frame,
+                'limit':str(min(200, max(1,limit-len(result))))}
+        if end is not None:params['endTime']=str(end)
+        raw=get('/api/v2/mix/market/candles',params)
+        if not isinstance(raw,list) or not raw:break
+        timestamps=[]
+        for row in raw:
+            ts=int(row[0]);ts=ts*1000 if ts<100000000000 else ts
+            timestamps.append(ts)
+            result[ts]=row
+        if len(result)>=limit:break
+        older=min(timestamps)-1
+        if end is not None and older>=end:break
+        end=older
+    return [result[t] for t in sorted(result)][-limit:]
 
 
 def analyze_depth(symbol,frames=('15m','30m','1H','4H')):
@@ -80,7 +96,7 @@ def analyze_depth(symbol,frames=('15m','30m','1H','4H')):
     if not re.fullmatch(r'[A-Z0-9]{2,25}USDT',symbol or ''):raise ValueError('Invalid symbol')
     now=int(time.time()*1000)
     output={'symbol':symbol,'source':'Bitget USDT futures candles','fetched_at_ms':now,
-            'timeframes':{},'errors':{},'warning':'확정봉 지지·저항 참고값. 현재 진행봉과 실제 체결 수급은 별도이며 승률 아님.'}
+            'timeframes':{},'errors':{},'requested_bars':320,'warning':'확정봉 지지·저항 참고값. 현재 진행봉과 실제 체결 수급은 별도이며 승률 아님.'}
     for tf in frames:
         try:
             raw=fetch_candles(symbol,tf)
@@ -93,7 +109,11 @@ def analyze_depth(symbol,frames=('15m','30m','1H','4H')):
             output['timeframes'][tf]={'quality':quality,'forming':current if current['forming'] else None,
                 'last_closed':closed[-1], 'ema20':ema(closes,20),'ema50':ema(closes,50),
                 'ema200':ema(closes,200),'atr14':volatility,'levels':structure,
-                'analysis_status':'VALID' if quality['usable'] else 'LIMITED',
+                'analysis_status':'VALID' if quality['usable'] and len(closed)>=200 else 'LIMITED',
+                'ema200_ready':len(closed)>=200,
+                'current_price':current['close'],
+                'nearest_support':max((z['price'] for z in structure['supports']),default=None),
+                'nearest_resistance':min((z['price'] for z in structure['resistances']),default=None),
                 'wave_status':'UNDETERMINED: insufficient validated multi-degree pivot structure'}
         except Exception as exc:output['errors'][tf]=str(exc)[:140]
     return output
