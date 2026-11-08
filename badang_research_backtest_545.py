@@ -21,4 +21,5 @@ def evaluate_signal(candles,signal_index,direction,horizon=4,fee_per_side=0.0006
     exit_price=float(candles[exit_index]["close"])
     result=net_round_trip(entry,exit_price,direction,fee_per_side,slippage_per_side)
     return {"signal_index":signal_index,"entry_index":entry_index,
-            "exit_index":exit_index,"direction":direction,**result}
+            "exit_index":exit_index,"direction":direction,
+            "raw_entry":entry,"raw_exit":exit_price,**result}
