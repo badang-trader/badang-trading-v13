@@ -33,6 +33,9 @@ jobs:
         run: python -m compileall -q .
       - name: Run 5.14 offline audit
         run: python badang_test_audit_508.py --report badang-ci-audit.json
+      - name: Diagnose offline unit-test errors on failure
+        if: failure()
+        run: python -m unittest discover -v 2>&1 | tail -n 75
       - name: Optional research regression tests
         run: python -m unittest -v test_optional_research_515.py
       - name: Market data provenance regression tests
