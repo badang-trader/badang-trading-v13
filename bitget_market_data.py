@@ -102,7 +102,9 @@ def fastest_candles(symbol,timeframe,exchanges=None):
                 prior=seen[stamp]
                 try:
                     same=(len(prior)>=6 and
-                          all(float(a)==float(b) for a,b in zip(prior[1:6],item[1:6])))
+                          all(math.isfinite(float(a)) and math.isfinite(float(b))
+                              and float(a)==float(b)
+                              for a,b in zip(prior[1:6],item[1:6])))
                 except (TypeError,ValueError,OverflowError):
                     same=False
                 if not same:
