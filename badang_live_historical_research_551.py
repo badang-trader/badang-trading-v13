@@ -4,6 +4,7 @@ Only the exchange's confirmed candles are used. Reports results without
 asserting profitability. Live API failures fail this validation step.
 """
 import json
+import re
 from bitget_market_data import fastest_candles
 from badang_engine_research_549 import research_engine_backtest
 from badang_research_sample_554 import assess_sample
@@ -13,9 +14,20 @@ from badang_research_regime_sample_563 import regime_sample_review
 from badang_research_regime_exposure_564 import regime_exposure
 from badang_research_timestamp_validation_569 import validate_research_timestamps
 
+def parse_exchange_timestamp(value):
+    """Require exchange epoch milliseconds, never silently coerce seconds."""
+    if isinstance(value,bool) or not (
+        isinstance(value,int) or (isinstance(value,str) and re.fullmatch(r"[0-9]{13}",value))
+    ):
+        raise ValueError("Invalid exchange millisecond timestamp")
+    timestamp=int(value)
+    if not 10**12<=timestamp<10**14:
+        raise ValueError("Exchange timestamp must be epoch milliseconds")
+    return timestamp
+
 def convert_closed_candles(snapshot):
     """Convert confirmed Bitget rows to named OHLCV values."""
-    return [{"timestamp":int(row[0]),"open":float(row[1]),
+    return [{"timestamp":parse_exchange_timestamp(row[0]),"open":float(row[1]),
              "high":float(row[2]),"low":float(row[3]),
              "close":float(row[4]),"volume":float(row[5])}
             for row in snapshot["candles"][:-1]]
