@@ -8,6 +8,7 @@ from bitget_market_data import fastest_candles
 from badang_engine_research_549 import research_engine_backtest
 from badang_research_sample_554 import assess_sample
 from badang_research_regime_metrics_556 import summarize_by_regime
+from badang_research_cost_sensitivity_560 import cost_sensitivity
 
 def convert_closed_candles(snapshot):
     """Convert confirmed Bitget rows to named OHLCV values."""
@@ -30,6 +31,7 @@ def main():
                         "trades":len(result["trades"]),
                         "skipped_overlaps":result["skipped_overlaps"],
                         "conditional_regime_metrics":summarize_by_regime(closed,result["trades"]),
+                        "execution_cost_sensitivity":cost_sensitivity(result["trades"]),
                         "sample_assessment":assess_sample(len(result["trades"]),len(closed)),
                         "win_rate":metrics["win_rate"] if metrics else None,
                         "compounded_net_return":metrics["compounded_net_return"] if metrics else None,
