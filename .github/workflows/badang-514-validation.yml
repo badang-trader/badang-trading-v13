@@ -47,6 +47,16 @@ jobs:
           name: badang-517-live-memory-benchmark
           path: badang-live-benchmark.json
           if-no-files-found: ignore
+      - name: Production-shaped scan load and memory check
+        timeout-minutes: 8
+        run: python badang_scan_load_518.py
+      - name: Upload scan load report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: badang-518-scan-load
+          path: badang-scan-load.json
+          if-no-files-found: ignore
       - name: Upload test report
         if: always()
         uses: actions/upload-artifact@v4
