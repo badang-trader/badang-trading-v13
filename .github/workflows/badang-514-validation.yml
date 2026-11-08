@@ -53,6 +53,8 @@ jobs:
         run: python -m unittest -v test_wave_pivot_plateau_526.py test_wave_rules_527.py
       - name: Research analyzer invalid OHLC regression tests
         run: python -m unittest -v test_research_ohlc_safety_528.py
+      - name: Research target geometry regression tests
+        run: python -m unittest -v test_research_target_safety_529.py
       - name: Bounded live read-only memory benchmark
         timeout-minutes: 8
         run: python badang_live_benchmark_517.py
