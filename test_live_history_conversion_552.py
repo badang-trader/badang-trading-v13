@@ -6,11 +6,11 @@ from badang_research_backtest_545 import evaluate_signal
 class LiveHistoryConversionTests(unittest.TestCase):
     def test_named_ohlc_and_unclosed_bar_excluded(self):
         snapshot={"candles":[
-            ["1000","100","101","99","100.5","5"],
-            ["2000","101","103","100","102","6"],
-            ["3000","103","104","102","103.5","7"],
-            ["4000","104","105","103","104.5","8"],
-            ["5000","999","1000","998","999","1"]]}
+            ["1794000000000","100","101","99","100.5","5"],
+            ["1794000900000","101","103","100","102","6"],
+            ["1794001800000","103","104","102","103.5","7"],
+            ["1794002700000","104","105","103","104.5","8"],
+            ["1794003600000","999","1000","998","999","1"]]}
         rows=convert_closed_candles(snapshot)
         self.assertEqual(len(rows),4)
         self.assertEqual(rows[1]["open"],101)
