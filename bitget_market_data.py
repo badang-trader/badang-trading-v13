@@ -90,10 +90,12 @@ def fastest_candles(symbol,timeframe,exchanges=None):
     seen={}
     def ingest(page):
         for item in page:
-            if not isinstance(item,(list,tuple)) or not item: continue
+            if not isinstance(item,(list,tuple)) or len(item)<6:
+                raise ValueError('Bitget 잘못된 캔들 구조 감지')
             try:
                 stamp=int(item[0]); stamp=stamp*1000 if stamp<100000000000 else stamp
-            except (TypeError,ValueError): continue
+            except (TypeError,ValueError,OverflowError):
+                raise ValueError('Bitget 잘못된 캔들 시각 감지')
             if stamp in seen and list(seen[stamp])!=list(item):
                 raise ValueError('Conflicting Bitget candle timestamp: '+str(stamp))
             seen[stamp]=item
