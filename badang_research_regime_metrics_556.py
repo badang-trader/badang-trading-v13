@@ -14,7 +14,13 @@ def summarize_by_regime(candles,trades,lookback=20,threshold=0.03):
     for trade in records:
         if not isinstance(trade,dict) or "signal_index" not in trade or "net_return" not in trade:
             raise ValueError("Invalid completed trade")
-        label=regime_at(candles,trade["signal_index"],lookback,threshold)
+        signal=trade["signal_index"]
+        entry=trade["entry_index"]
+        exit_index=trade["exit_index"]
+        if (not isinstance(signal,int) or isinstance(signal,bool) or signal<0
+            or entry!=signal+1 or exit_index>=len(candles)):
+            raise ValueError("Trade signal or execution timing inconsistent with candles")
+        label=regime_at(candles,signal,lookback,threshold)
         groups[label].append(trade["net_return"])
     return {label:{"trade_count":len(values),
                    "conditional_only_not_portfolio":True,
