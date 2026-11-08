@@ -11,7 +11,7 @@ def main():
     reports=[]
     for symbol,frame,mode in (("BTCUSDT","15m","scalp"),("ETHUSDT","1D","swing")):
         snapshot=fastest_candles(symbol,frame)
-        closed=snapshot["candles"][:-1]
+        # Bitget returns [timestamp,open,high,low,close,volume] string rows.\n        # The analysis engine accepts them, but the research execution ledger\n        # requires named OHLC fields for next-open and exit-close pricing.\n        closed=[{"timestamp":row[0],"open":float(row[1]),\n                 "high":float(row[2]),"low":float(row[3]),\n                 "close":float(row[4]),"volume":float(row[5])}\n                for row in snapshot["candles"][:-1]]
         if len(closed)<210:
             raise ValueError("Too few confirmed historical bars: "+symbol+" "+frame)
         result=research_engine_backtest(closed,mode=mode,horizon=3)
