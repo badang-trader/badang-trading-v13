@@ -29,10 +29,14 @@ def _get(path, params):
             except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
                 if attempt==2:
                     raise
-                # Retry transient transport failures with bounded backoff.
-                # Never return cached or unconfirmed market data.
-                time.sleep(0.8*(attempt+1))
-                continue
+                # Back off outside the shared request lock so unrelated
+                # scan requests do not wait for this retry delay.
+                transport_retry=True
+            else:
+                transport_retry=False
+        if transport_retry:
+            time.sleep(0.8*(attempt+1))
+            continue
         if r.status_code==429:
             if attempt==2:
                 raise ValueError('Bitget 요청 제한(HTTP 429): 재시도 3회 실패')
