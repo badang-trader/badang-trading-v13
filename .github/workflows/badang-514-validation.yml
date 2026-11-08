@@ -1,0 +1,42 @@
+name: BADANG 5.14 validation (no deployment)
+on:
+  push:
+    branches: [badang-514-validation]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  offline-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      DATABASE_URL: ''
+      BADANG_OI_COLLECTOR_TOKEN: ''
+      BADANG_TRADING_ENABLED: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install declared dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Verify Flask and PostgreSQL driver
+        run: |
+          python - <<'PY'
+          import flask, requests, psycopg2
+          print("Flask and PostgreSQL driver import OK")
+          PY
+      - name: Check 5.14 test suite is present
+        run: |
+          test -f badang_test_audit_508.py || { echo "5.14 source not yet uploaded; validation cannot pass"; exit 1; }
+      - name: Python syntax
+        run: python -m compileall -q .
+      - name: Run 5.14 offline audit
+        run: python badang_test_audit_508.py --report badang-ci-audit.json
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: badang-514-offline-audit
+          path: badang-ci-audit.json
+          if-no-files-found: ignore
