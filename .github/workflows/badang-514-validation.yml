@@ -133,6 +133,8 @@ jobs:
         run: python -m unittest -v test_research_candle_validation_568.py
       - name: Research historical timestamp integrity regression
         run: python -m unittest -v test_research_timestamp_validation_569.py
+      - name: Exchange epoch timestamp parsing regression
+        run: python -m unittest -v test_research_exchange_timestamp_570.py
       - name: Live public Bitget historical research BTC ETH
         run: python badang_live_historical_research_551.py
       - name: Bounded live read-only memory benchmark
