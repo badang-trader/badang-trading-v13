@@ -89,6 +89,8 @@ jobs:
         run: python -m unittest -v test_research_backtest_545.py
       - name: Research net returns and drawdown tests
         run: python -m unittest -v test_research_metrics_546.py
+      - name: Research nonoverlapping trade ledger tests
+        run: python -m unittest -v test_research_ledger_547.py
       - name: Bounded live read-only memory benchmark
         timeout-minutes: 8
         run: python badang_live_benchmark_517.py
