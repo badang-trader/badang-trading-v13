@@ -59,7 +59,15 @@ def fastest_candles(symbol,timeframe,exchanges=None):
     try:
         raw=_get('/api/v2/mix/market/candles',
                  {'symbol':symbol,'productType':'USDT-FUTURES','granularity':gran,'limit':'350'})
-    except (ValueError, requests.RequestException):
+    except ValueError as exc:
+        # Only retry with a smaller page if the exchange explicitly rejects
+        # the page size. Rate limits, transport errors and malformed responses
+        # must not trigger an additional request burst.
+        message=str(exc).lower()
+        if not (('limit' in message or 'page size' in message) and
+                ('invalid' in message or 'exceed' in message or
+                 'maximum' in message or 'range' in message)):
+            raise
         raw=_get('/api/v2/mix/market/candles',
                  {'symbol':symbol,'productType':'USDT-FUTURES','granularity':gran,'limit':'200'})
     if not isinstance(raw,list):
