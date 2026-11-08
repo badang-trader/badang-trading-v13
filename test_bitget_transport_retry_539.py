@@ -31,4 +31,18 @@ class TransportRetryTests(unittest.TestCase):
                 m._get("/test",{})
             self.assertEqual(get.call_count,3)
 
+    def test_retry_backoff_does_not_hold_request_lock(self):
+        good=Mock(status_code=200)
+        good.json.return_value={"code":"00000","data":[]}
+        observed=[]
+        def record_sleep(seconds):
+            if seconds>=0.8:
+                acquired=m._REQUEST_LOCK.acquire(blocking=False)
+                observed.append(acquired)
+                if acquired:
+                    m._REQUEST_LOCK.release()
+        with patch.object(m.SESSION,"get",side_effect=[requests.exceptions.ReadTimeout("timeout"),good]),patch.object(m.time,"sleep",side_effect=record_sleep):
+            m._get("/test",{})
+        self.assertEqual(observed,[True])
+
 if __name__=="__main__":unittest.main()
