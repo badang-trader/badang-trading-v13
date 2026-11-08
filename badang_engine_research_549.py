@@ -27,6 +27,6 @@ def research_engine_backtest(candles,mode="scalp",horizon=4,fee_per_side=0.0006,
     # Exclude signals whose full future exit window is unavailable.
     if not isinstance(horizon,int) or isinstance(horizon,bool) or horizon<1:
         raise ValueError("Invalid horizon")
-    cutoff=len(candles)-horizon-1
+    cutoff=max(0,len(candles)-horizon-1)
     signals=research_engine_signals(candles,mode,end_index=cutoff)
     return evaluate_signals(candles,signals,horizon,fee_per_side,slippage_per_side)
