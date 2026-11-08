@@ -14,7 +14,7 @@ def _num(v: Any) -> float:
     try:
         f = float(v)
         return f if math.isfinite(f) else float('nan')
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         return float('nan')
 
 
@@ -38,7 +38,7 @@ def normalize(candles: list) -> list[dict]:
             continue
 
         if (
-            d['low'] <= 0
+            min(d['open'], d['high'], d['low'], d['close']) <= 0
             or d['high'] < max(d['open'], d['close'], d['low'])
             or d['low'] > min(d['open'], d['close'])
             or d['volume'] < 0
