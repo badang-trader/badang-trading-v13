@@ -149,6 +149,11 @@ def fastest_candles(symbol,timeframe,exchanges=None):
     # contaminate EMA200, RSI, MACD, or wave analysis.
     complete=[r for r in rows if int(r[0])+step<=now]
     if complete:
+        # A long but stale history is not suitable for a current trade signal.
+        # At most one additional completed interval may have elapsed since
+        # the latest returned closed candle (allowing exchange publication lag).
+        if now-(int(complete[-1][0])+step)>2*step:
+            raise ValueError('Bitget 최근 확정봉 지연: 최신 봉이 2개 시간간격 이상 오래됨')
         contiguous=[complete[-1]]
         for r in reversed(complete[:-1]):
             if int(contiguous[-1][0])-int(r[0]) != step: break
