@@ -15,4 +15,18 @@ class HistoryDiagnosticsTests(unittest.TestCase):
             self.assertIn("history_pages=1",str(caught.exception))
             self.assertEqual(get.call_count,2)
 
+    def test_history_cursor_uses_oldest_observed_timestamp(self):
+        step=86400000
+        now=1760000000000
+        newest=(now//step-1)*step
+        page=[[str(newest-i*step),"100","101","99","100","10"] for i in range(89)]
+        requests=[]
+        def fake_get(path,params):
+            requests.append((path,params))
+            return page if len(requests)==1 else []
+        with patch("bitget_market_data.time.time",return_value=now/1000),patch("bitget_market_data._get",side_effect=fake_get):
+            with self.assertRaises(ValueError):
+                fastest_candles("SOXLUSDT","1D")
+        self.assertEqual(requests[1][1]["endTime"],str(newest-88*step))
+
 if __name__=="__main__":unittest.main()
