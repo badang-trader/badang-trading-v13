@@ -20,8 +20,10 @@ class StoredSignalSafetyTests(unittest.TestCase):
               "take_profit_2":95,"timestamp":1700000000000}
         self.assertIsNone(extract_v13_signal(item,"scalp")["tp2_price"])
     def test_extreme_finite_prices_cannot_overflow_persisted_rr(self):
-        self.assertIsNone(signal(entry_reference=1e308,stop_loss=1e-308,
-                                 take_profit_1=1.7e308,take_profit_2=None))
+        # Tiny positive risk with an enormous target makes reward/risk
+        # overflow even though all individual prices are finite.
+        self.assertIsNone(signal(entry_reference=1e-308,stop_loss=5e-309,
+                                 take_profit_1=1e308,take_profit_2=None))
     def test_normal_risk_reward_is_finite(self):
         self.assertEqual(signal()["risk_reward"],2.0)
 
