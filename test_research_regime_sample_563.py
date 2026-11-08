@@ -12,8 +12,9 @@ class RegimeSampleTests(unittest.TestCase):
     def test_whole_series_not_misrepresented_as_regime_exposure(self):
         trades=[{"signal_index":25,"entry_index":26,"exit_index":29,"net_return":.1}]
         result=regime_sample_review(self.bars,trades)
-        self.assertFalse(result["sideways"]["regime_specific_bars_measured"])
-        self.assertIn("REGIME_EXPOSURE_NOT_MEASURED",result["sideways"]["warnings"])
+        self.assertTrue(result["sideways"]["regime_specific_bars_measured"])
+        self.assertEqual(result["sideways"]["regime_bars"],1080)
+        self.assertNotIn("INSUFFICIENT_HISTORICAL_BARS",result["sideways"]["warnings"])
         self.assertFalse(result["sideways"]["sample_adequate_for_preliminary_review"])
     def test_empty_groups_never_verified(self):
         result=regime_sample_review(self.bars,[])
