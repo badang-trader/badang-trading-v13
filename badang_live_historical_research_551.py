@@ -14,6 +14,7 @@ from badang_research_cost_sensitivity_560 import cost_sensitivity
 from badang_research_regime_sample_563 import regime_sample_review
 from badang_research_regime_exposure_564 import regime_exposure
 from badang_research_timestamp_validation_569 import validate_research_timestamps
+from badang_research_holdout_metrics_578 import holdout_performance
 
 def parse_exchange_timestamp(value):
     """Require exchange epoch milliseconds, never silently coerce seconds."""
@@ -71,6 +72,7 @@ def main():
                         "confirmed_bars":len(closed),
                         "trades":len(result["trades"]),
                         "skipped_overlaps":result["skipped_overlaps"],
+                        "chronological_holdout":holdout_performance(result["trades"],int(len(closed)*0.7),len(closed)),
                         "conditional_regime_metrics":summarize_by_regime(closed,result["trades"]),
                         "regime_sample_review":regime_sample_review(closed,result["trades"]),
                         "regime_exposure":regime_exposure(closed),
