@@ -101,6 +101,8 @@ jobs:
         run: python -m unittest -v test_research_tail_cutoff_553.py
       - name: Live Bitget OHLC conversion regression
         run: python -m unittest -v test_live_history_conversion_552.py
+      - name: Research sample adequacy and claim guard tests
+        run: python -m unittest -v test_research_sample_554.py
       - name: Live public Bitget historical research BTC ETH
         run: python badang_live_historical_research_551.py
       - name: Bounded live read-only memory benchmark
