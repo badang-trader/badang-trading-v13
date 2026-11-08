@@ -71,6 +71,8 @@ jobs:
         run: python -m unittest -v test_scan_offset_safety_536.py
       - name: Bitget historical pagination diagnostic regression tests
         run: python -m unittest -v test_history_diagnostics_537.py
+      - name: Research extreme-price overflow safety regression tests
+        run: python -m unittest -v test_research_overflow_538.py
       - name: Bounded live read-only memory benchmark
         timeout-minutes: 8
         run: python badang_live_benchmark_517.py
