@@ -2567,15 +2567,12 @@ def v13_scan():
                 # v1.7.1: avoid duplicate OKX network calls from legacy v1.5.
                 # Keep the v1.5 module as a local utility dependency of v1.7.
 
-                # BADANG 1.7: stateless, on-demand research only. No database calls.
-                try:
-                    item['v17_research'] = research_v18(item, data['candles'])
-                except Exception as v17_exc:
-                    logger.warning('v1.7 research unavailable for %s: %s', symbol, v17_exc)
-                    item['v17_research'] = {
-                        'status': 'UNAVAILABLE', 'eligible_for_alert': False,
-                        'reason': '1.7 보조 분석 조회 실패'
-                    }
+                # Optional legacy research is not bundled with 5.14.
+                # Do not fabricate funding/OI or spam NameError warnings.
+                from badang_optional_research_515 import evaluate_optional_research
+                item['v17_research'] = evaluate_optional_research(
+                    globals().get('research_v18'), item, data['candles'], logger, symbol
+                )
 
                 # 4.40: never promote another venue's OI/funding to Bitget fields.
                 from badang_source_gate_440 import same_venue_derivatives
