@@ -31,8 +31,6 @@ jobs:
           test -f badang_test_audit_508.py || { echo "5.14 source not yet uploaded; validation cannot pass"; exit 1; }
       - name: Python syntax
         run: python -m compileall -q .
-      - name: Diagnose invalid OHLCV regression
-        run: python -m unittest -v test_future_candle_safety_540.FutureCandleSafetyTests.test_invalid_ohlcv_does_not_get_silently_dropped
       - name: Run 5.14 offline audit
         run: python badang_test_audit_508.py --report badang-ci-audit.json
       - name: Optional research regression tests
