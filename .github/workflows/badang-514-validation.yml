@@ -97,6 +97,8 @@ jobs:
         run: python -m unittest -v test_engine_research_549.py
       - name: Unmocked historical analysis engine research smoke tests
         run: python -m unittest -v test_engine_research_smoke_550.py
+      - name: Live Bitget OHLC conversion regression
+        run: python -m unittest -v test_live_history_conversion_552.py
       - name: Live public Bitget historical research BTC ETH
         run: python badang_live_historical_research_551.py
       - name: Bounded live read-only memory benchmark
