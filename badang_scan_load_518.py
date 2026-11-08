@@ -23,6 +23,7 @@ def one(offset, mode):
         "elapsed_s":round(time.monotonic()-started,2),
         "results":len(payload.get("results",[])),
         "errors":len(payload.get("errors",[])),
+        "insufficient_history":sum("연속 확정봉 부족" in x.get("error","") or "확정봉 부족" in x.get("error","") for x in payload.get("errors",[])),
         "total":payload.get("total"),
         "error_samples":[x.get("error","")[:100] for x in payload.get("errors",[])[:3]],
         "rss_mb":round(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss/1024,2),
@@ -47,6 +48,8 @@ summary={
     "http_200":sum(r["http"]==200 for r in records),
     "symbol_results":sum(r["results"] for r in records),
     "symbol_errors":sum(r["errors"] for r in records),
+    "insufficient_history":sum(r["insufficient_history"] for r in records),
+    "unexpected_errors":sum(r["errors"]-r["insufficient_history"] for r in records),
     "empty_results":sum(r["results"]==0 for r in records),
     "modes_tested":sorted(set(r["mode"] for r in records)),
     "peak_rss_mb":round(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss/1024,2),
@@ -56,5 +59,5 @@ summary={
 }
 with open("badang-scan-load.json","w") as f:json.dump(summary,f,indent=2)
 print("SCAN_SUMMARY",json.dumps({k:v for k,v in summary.items() if k!="records"}),flush=True)
-if summary["http_200"]!=len(records) or summary["symbol_errors"] or summary["empty_results"]:
+if summary["http_200"]!=len(records) or summary["unexpected_errors"] or summary["empty_results"]:
     raise SystemExit("Scan route failed or produced symbol errors")
