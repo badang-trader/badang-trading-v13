@@ -39,6 +39,11 @@ def audit(start_dir='.', pattern='test*.py', loader=None, runner=None):
             outcome = (runner or unittest.TextTestRunner(stream=stream, verbosity=0)).run(suite)
         result.update(tests_run=outcome.testsRun, failures=len(outcome.failures),
                       errors=len(outcome.errors), skipped=len(outcome.skipped))
+        # Test identifiers only: no traceback, inputs, secrets or credentials.
+        if outcome.failures or outcome.errors:
+            result['failed_test_ids'] = [
+                test.id() for test, _ in outcome.failures + outcome.errors
+            ][:20]
         missing = set()
         dependency_errors = 0
         for _, trace in outcome.errors:
