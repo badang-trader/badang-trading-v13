@@ -99,6 +99,10 @@ def _summary(events, minimum):
             grade: _grade_summary(events, grade, minimum)
             for grade in ("strong_evidence", "moderate_evidence", "limited_evidence", "ungraded")
         },
+        "by_pre_touch_regime": {
+            regime: _regime_summary(events, regime, minimum)
+            for regime in ("up", "down", "sideways", "unclassified")
+        },
         "adequate_sample": resolved >= minimum,
         "rebound_fraction": (
             round(counts["rebound"] / resolved, 4) if resolved >= minimum else None),
@@ -131,5 +135,18 @@ def _grade_summary(events, grade, minimum):
     return {"events": len(selected), "resolved": resolved,
             "rebound": rebound, "breakdown": breakdown,
             "pre_outcome_mae_by_outcome": mae_by_outcome,
+            "rebound_fraction": round(rebound / resolved, 4) if resolved >= minimum else None,
+            "sample_adequate": resolved >= minimum}
+
+
+def _regime_summary(events, regime, minimum):
+    selected = [e for e in events if (
+        e.get("regime_before_touch") not in ("up", "down", "sideways")
+        if regime == "unclassified" else e.get("regime_before_touch") == regime)]
+    rebound = sum(e["outcome"] == "rebound" for e in selected)
+    breakdown = sum(e["outcome"] in ("breakdown", "breakdown_on_touch") for e in selected)
+    resolved = rebound + breakdown
+    return {"events": len(selected), "resolved": resolved,
+            "rebound": rebound, "breakdown": breakdown,
             "rebound_fraction": round(rebound / resolved, 4) if resolved >= minimum else None,
             "sample_adequate": resolved >= minimum}
