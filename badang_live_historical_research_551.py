@@ -79,8 +79,8 @@ def main():
             raise ValueError("Too few confirmed historical bars: "+symbol+" "+frame)
         result=research_engine_backtest(closed,mode=mode,horizon=3)
         support_research=None
-        if (symbol,frame,mode) in (("BTCUSDT","15m","scalp"),("BTCUSDT","30m","scalp"),("ETHUSDT","30m","scalp"),("ETHUSDT","4H","swing")):
-            support_frame={"15m":"15m","30m":"30m","4H":"4h"}[frame]
+        if (symbol,frame,mode) in (("BTCUSDT","15m","scalp"),("BTCUSDT","30m","scalp"),("BTCUSDT","1H","scalp"),("ETHUSDT","30m","scalp"),("ETHUSDT","1H","scalp"),("ETHUSDT","4H","swing")):
+            support_frame={"15m":"15m","30m":"30m","1H":"1h","4H":"4h"}[frame]
             support_research=chronological_support_holdout(
                 closed,symbol.removesuffix("USDT"),support_frame,mode,
                 exchange_now_ms=closed[-1]["timestamp"]+FRAME_INTERVAL_MS[frame],
