@@ -49,6 +49,9 @@ class EvidenceGradeHoldoutTests(unittest.TestCase):
         result=_summary(events,30)["by_pre_touch_regime"]
         self.assertEqual(sum(g["events"] for g in result.values()),4)
         self.assertEqual(result["up"]["rebound"],1)
+        self.assertEqual(result["up"]["pre_outcome_mae_by_outcome"]["rebound"]["mean_pre_outcome_mae_pct"],0.2)
+        self.assertEqual(result["down"]["pre_outcome_mae_by_outcome"]["breakdown"]["max_pre_outcome_mae_pct"],1.0)
+        self.assertEqual(result["unclassified"]["pre_outcome_mae_by_outcome"]["breakdown_on_touch"]["count"],1)
         self.assertEqual(result["down"]["breakdown"],1)
         self.assertEqual(result["sideways"]["resolved"],0)
         self.assertEqual(result["unclassified"]["breakdown"],1)
