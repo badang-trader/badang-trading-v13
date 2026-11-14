@@ -16,8 +16,8 @@ def bars():
 
 def fake_support(candles, symbol, timeframe, mode, *, exchange_now_ms):
     return {"status": "ok", "zones": [{
-        "status": "historical_support", "lower": 98.5,
-        "upper": 99.5, "center": 99, "evidence_score": 75
+        "status": "historical_support", "lower": 99.0,
+        "upper": 100.5, "center": 100, "evidence_score": 75
     }]}
 
 
@@ -38,8 +38,8 @@ class CloseOutcomeTests(unittest.TestCase):
     def test_confirmed_close_counts(self):
         data = bars()
         data[91]["open"] = 100
-        data[91]["high"] = 102
-        data[91]["close"] = 101
+        data[91]["high"] = 103
+        data[91]["close"] = 102
         with patch("badang_support_backtest_545.validated_support_reliability",
                    side_effect=fake_support):
             result = support_touch_backtest(
