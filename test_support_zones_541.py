@@ -41,6 +41,28 @@ class SupportZonesTests(unittest.TestCase):
         self.assertFalse(any(89 <= z["center"] <= 91
                              for z in result["zones"]))
 
+    def test_identical_timeframe_zones_report_confluence(self):
+        same = candles()
+        result = multi_timeframe_support(
+            {"1h": same, "4h": same, "1d": same}, "BTC", "swing")
+        for tf, item in result.items():
+            self.assertEqual(item["status"], "ok")
+            self.assertTrue(item["zones"])
+            for zone in item["zones"]:
+                self.assertEqual(zone["timeframe_confluence_count"], 3)
+                self.assertEqual(set(zone["overlapping_timeframes"]),
+                                 {"1h", "4h", "1d"} - {tf})
+
+    def test_missing_timeframe_does_not_inflate_confluence(self):
+        result = multi_timeframe_support(
+            {"1h": candles()}, "BTC", "swing")
+        self.assertEqual(result["4h"]["status"], "insufficient_history")
+        self.assertEqual(result["1d"]["status"], "insufficient_history")
+        self.assertTrue(result["1h"]["zones"])
+        self.assertTrue(all(z["timeframe_confluence_count"] == 1
+                            and z["overlapping_timeframes"] == []
+                            for z in result["1h"]["zones"]))
+
     def test_boolean_pivot_settings_rejected(self):
         for kwargs in ({"radius": True}, {"radius": False},
                        {"max_zones": True}, {"max_zones": False}):
