@@ -1,5 +1,7 @@
 """Regression checks for causal support-touch research."""
 import unittest
+from unittest.mock import patch
+from badang_research_regimes_555 import regime_at
 from badang_support_backtest_545 import support_touch_backtest
 
 STEP = 900000
@@ -31,6 +33,25 @@ class BacktestTests(unittest.TestCase):
         changed[-1]["high"] += 30
         after = support_touch_backtest(changed, "BTC", "15m", exchange_now_ms=130*STEP)
         self.assertEqual(before["events"], after["events"])
+
+    def test_regime_at_touch_uses_only_pre_touch_closes(self):
+        data = bars()
+        zone = {"status":"historical_support","lower":98.0,"upper":105.0,
+                "center":101.5,"evidence_score":2,"evidence_grade":"limited_evidence"}
+        with patch("badang_support_backtest_545.validated_support_reliability",
+                   return_value={"status":"ok","zones":[zone]}):
+            original = support_touch_backtest(data,"BTC","15m",
+                                               exchange_now_ms=130*STEP)
+            changed = bars()
+            changed[90]["close"] = 104.0
+            altered = support_touch_backtest(changed,"BTC","15m",
+                                              exchange_now_ms=130*STEP)
+        self.assertTrue(original["events"])
+        self.assertEqual(original["events"][0]["touch_bar_index"],90)
+        self.assertEqual(original["events"][0]["regime_before_touch"],
+                         altered["events"][0]["regime_before_touch"])
+        self.assertEqual(original["events"][0]["regime_before_touch"],
+                         regime_at(data,89))
 
     def test_gap_rejected(self):
         data = bars()
