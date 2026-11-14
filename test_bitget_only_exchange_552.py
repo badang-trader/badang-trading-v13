@@ -7,7 +7,7 @@ from exchange_data import fastest_candles
 class BitgetOnlyExchangeTests(unittest.TestCase):
     def test_other_exchanges_rejected_without_network(self):
         for exchanges in (["okx"], ["binance"], ["bitget", "okx"],
-                          [], "bitget", None if False else ["BITGET"]):
+                          [], "bitget", ["BITGET"]):
             with self.subTest(exchanges=exchanges):
                 with patch("exchange_data.bitget_candles") as bitget, \
                      patch("exchange_data.okx_candles") as okx, \
