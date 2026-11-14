@@ -84,6 +84,20 @@ class HoldoutTests(unittest.TestCase):
                         bars(), "BTC", "15m", exchange_now_ms=200*STEP,
                         min_resolved=invalid)
 
+    def test_invalid_horizon_warmup_and_rebound_rejected(self):
+        cases = [
+            {"horizon": True}, {"horizon": 1.5}, {"horizon": 0},
+            {"warmup": True}, {"warmup": 60.5}, {"warmup": 59},
+            {"rebound_pct": True}, {"rebound_pct": float("nan")},
+            {"rebound_pct": float("inf")}, {"rebound_pct": 0},
+        ]
+        for overrides in cases:
+            with self.subTest(overrides=overrides):
+                with self.assertRaises(ValueError):
+                    chronological_support_holdout(
+                        bars(), "BTC", "15m", exchange_now_ms=200*STEP,
+                        **overrides)
+
     def test_invalid_split(self):
         with self.assertRaises(ValueError):
             chronological_support_holdout(
