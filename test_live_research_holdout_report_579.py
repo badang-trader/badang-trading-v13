@@ -7,8 +7,8 @@ import badang_live_historical_research_551 as m
 
 BASE=1793999700000
 def snapshot(frame):
-    step=900000 if frame=="15m" else 86400000
-    start=BASE if frame=="15m" else BASE-BASE%86400000
+    step=m.FRAME_INTERVAL_MS[frame]
+    start=BASE-BASE%step
     row=lambda i:[str(start+i*step),"100","102","99","101","10"]
     return {"candles":[row(i) for i in range(212)]}
 
@@ -21,7 +21,7 @@ class LiveHoldoutReportTests(unittest.TestCase):
             with redirect_stdout(output):m.main()
         report=json.loads(output.getvalue().split("LIVE_HISTORICAL_RESEARCH_SUMMARY ",1)[1])
         self.assertFalse(report["trading_enabled"])
-        self.assertEqual(len(report["results"]),2)
+        self.assertEqual(len(report["results"]),len(m.TARGETS))
         for result in report["results"]:
             holdout=result["chronological_holdout"]
             self.assertEqual(holdout["split_index"],int(result["confirmed_bars"]*.7))
