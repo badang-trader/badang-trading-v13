@@ -51,7 +51,7 @@ def research_history(symbol, timeframe, *, target_bars=1000, max_pages=6,
                 o, h, l, c, v = map(float, item[1:6])
             except (TypeError, ValueError, OverflowError) as exc:
                 raise ValueError("Invalid Bitget historical OHLCV") from exc
-            if (stamp % step or stamp < 0 or
+            if (stamp % step or stamp < 0 or stamp > now_ms + step or
                 not all(math.isfinite(x) for x in (o, h, l, c, v)) or
                 min(o, h, l, c) <= 0 or h < max(o, l, c) or
                 l > min(o, c) or v < 0):
