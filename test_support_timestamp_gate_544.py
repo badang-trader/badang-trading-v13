@@ -32,6 +32,35 @@ class TimestampGateTests(unittest.TestCase):
                     validated_support_reliability(
                         bars(), "BTC", "15m", exchange_now_ms=clock)
 
+    def test_all_bitget_timeframes_require_closed_contiguous_bars(self):
+        intervals = {"15m": 900000, "30m": 1800000,
+                     "1h": 3600000, "4h": 14400000,
+                     "1d": 86400000}
+        for timeframe, interval in intervals.items():
+            mode = "swing" if timeframe in ("4h", "1d") else "scalp"
+            with self.subTest(timeframe=timeframe):
+                data = bars()
+                for i, row in enumerate(data):
+                    row["timestamp"] = i * interval
+                result = validated_support_reliability(
+                    data, "BTC", timeframe, mode,
+                    exchange_now_ms=len(data)*interval)
+                self.assertEqual(result["status"], "ok")
+                self.assertEqual(result["timestamp_integrity"], "verified")
+
+                data[40]["timestamp"] += interval
+                broken = validated_support_reliability(
+                    data, "BTC", timeframe, mode,
+                    exchange_now_ms=len(data)*interval)
+                self.assertEqual(broken["status"], "noncontiguous_history")
+                self.assertFalse(broken["trading_ready"])
+
+                data[40]["timestamp"] -= interval
+                open_bar = validated_support_reliability(
+                    data, "BTC", timeframe, mode,
+                    exchange_now_ms=len(data)*interval-1)
+                self.assertEqual(open_bar["status"], "open_or_future_candle")
+
     def test_closed_contiguous(self):
         data = bars()
         r = validated_support_reliability(data, "BTC", "15m",
