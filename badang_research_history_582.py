@@ -73,6 +73,8 @@ def research_history(symbol, timeframe, *, target_bars=1000, max_pages=6,
         if len(seen) >= target_bars:
             stop = "target_reached"
             break
+    # A page with fewer than the requested 200 candles can still have a gap;
+    # only the final consecutive suffix is eligible for research.
     stamps = sorted(seen)
     if not stamps:
         return {"status": "insufficient_history", "candles": [],
