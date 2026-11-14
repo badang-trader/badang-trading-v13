@@ -24,6 +24,8 @@ class LiveHoldoutReportTests(unittest.TestCase):
         self.assertEqual(len(report["results"]),len(m.TARGETS))
         for result in report["results"]:
             self.assertLess(result["research_window_start_ms"], result["research_window_end_ms"])
+            self.assertFalse(result["mode_specific_strategy_verified"])
+            self.assertEqual(result["mode_comparison_warning"], "SCALP_SWING_SHARE_SIGNAL_RULES_AND_HORIZON")
             holdout=result["chronological_holdout"]
             self.assertEqual(holdout["split_index"],int(result["confirmed_bars"]*.7))
             self.assertEqual(holdout["development"]["completed_trades"],0)
