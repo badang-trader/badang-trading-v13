@@ -61,6 +61,21 @@ class TimestampGateTests(unittest.TestCase):
                     exchange_now_ms=len(data)*interval-1)
                 self.assertEqual(open_bar["status"], "open_or_future_candle")
 
+    def test_short_history_does_not_hide_invalid_symbol_or_mode(self):
+        for symbol, timeframe, mode in (
+            ("SOL", "15m", "scalp"),
+            (None, "15m", "scalp"),
+            ("BTC", "1d", "scalp"),
+            ("BTC", "15m", "swing"),
+            ("BTC", "15m", None),
+            ("BTC", "15m", []),
+        ):
+            with self.subTest(symbol=symbol, timeframe=timeframe, mode=mode):
+                with self.assertRaises(ValueError):
+                    validated_support_reliability(
+                        bars(10), symbol, timeframe, mode,
+                        exchange_now_ms=120*STEP)
+
     def test_short_history_does_not_bypass_exchange_clock_validation(self):
         for clock in (None, True, -1, float("nan"), "invalid"):
             with self.subTest(clock=clock):
