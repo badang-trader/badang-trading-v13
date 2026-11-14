@@ -41,6 +41,13 @@ class SupportZonesTests(unittest.TestCase):
         self.assertFalse(any(89 <= z["center"] <= 91
                              for z in result["zones"]))
 
+    def test_boolean_pivot_settings_rejected(self):
+        for kwargs in ({"radius": True}, {"radius": False},
+                       {"max_zones": True}, {"max_zones": False}):
+            with self.subTest(kwargs=kwargs):
+                with self.assertRaises(ValueError):
+                    support_zones(candles(), "BTC", "15m", **kwargs)
+
     def test_invalid_middle_bar_fails_closed(self):
         data = candles()
         data[44]["high"] = 0
