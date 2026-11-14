@@ -74,6 +74,17 @@ class ResearchHistoryTests(unittest.TestCase):
         self.assertLessEqual(int(r["candles"][-1][0]) + STEP, NOW)
         self.assertTrue(r["fresh"])
 
+    def test_in_progress_candle_is_excluded_without_aborting_page(self):
+        def fetch(path, params):
+            end = int(params["endTime"]) // STEP
+            return [candle(i) for i in range(end - 200, end)]
+        r = research_history("BTCUSDT", "15m", target_bars=205,
+                             max_pages=2, now_ms=NOW, fetch=fetch)
+        self.assertEqual(r["status"], "ok")
+        self.assertEqual(r["confirmed_bars"], 205)
+        self.assertNotIn(str(2000000 * STEP),
+                         [row[0] for row in r["candles"]])
+
     def test_stale_contiguous_history_is_not_adequate(self):
         def fetch(path, params):
             end = min(int(params["endTime"]) // STEP, 1999000)
