@@ -436,6 +436,12 @@ def validate_candles(
             f"{len(result)}/{minimum}"
         )
 
+    timestamps = sorted(valid)
+    if any(ts % interval_ms != 0 for ts in timestamps):
+        raise ValueError("Misaligned Bitget candle timestamps")
+    if any(b - a != interval_ms for a, b in zip(timestamps, timestamps[1:])):
+        raise ValueError("Noncontiguous Bitget candle history")
+
     return result
 
 
