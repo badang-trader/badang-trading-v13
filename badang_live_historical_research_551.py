@@ -80,6 +80,8 @@ def main():
         metrics=result["summary"]
         reports.append({"symbol":symbol,"frame":frame,"mode":mode,
                         "confirmed_bars":len(closed),
+                        "mode_specific_strategy_verified":False,
+                        "mode_comparison_warning":"SCALP_SWING_SHARE_SIGNAL_RULES_AND_HORIZON",
                         "research_window_start_ms":closed[0]["timestamp"],
                         "research_window_end_ms":closed[-1]["timestamp"],
                         "trades":len(result["trades"]),
