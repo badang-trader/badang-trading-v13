@@ -36,6 +36,16 @@ class HoldoutTests(unittest.TestCase):
         self.assertIsNone(r["holdout"]["rebound_fraction"])
         self.assertFalse(r["holdout"]["adequate_sample"])
 
+    def test_event_cap_refuses_biased_holdout(self):
+        events = [event(100)] * 1000
+        with patch("badang_support_holdout_550.support_touch_backtest",
+                   return_value={"status": "ok", "events": events}):
+            r = chronological_support_holdout(
+                bars(), "BTC", "15m", exchange_now_ms=200*STEP)
+        self.assertEqual(r["status"], "event_cap_reached")
+        self.assertFalse(r["trading_ready"])
+        self.assertNotIn("holdout", r)
+
     def test_invalid_split(self):
         with self.assertRaises(ValueError):
             chronological_support_holdout(
