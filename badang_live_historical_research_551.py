@@ -80,6 +80,8 @@ def main():
         metrics=result["summary"]
         reports.append({"symbol":symbol,"frame":frame,"mode":mode,
                         "confirmed_bars":len(closed),
+                        "research_window_start_ms":closed[0]["timestamp"],
+                        "research_window_end_ms":closed[-1]["timestamp"],
                         "trades":len(result["trades"]),
                         "skipped_overlaps":result["skipped_overlaps"],
                         "chronological_holdout":holdout_performance(result["trades"],int(len(closed)*0.7),len(closed)),
