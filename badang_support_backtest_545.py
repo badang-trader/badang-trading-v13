@@ -88,6 +88,7 @@ def support_touch_backtest(candles, symbol, timeframe, mode="scalp",
                        "max_adverse_excursion_pct": round(adverse_pct, 4)})
         # Non-overlapping evaluation windows avoid repeated counting.
         i += horizon + 1
+    scan_complete = i + horizon >= len(rows)
     counts = {name: sum(e["outcome"] == name for e in events)
               for name in ("rebound", "breakdown", "breakdown_on_touch", "ambiguous", "unresolved")}
     resolved = counts["rebound"] + counts["breakdown"] + counts["breakdown_on_touch"]
@@ -107,6 +108,8 @@ def support_touch_backtest(candles, symbol, timeframe, mode="scalp",
             "horizon_bars": horizon, "rebound_threshold_pct": rebound_pct,
             "outcome_basis": "confirmed close only; no intrabar wick credit",
             "events": events, "counts": counts,
+            "scan_complete": scan_complete,
+            "event_cap_reached": not scan_complete and len(events) >= max_events,
             "resolved_events": resolved,
             "adverse_excursion_by_outcome": adverse_by_outcome,
             "mean_pre_outcome_max_adverse_excursion_pct": (
