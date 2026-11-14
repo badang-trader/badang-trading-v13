@@ -70,6 +70,20 @@ class HoldoutTests(unittest.TestCase):
                 bars(), "ETH", "15m", exchange_now_ms=200*STEP)
         self.assertEqual(r["status"], "event_cap_reached")
 
+    def test_nonfinite_and_boolean_inputs_rejected(self):
+        for invalid in (float("nan"), float("inf"), -float("inf"), True, False, "0.7"):
+            with self.subTest(train_fraction=repr(invalid)):
+                with self.assertRaises(ValueError):
+                    chronological_support_holdout(
+                        bars(), "BTC", "15m", exchange_now_ms=200*STEP,
+                        train_fraction=invalid)
+        for invalid in (True, False, 0):
+            with self.subTest(min_resolved=repr(invalid)):
+                with self.assertRaises(ValueError):
+                    chronological_support_holdout(
+                        bars(), "BTC", "15m", exchange_now_ms=200*STEP,
+                        min_resolved=invalid)
+
     def test_invalid_split(self):
         with self.assertRaises(ValueError):
             chronological_support_holdout(
