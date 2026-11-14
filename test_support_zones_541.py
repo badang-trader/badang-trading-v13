@@ -26,6 +26,21 @@ class SupportZonesTests(unittest.TestCase):
         self.assertEqual(centers, sorted(centers, reverse=True))
         self.assertTrue(all(z["upper"] < result["reference_close"] for z in result["zones"]))
 
+    def test_broken_historical_support_is_not_reintroduced(self):
+        data = [{"open": 100, "high": 101, "low": 99,
+                 "close": 100, "volume": 100} for _ in range(120)]
+        for i in (20, 40):
+            data[i]["low"] = 90
+        # A later confirmed close below the old 90 support invalidates it.
+        data[60].update({"open": 100, "high": 101, "low": 84,
+                         "close": 85})
+        data[-1].update({"open": 100, "high": 111, "low": 99,
+                         "close": 110})
+        result = support_zones(data, "BTC", "15m")
+        self.assertEqual(result["status"], "ok")
+        self.assertFalse(any(89 <= z["center"] <= 91
+                             for z in result["zones"]))
+
     def test_invalid_middle_bar_fails_closed(self):
         data = candles()
         data[44]["high"] = 0
