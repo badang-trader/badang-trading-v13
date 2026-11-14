@@ -93,6 +93,13 @@ def main():
                 if grade_total != section["event_count"]:
                     raise ValueError("Support grade event accounting mismatch: "+
                                      symbol+" "+frame+" "+partition)
+                regime_groups = section.get("by_pre_touch_regime", {})
+                if sum(group["events"] for group in regime_groups.values()) != section["event_count"]:
+                    raise ValueError("Support regime event accounting mismatch: "+
+                                     symbol+" "+frame+" "+partition)
+                if sum(group["resolved"] for group in regime_groups.values()) != section["resolved_count"]:
+                    raise ValueError("Support regime resolved accounting mismatch: "+
+                                     symbol+" "+frame+" "+partition)
                 grade_resolved = sum(group["resolved"] for group in
                                      section["by_evidence_grade"].values())
                 if grade_resolved != section["resolved_count"]:
