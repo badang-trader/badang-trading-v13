@@ -180,6 +180,13 @@ jobs:
         run: python -m unittest -v test_live_research_timeframe_580.py
       - name: Live public Bitget historical research BTC ETH
         run: python badang_live_historical_research_551.py
+      - name: Upload per-timeframe historical research report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: badang-551-bitget-historical-research
+          path: badang-live-historical-research.json
+          if-no-files-found: ignore
       - name: Bounded live read-only memory benchmark
         timeout-minutes: 8
         run: python badang_live_benchmark_517.py
