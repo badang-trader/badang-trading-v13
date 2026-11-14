@@ -160,6 +160,8 @@ jobs:
         run: python -m unittest -v test_support_zones_541.py test_volume_profile_542.py test_support_reliability_543.py
       - name: BTC ETH support timestamp integrity regression
         run: python -m unittest -v test_support_timestamp_gate_544.py
+      - name: Causal BTC ETH support touch outcome regression
+        run: python -m unittest -v test_support_backtest_545.py
       - name: Live public Bitget historical research BTC ETH
         run: python badang_live_historical_research_551.py
       - name: Bounded live read-only memory benchmark
