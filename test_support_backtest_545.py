@@ -43,7 +43,7 @@ class BacktestTests(unittest.TestCase):
             original = support_touch_backtest(data,"BTC","15m",
                                                exchange_now_ms=130*STEP)
             changed = bars()
-            changed[90]["close"] = 104.0
+            changed[90]["close"] = changed[90]["open"] + 0.5
             altered = support_touch_backtest(changed,"BTC","15m",
                                               exchange_now_ms=130*STEP)
         self.assertTrue(original["events"])
