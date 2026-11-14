@@ -61,6 +61,16 @@ class TimestampGateTests(unittest.TestCase):
                     exchange_now_ms=len(data)*interval-1)
                 self.assertEqual(open_bar["status"], "open_or_future_candle")
 
+    def test_short_history_does_not_bypass_exchange_clock_validation(self):
+        for clock in (None, True, -1, float("nan"), "invalid"):
+            with self.subTest(clock=clock):
+                with self.assertRaises(ValueError):
+                    validated_support_reliability(
+                        bars(10), "BTC", "15m", exchange_now_ms=clock)
+        result = validated_support_reliability(
+            bars(10), "BTC", "15m", exchange_now_ms=120*STEP)
+        self.assertEqual(result["status"], "insufficient_history")
+
     def test_closed_contiguous(self):
         data = bars()
         r = validated_support_reliability(data, "BTC", "15m",
