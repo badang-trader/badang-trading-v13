@@ -24,6 +24,10 @@ class LiveHoldoutReportTests(unittest.TestCase):
         self.assertEqual(report["historical_sample_coverage"]["target_count"],len(m.TARGETS))
         self.assertEqual(report["historical_sample_coverage"]["insufficient_target_count"],len(m.TARGETS))
         self.assertFalse(report["historical_sample_coverage"]["all_targets_preliminary_sample_adequate"])
+        self.assertEqual(set(report["support_holdout_regime_coverage"]),
+                         {"up","down","sideways","unclassified"})
+        self.assertTrue(all(group["timeframes_with_adequate_sample"] == 0
+                            for group in report["support_holdout_regime_coverage"].values()))
         self.assertEqual(len(report["results"]),len(m.TARGETS))
         self.assertEqual(support_mock.call_count,8)
         self.assertEqual({call.args[1] for call in support_mock.call_args_list},{"BTC","ETH"})
