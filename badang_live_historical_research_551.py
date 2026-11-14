@@ -15,6 +15,7 @@ from badang_research_regime_sample_563 import regime_sample_review
 from badang_research_regime_exposure_564 import regime_exposure
 from badang_research_timestamp_validation_569 import validate_research_timestamps
 from badang_research_holdout_metrics_578 import holdout_performance
+from badang_support_holdout_550 import chronological_support_holdout
 
 def parse_exchange_timestamp(value):
     """Require exchange epoch milliseconds, never silently coerce seconds."""
@@ -77,9 +78,17 @@ def main():
         if len(closed)<210:
             raise ValueError("Too few confirmed historical bars: "+symbol+" "+frame)
         result=research_engine_backtest(closed,mode=mode,horizon=3)
+        support_research=None
+        if (symbol,frame,mode) in (("BTCUSDT","15m","scalp"),("ETHUSDT","4H","swing")):
+            support_frame={"15m":"15m","4H":"4h"}[frame]
+            support_research=chronological_support_holdout(
+                closed,symbol,support_frame,mode,
+                exchange_now_ms=closed[-1]["timestamp"]+FRAME_INTERVAL_MS[frame],
+                horizon=8,warmup=90,rebound_pct=0.5,min_resolved=30)
         metrics=result["summary"]
         reports.append({"symbol":symbol,"frame":frame,"mode":mode,
                         "confirmed_bars":len(closed),
+                        "support_holdout_research":support_research,
                         "mode_specific_strategy_verified":False,
                         "mode_comparison_warning":"SCALP_SWING_SHARE_SIGNAL_RULES_AND_HORIZON",
                         "research_window_start_ms":closed[0]["timestamp"],
