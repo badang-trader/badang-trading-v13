@@ -8,6 +8,7 @@ Not a calibrated trading signal or win-rate claim without adequate samples.
 from __future__ import annotations
 from badang_support_timestamp_gate_544 import validated_support_reliability, FRAME_MS
 from badang_support_zones_541 import _candle
+from badang_research_regimes_555 import regime_at
 
 
 def support_touch_backtest(candles, symbol, timeframe, mode="scalp",
@@ -85,6 +86,7 @@ def support_touch_backtest(candles, symbol, timeframe, mode="scalp",
                        "zone_upper": zone["upper"],
                        "evidence_score_at_touch": zone["evidence_score"],
                        "evidence_grade_at_touch": zone.get("evidence_grade"),
+                       "regime_before_touch": regime_at(rows, i-1),
                        "outcome": outcome,
                        "outcome_bar_index": outcome_bar_index,
                        "pre_outcome_max_adverse_excursion_pct": round(pre_outcome_adverse_pct, 4),
