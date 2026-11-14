@@ -36,6 +36,8 @@ def support_zones(candles, symbol, timeframe, mode="scalp", *, confirmed=True,
 
     Caller must verify source timestamps, equal bar spacing and closed-bar status.
     """
+    if not isinstance(symbol, str) or not symbol.strip():
+        raise ValueError("invalid symbol")
     base = symbol.upper().split("-")[0].split("/")[0]
     if base not in SYMBOLS or mode not in TIMEFRAMES or timeframe not in TIMEFRAMES[mode]:
         raise ValueError("unsupported symbol/timeframe/mode")
