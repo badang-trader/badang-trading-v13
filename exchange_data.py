@@ -416,13 +416,15 @@ def validate_candles(
             ):
                 continue
 
+            if ts in valid:
+                raise ValueError("Duplicate Bitget candle timestamp")
             valid[ts] = row
 
-        except (
-            ValueError,
-            TypeError,
-            IndexError
-        ):
+        except ValueError as exc:
+            if str(exc) == "Duplicate Bitget candle timestamp":
+                raise
+            continue
+        except (TypeError, IndexError):
             continue
 
     result = [
