@@ -28,7 +28,7 @@ def chronological_support_holdout(candles, symbol, timeframe, mode="scalp",
         raise ValueError("invalid warmup")
     if (isinstance(rebound_pct, bool) or
             not isinstance(rebound_pct, (int, float)) or
-            not math.isfinite(rebound_pct) or not 0 < rebound_pct <= 20):
+            not 0 < rebound_pct <= 20):
         raise ValueError("invalid rebound threshold")
     if not isinstance(candles, (list, tuple)) or len(candles) < warmup + horizon + 2:
         return {"status": "insufficient_history", "trading_ready": False}
