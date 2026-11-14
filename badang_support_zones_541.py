@@ -39,7 +39,9 @@ def support_zones(candles, symbol, timeframe, mode="scalp", *, confirmed=True,
     if not isinstance(symbol, str) or not symbol.strip():
         raise ValueError("invalid symbol")
     base = symbol.upper().split("-")[0].split("/")[0]
-    if base not in SYMBOLS or mode not in TIMEFRAMES or timeframe not in TIMEFRAMES[mode]:
+    if (base not in SYMBOLS or not isinstance(mode, str) or
+            mode not in TIMEFRAMES or not isinstance(timeframe, str) or
+            timeframe not in TIMEFRAMES[mode]):
         raise ValueError("unsupported symbol/timeframe/mode")
     if not confirmed:
         return {"status": "unconfirmed", "zones": [], "trading_ready": False}
@@ -115,7 +117,7 @@ def support_zones(candles, symbol, timeframe, mode="scalp", *, confirmed=True,
 
 def multi_timeframe_support(series_by_timeframe, symbol, mode="scalp"):
     """Input is a mapping of timeframe to independently confirmed candles."""
-    if mode not in TIMEFRAMES:
+    if not isinstance(mode, str) or mode not in TIMEFRAMES:
         raise ValueError("unsupported mode")
     results = {tf: support_zones(series_by_timeframe.get(tf, []), symbol, tf, mode)
                for tf in TIMEFRAMES[mode]}
