@@ -74,6 +74,25 @@ class ResearchHistoryTests(unittest.TestCase):
         self.assertLessEqual(int(r["candles"][-1][0]) + STEP, NOW)
         self.assertTrue(r["fresh"])
 
+    def test_stale_contiguous_history_is_not_adequate(self):
+        def fetch(path, params):
+            end = min(int(params["endTime"]) // STEP, 1999000)
+            return [candle(i) for i in range(end - 200, end)]
+        r = research_history("BTCUSDT", "15m", target_bars=205,
+                             max_pages=2, now_ms=NOW, fetch=fetch)
+        self.assertEqual(r["confirmed_bars"], 205)
+        self.assertFalse(r["fresh"])
+        self.assertEqual(r["status"], "insufficient_history")
+
+    def test_malformed_ohlc_is_rejected_without_repair(self):
+        def fetch(path, params):
+            row = candle(1999999)
+            row[2] = "98"  # high below open and close
+            return [row]
+        with self.assertRaisesRegex(ValueError, "Invalid Bitget historical candle"):
+            research_history("BTCUSDT", "15m", target_bars=205,
+                             now_ms=NOW, fetch=fetch)
+
     def test_rejects_invalid_and_future_candles(self):
         def future(path, params):
             return [candle(2000002)]
