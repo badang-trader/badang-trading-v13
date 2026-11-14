@@ -97,7 +97,7 @@ def _summary(events, minimum):
         "counts": counts,
         "by_evidence_grade": {
             grade: _grade_summary(events, grade, minimum)
-            for grade in ("strong_evidence", "moderate_evidence", "limited_evidence")
+            for grade in ("strong_evidence", "moderate_evidence", "limited_evidence", None)
         },
         "adequate_sample": resolved >= minimum,
         "rebound_fraction": (
