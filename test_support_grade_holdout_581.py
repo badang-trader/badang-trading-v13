@@ -17,7 +17,20 @@ class EvidenceGradeHoldoutTests(unittest.TestCase):
         self.assertFalse(strong["sample_adequate"])
         self.assertEqual(result["by_evidence_grade"]["moderate_evidence"]["breakdown"],1)
         self.assertEqual(result["by_evidence_grade"]["limited_evidence"]["resolved"],0)
-        self.assertEqual(result["by_evidence_grade"][None]["events"],0)
+        self.assertEqual(result["by_evidence_grade"]["ungraded"]["events"],0)
+
+    def test_missing_and_unknown_grades_are_not_lost(self):
+        events=[
+            {"outcome":"rebound","pre_outcome_max_adverse_excursion_pct":0.2},
+            {"outcome":"breakdown","evidence_grade_at_touch":"unknown","pre_outcome_max_adverse_excursion_pct":0.8},
+            {"outcome":"unresolved","evidence_grade_at_touch":"limited_evidence","pre_outcome_max_adverse_excursion_pct":0.1},
+        ]
+        result=_summary(events,30)
+        groups=result["by_evidence_grade"]
+        self.assertEqual(sum(g["events"] for g in groups.values()),len(events))
+        self.assertEqual(groups["ungraded"]["events"],2)
+        self.assertEqual(groups["ungraded"]["resolved"],2)
+        self.assertIsNone(groups["ungraded"]["rebound_fraction"])
 
     def test_probability_only_when_threshold_met(self):
         events=[{"outcome":"rebound" if i<18 else "breakdown",
