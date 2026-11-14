@@ -16,7 +16,7 @@ class LiveHoldoutReportTests(unittest.TestCase):
     def test_public_report_has_separate_unverified_holdout(self):
         def market(symbol,frame):
             return snapshot(frame)
-        with patch.object(m,"fastest_candles",side_effect=market),patch.object(m,"research_engine_backtest",return_value={"trades":[],"summary":None,"skipped_overlaps":0}),patch.object(m,"chronological_support_holdout",return_value={"status":"ok","trading_ready":False}) as support_mock:
+        with patch.object(m,"fastest_candles",side_effect=market),patch.object(m,"research_engine_backtest",return_value={"trades":[],"summary":None,"skipped_overlaps":0}),patch.object(m,"chronological_support_holdout",return_value={"status":"ok","trading_ready":False,"train":{"event_count":0,"resolved_count":0,"by_evidence_grade":{}},"holdout":{"event_count":0,"resolved_count":0,"by_evidence_grade":{}}}) as support_mock:
             output=io.StringIO()
             with redirect_stdout(output):m.main()
         report=json.loads(output.getvalue().split("LIVE_HISTORICAL_RESEARCH_SUMMARY ",1)[1])
