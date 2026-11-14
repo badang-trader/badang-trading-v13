@@ -84,6 +84,17 @@ class HoldoutTests(unittest.TestCase):
                         bars(), "BTC", "15m", exchange_now_ms=200*STEP,
                         min_resolved=invalid)
 
+    def test_incomplete_scan_without_cap_refuses_holdout(self):
+        with patch("badang_support_holdout_550.support_touch_backtest",
+                   return_value={"status": "ok", "events": [event(150)],
+                                 "scan_complete": False,
+                                 "event_cap_reached": False}):
+            r = chronological_support_holdout(
+                bars(), "BTC", "15m", exchange_now_ms=200*STEP)
+        self.assertEqual(r["status"], "incomplete_scan")
+        self.assertFalse(r["trading_ready"])
+        self.assertNotIn("holdout", r)
+
     def test_invalid_horizon_warmup_and_rebound_rejected(self):
         cases = [
             {"horizon": True}, {"horizon": 1.5}, {"horizon": 0},
