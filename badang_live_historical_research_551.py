@@ -126,6 +126,17 @@ def main():
                         "max_drawdown":metrics["max_drawdown"] if metrics else None,
                         "fee_per_side_assumed":0.0006,
                         "slippage_per_side_assumed":0.0005})
+    support_reports = [r for r in reports if r["support_holdout_research"] is not None]
+    support_regime_coverage = {}
+    for regime in ("up", "down", "sideways", "unclassified"):
+        counts = [r["support_holdout_research"].get("holdout", {})
+                  .get("by_pre_touch_regime", {}).get(regime, {})
+                  for r in support_reports]
+        support_regime_coverage[regime] = {
+            "timeframes_with_resolved_events": sum(g.get("resolved", 0) > 0 for g in counts),
+            "timeframes_with_adequate_sample": sum(g.get("sample_adequate", False) for g in counts),
+            "resolved_events_across_timeframes_not_independent": sum(g.get("resolved", 0) for g in counts),
+        }
     insufficient = [r for r in reports if not r["sample_assessment"]["sample_adequate_for_preliminary_review"]]
     report={"read_only":True,"trading_enabled":False,
             "historical_sample_coverage":{
@@ -136,6 +147,7 @@ def main():
                 "minimum_completed_trades_required":30,
                 "warnings":["Insufficient history or completed trades in one or more timeframes"]
                            if insufficient else []},
+            "support_holdout_regime_coverage":support_regime_coverage,
             "results":reports}
     encoded=json.dumps(report,allow_nan=False)
     from pathlib import Path
