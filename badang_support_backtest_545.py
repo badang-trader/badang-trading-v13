@@ -86,8 +86,10 @@ def support_touch_backtest(candles, symbol, timeframe, mode="scalp",
             "horizon_bars": horizon, "rebound_threshold_pct": rebound_pct,
             "outcome_basis": "confirmed close only; no intrabar wick credit",
             "events": events, "counts": counts,
-            "resolved_events": resolved,\n            "mean_max_adverse_excursion_pct": (
-                round(sum(e["max_adverse_excursion_pct"] for e in events) / len(events), 4)\n                if events else None),
+            "resolved_events": resolved,
+            "mean_max_adverse_excursion_pct": (
+                round(sum(e["max_adverse_excursion_pct"] for e in events) / len(events), 4)
+                if events else None),
             "observed_rebound_fraction": (
                 round(counts["rebound"] / resolved, 4) if resolved >= 30 else None),
             "sample_adequate": resolved >= 30,
