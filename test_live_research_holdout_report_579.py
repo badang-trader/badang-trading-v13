@@ -37,4 +37,22 @@ class LiveHoldoutReportTests(unittest.TestCase):
             self.assertEqual(holdout["development"]["completed_trades"],0)
             self.assertIsNone(holdout["holdout"]["metrics"])
             self.assertFalse(holdout["performance_verified"])
+    def test_rejects_missing_or_double_counted_support_events(self):
+        def market(symbol,frame):
+            return snapshot(frame)
+        for event_count,resolved_count,grade_events,grade_resolved in ((2,1,1,1),(1,1,2,1),(1,1,1,0),(1,1,1,2)):
+            with self.subTest(event_count=event_count,resolved_count=resolved_count,
+                              grade_events=grade_events,grade_resolved=grade_resolved):
+                section={"event_count":event_count,"resolved_count":resolved_count,
+                         "by_evidence_grade":{"limited_evidence":{
+                             "events":grade_events,"resolved":grade_resolved}}}
+                support={"status":"ok","trading_ready":False,
+                         "train":section,"holdout":section}
+                with patch.object(m,"fastest_candles",side_effect=market),\
+                     patch.object(m,"research_engine_backtest",return_value={
+                         "trades":[],"summary":None,"skipped_overlaps":0}),\
+                     patch.object(m,"chronological_support_holdout",return_value=support):
+                    with self.assertRaisesRegex(ValueError,"Support grade"):
+                        with redirect_stdout(io.StringIO()):m.main()
+
 if __name__=="__main__":unittest.main()
