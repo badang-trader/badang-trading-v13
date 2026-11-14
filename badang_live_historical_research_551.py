@@ -82,7 +82,7 @@ def main():
         if (symbol,frame,mode) in (("BTCUSDT","15m","scalp"),("ETHUSDT","4H","swing")):
             support_frame={"15m":"15m","4H":"4h"}[frame]
             support_research=chronological_support_holdout(
-                closed,symbol,support_frame,mode,
+                closed,symbol.removesuffix("USDT"),support_frame,mode,
                 exchange_now_ms=closed[-1]["timestamp"]+FRAME_INTERVAL_MS[frame],
                 horizon=8,warmup=90,rebound_pct=0.5,min_resolved=30)
         metrics=result["summary"]
