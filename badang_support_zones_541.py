@@ -41,9 +41,9 @@ def support_zones(candles, symbol, timeframe, mode="scalp", *, confirmed=True,
         raise ValueError("unsupported symbol/timeframe/mode")
     if not confirmed:
         return {"status": "unconfirmed", "zones": [], "trading_ready": False}
-    if not isinstance(radius, int) or not 2 <= radius <= 10:
+    if isinstance(radius, bool) or not isinstance(radius, int) or not 2 <= radius <= 10:
         raise ValueError("invalid pivot radius")
-    if not isinstance(max_zones, int) or not 1 <= max_zones <= 5:
+    if isinstance(max_zones, bool) or not isinstance(max_zones, int) or not 1 <= max_zones <= 5:
         raise ValueError("invalid zone limit")
     if len(candles) < 60:
         return {"status": "insufficient_history", "zones": [], "trading_ready": False}
