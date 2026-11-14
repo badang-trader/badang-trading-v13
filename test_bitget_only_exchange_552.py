@@ -18,6 +18,17 @@ class BitgetOnlyExchangeTests(unittest.TestCase):
                     okx.assert_not_called()
                     binance.assert_not_called()
 
+    def test_bitget_failure_never_falls_back_to_other_exchange(self):
+        with patch("exchange_data.bitget_candles",
+                   side_effect=RuntimeError("Bitget temporarily unavailable")) as bitget, \
+             patch("exchange_data.okx_candles") as okx, \
+             patch("exchange_data.binance_candles") as binance:
+            with self.assertRaisesRegex(ValueError, "All exchanges failed"):
+                fastest_candles("BTCUSDT", "1h")
+            bitget.assert_called_once()
+            okx.assert_not_called()
+            binance.assert_not_called()
+
     def test_default_only_calls_bitget(self):
         rows = [{"timestamp": i * 3600000, "open": 100, "high": 101,
                  "low": 99, "close": 100, "volume": 10} for i in range(230)]
