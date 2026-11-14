@@ -106,7 +106,9 @@ def _summary(events, minimum):
             round(sum(rebound_mae) / len(rebound_mae), 4)
             if rebound_mae and resolved >= minimum else None),
     }
-\n\ndef _grade_summary(events, grade, minimum):
+
+
+def _grade_summary(events, grade, minimum):
     selected = [e for e in events if e.get("evidence_grade_at_touch") == grade]
     rebound = sum(e["outcome"] == "rebound" for e in selected)
     breakdown = sum(e["outcome"] in ("breakdown", "breakdown_on_touch") for e in selected)
