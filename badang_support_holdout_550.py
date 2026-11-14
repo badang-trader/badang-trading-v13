@@ -33,6 +33,11 @@ def chronological_support_holdout(candles, symbol, timeframe, mode="scalp",
         max_events=1000)
     if result["status"] != "ok":
         return {"status": result["status"], "trading_ready": False}
+    # A capped event scan can omit later holdout observations and bias the
+    # comparison. Refuse to publish a partial holdout in that case.
+    if len(result["events"]) >= 1000:
+        return {"status": "event_cap_reached", "trading_ready": False,
+                "warnings": ["Holdout omitted: capped scan may exclude later events"]}
     # Only include events whose full evaluation horizon lies within the
     # training or holdout segment. Discard the split-boundary overlap.
     train = [e for e in result["events"]
