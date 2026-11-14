@@ -54,6 +54,26 @@ class ResearchHistoryTests(unittest.TestCase):
             research_history("BTCUSDT", "15m", target_bars=205,
                              max_pages=2, now_ms=NOW, fetch=fetch)
 
+    def test_rate_limit_propagates_without_unbounded_retry(self):
+        calls = []
+        def limited(path, params):
+            calls.append(params)
+            raise ValueError("Bitget 요청 제한(HTTP 429): 재시도 3회 실패")
+        with self.assertRaisesRegex(ValueError, "429"):
+            research_history("BTCUSDT", "15m", target_bars=1000,
+                             max_pages=6, now_ms=NOW, fetch=limited)
+        self.assertEqual(len(calls), 1)
+
+    def test_unconfirmed_latest_candle_is_not_counted(self):
+        def fetch(path, params):
+            end = int(params["endTime"]) // STEP
+            return [candle(i) for i in range(end - 200, end)]
+        r = research_history("BTCUSDT", "15m", target_bars=205,
+                             max_pages=2, now_ms=NOW, fetch=fetch)
+        self.assertEqual(r["confirmed_bars"], 205)
+        self.assertLessEqual(int(r["candles"][-1][0]) + STEP, NOW)
+        self.assertTrue(r["fresh"])
+
     def test_rejects_invalid_and_future_candles(self):
         def future(path, params):
             return [candle(2000002)]
