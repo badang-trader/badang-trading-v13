@@ -84,6 +84,18 @@ class SupportZonesTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             support_zones(candles(), "BTC", "1d", "scalp")
 
+    def test_malformed_timeframe_and_mode_raise_value_error(self):
+        for timeframe, mode in ((None, "scalp"), ([], "scalp"),
+                                ("15m", None), ("15m", []),
+                                ("15m", 123)):
+            with self.subTest(timeframe=timeframe, mode=mode):
+                with self.assertRaises(ValueError):
+                    support_zones(candles(), "BTC", timeframe, mode)
+        for mode in (None, [], 123):
+            with self.subTest(multi_mode=mode):
+                with self.assertRaises(ValueError):
+                    multi_timeframe_support({}, "BTC", mode)
+
     def test_malformed_candle_collection_fails_closed(self):
         for data in (None, 123, True, "not candles", {"bars": candles()}):
             with self.subTest(data_type=type(data).__name__):
