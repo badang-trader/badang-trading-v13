@@ -46,6 +46,26 @@ class HoldoutTests(unittest.TestCase):
         self.assertFalse(r["trading_ready"])
         self.assertNotIn("holdout", r)
 
+    def test_exactly_cap_events_with_complete_scan_are_allowed(self):
+        events = [event(100)] * 1000
+        with patch("badang_support_holdout_550.support_touch_backtest",
+                   return_value={"status": "ok", "events": events,
+                                 "scan_complete": True,
+                                 "event_cap_reached": False}):
+            r = chronological_support_holdout(
+                bars(), "BTC", "15m", exchange_now_ms=200*STEP)
+        self.assertEqual(r["status"], "ok")
+        self.assertEqual(r["train"]["event_count"], 1000)
+
+    def test_explicit_cap_flag_rejects_even_under_1000_events(self):
+        with patch("badang_support_holdout_550.support_touch_backtest",
+                   return_value={"status": "ok", "events": [event(100)],
+                                 "scan_complete": False,
+                                 "event_cap_reached": True}):
+            r = chronological_support_holdout(
+                bars(), "ETH", "15m", exchange_now_ms=200*STEP)
+        self.assertEqual(r["status"], "event_cap_reached")
+
     def test_invalid_split(self):
         with self.assertRaises(ValueError):
             chronological_support_holdout(
