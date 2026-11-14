@@ -84,6 +84,14 @@ class SupportZonesTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             support_zones(candles(), "BTC", "1d", "scalp")
 
+    def test_malformed_candle_collection_fails_closed(self):
+        for data in (None, 123, True, "not candles", {"bars": candles()}):
+            with self.subTest(data_type=type(data).__name__):
+                result = support_zones(data, "BTC", "15m")
+                self.assertEqual(result["status"], "invalid_data")
+                self.assertEqual(result["zones"], [])
+                self.assertFalse(result["trading_ready"])
+
     def test_malformed_symbol_is_rejected_cleanly(self):
         for symbol in (None, 123, True, "", "   ", []):
             with self.subTest(symbol=symbol):
