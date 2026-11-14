@@ -1,7 +1,7 @@
 """Ensure legacy candle selection never falls back to other exchanges."""
 import unittest
 from unittest.mock import patch
-from exchange_data import fastest_candles
+from exchange_data import fastest_candles, validate_candles
 
 
 class BitgetOnlyExchangeTests(unittest.TestCase):
@@ -28,6 +28,20 @@ class BitgetOnlyExchangeTests(unittest.TestCase):
             bitget.assert_called_once()
             okx.assert_not_called()
             binance.assert_not_called()
+
+    def test_missing_or_misaligned_bitget_candles_are_rejected(self):
+        interval = 3600000
+        rows = [[str(i * interval), "100", "101", "99", "100", "10"]
+                for i in range(230)]
+        with patch("exchange_data.time.time", return_value=1000000000):
+            self.assertEqual(len(validate_candles(rows, "1H")), 230)
+            missing = rows[:40] + rows[41:]
+            with self.assertRaisesRegex(ValueError, "Noncontiguous"):
+                validate_candles(missing, "1H")
+            misaligned = [r[:] for r in rows]
+            misaligned[40][0] = str(40 * interval + 1)
+            with self.assertRaisesRegex(ValueError, "Misaligned"):
+                validate_candles(misaligned, "1H")
 
     def test_default_only_calls_bitget(self):
         rows = [{"timestamp": i * 3600000, "open": 100, "high": 101,
