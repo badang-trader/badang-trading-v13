@@ -31,7 +31,7 @@ def validated_support_reliability(candles, symbol, timeframe, mode="scalp",
 
     Timestamp is candle *opening* epoch ms, as in standard exchange OHLCV.
     """
-    if timeframe not in FRAME_MS:
+    if not isinstance(timeframe, str) or timeframe not in FRAME_MS:
         raise ValueError("unsupported timeframe")
     if not isinstance(candles, (list, tuple)) or len(candles) < 60:
         return {"status": "insufficient_history", "zones": [], "trading_ready": False}
