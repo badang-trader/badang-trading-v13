@@ -115,7 +115,21 @@ def _grade_summary(events, grade, minimum):
     rebound = sum(e["outcome"] == "rebound" for e in selected)
     breakdown = sum(e["outcome"] in ("breakdown", "breakdown_on_touch") for e in selected)
     resolved = rebound + breakdown
+    mae_by_outcome = {}
+    for outcome in ("rebound", "breakdown", "breakdown_on_touch", "unresolved"):
+        values = [e["pre_outcome_max_adverse_excursion_pct"] for e in selected
+                  if e["outcome"] == outcome and
+                  isinstance(e.get("pre_outcome_max_adverse_excursion_pct"), (int, float)) and
+                  not isinstance(e["pre_outcome_max_adverse_excursion_pct"], bool) and
+                  math.isfinite(e["pre_outcome_max_adverse_excursion_pct"]) and
+                  e["pre_outcome_max_adverse_excursion_pct"] >= 0]
+        mae_by_outcome[outcome] = {
+            "count": len(values),
+            "mean_pre_outcome_mae_pct": round(sum(values) / len(values), 4) if values else None,
+            "max_pre_outcome_mae_pct": max(values) if values else None,
+        }
     return {"events": len(selected), "resolved": resolved,
             "rebound": rebound, "breakdown": breakdown,
+            "pre_outcome_mae_by_outcome": mae_by_outcome,
             "rebound_fraction": round(rebound / resolved, 4) if resolved >= minimum else None,
             "sample_adequate": resolved >= minimum}
