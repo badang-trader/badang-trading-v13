@@ -4,6 +4,7 @@ This does NOT optimize parameters or produce trading signals. Training data is
 not used to select the best horizon, threshold, or evidence cutoff here.
 """
 from __future__ import annotations
+import math
 from badang_support_backtest_545 import support_touch_backtest
 from badang_support_timestamp_gate_544 import FRAME_MS
 
@@ -14,9 +15,12 @@ def chronological_support_holdout(candles, symbol, timeframe, mode="scalp",
                                   min_resolved=30):
     if timeframe not in FRAME_MS:
         raise ValueError("unsupported timeframe")
-    if not 0.5 <= train_fraction <= 0.85:
+    if (isinstance(train_fraction, bool) or
+            not isinstance(train_fraction, (int, float)) or
+            not math.isfinite(train_fraction) or
+            not 0.5 <= train_fraction <= 0.85):
         raise ValueError("train_fraction must be 0.5 to 0.85")
-    if not isinstance(min_resolved, int) or min_resolved < 1:
+    if isinstance(min_resolved, bool) or not isinstance(min_resolved, int) or min_resolved < 1:
         raise ValueError("min_resolved must be positive")
     if not isinstance(candles, (list, tuple)) or len(candles) < warmup + horizon + 2:
         return {"status": "insufficient_history", "trading_ready": False}
