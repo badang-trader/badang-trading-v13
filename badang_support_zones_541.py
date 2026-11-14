@@ -85,6 +85,11 @@ def support_zones(candles, symbol, timeframe, mode="scalp", *, confirmed=True,
         upper = center + width
         if upper >= close:
             continue
+        # A historical zone is not active after a later confirmed close breaks it.
+        # Check from its most recent pivot; older broken levels must not reappear.
+        last_pivot = max(c["indices"])
+        if any(row["close"] < lower for row in rows[last_pivot + 1:]):
+            continue
         touches = len(c["indices"])
         age = len(rows) - 1 - max(c["indices"])
         strength = "high" if touches >= 3 and age <= 80 else (
