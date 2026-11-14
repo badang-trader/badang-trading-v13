@@ -170,6 +170,8 @@ jobs:
         run: python -m unittest -v test_support_pre_outcome_mae_548.py
       - name: Outcome-specific support MAE regression
         run: python -m unittest -v test_support_mae_by_outcome_549.py
+      - name: Chronological support holdout regression
+        run: python -m unittest -v test_support_holdout_550.py
       - name: Live public Bitget historical research BTC ETH
         run: python badang_live_historical_research_551.py
       - name: Bounded live read-only memory benchmark
