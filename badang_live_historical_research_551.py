@@ -94,6 +94,16 @@ def main():
                     raise ValueError("Support grade event accounting mismatch: "+
                                      symbol+" "+frame+" "+partition)
                 regime_groups = section.get("by_pre_touch_regime", {})
+                for outcome in ("rebound", "breakdown", "breakdown_on_touch", "unresolved"):
+                    expected = section.get("counts", {}).get(outcome)
+                    if expected is not None:
+                        observed = sum(group.get("pre_outcome_mae_by_outcome", {})
+                                       .get(outcome, {}).get("count", 0)
+                                       for group in section.get("by_pre_touch_regime", {}).values())
+                        if observed != expected:
+                            raise ValueError("Support regime MAE outcome accounting mismatch: "+
+                                             symbol+" "+frame+" "+partition+" "+outcome)
+
                 if sum(group["events"] for group in regime_groups.values()) != section["event_count"]:
                     raise ValueError("Support regime event accounting mismatch: "+
                                      symbol+" "+frame+" "+partition)
