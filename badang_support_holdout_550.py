@@ -22,6 +22,14 @@ def chronological_support_holdout(candles, symbol, timeframe, mode="scalp",
         raise ValueError("train_fraction must be 0.5 to 0.85")
     if isinstance(min_resolved, bool) or not isinstance(min_resolved, int) or min_resolved < 1:
         raise ValueError("min_resolved must be positive")
+    if isinstance(horizon, bool) or not isinstance(horizon, int) or not 1 <= horizon <= 48:
+        raise ValueError("invalid horizon")
+    if isinstance(warmup, bool) or not isinstance(warmup, int) or warmup < 60:
+        raise ValueError("invalid warmup")
+    if (isinstance(rebound_pct, bool) or
+            not isinstance(rebound_pct, (int, float)) or
+            not math.isfinite(rebound_pct) or not 0 < rebound_pct <= 20):
+        raise ValueError("invalid rebound threshold")
     if not isinstance(candles, (list, tuple)) or len(candles) < warmup + horizon + 2:
         return {"status": "insufficient_history", "trading_ready": False}
     split = int(len(candles) * train_fraction)
