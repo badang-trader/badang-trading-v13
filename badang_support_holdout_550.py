@@ -49,6 +49,14 @@ def chronological_support_holdout(candles, symbol, timeframe, mode="scalp",
         "status": "ok", "symbol": symbol, "timeframe": timeframe,
         "split_index": split, "train": _summary(train, min_resolved),
         "holdout": _summary(holdout, min_resolved),
+        "holdout_sample_adequate": sum(
+            e["outcome"] in ("rebound", "breakdown", "breakdown_on_touch")
+            for e in holdout) >= min_resolved,
+        "holdout_event_coverage": {
+            "first_touch_index": min((e["touch_bar_index"] for e in holdout), default=None),
+            "last_touch_index": max((e["touch_bar_index"] for e in holdout), default=None),
+            "holdout_bars": len(candles) - split,
+        },
         "parameters_predeclared": True,
         "trading_ready": False,
         "warnings": [
