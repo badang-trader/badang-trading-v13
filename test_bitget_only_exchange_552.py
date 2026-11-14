@@ -43,6 +43,15 @@ class BitgetOnlyExchangeTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "Misaligned"):
                 validate_candles(misaligned, "1H")
 
+    def test_duplicate_bitget_candle_is_not_silently_deduplicated(self):
+        interval = 3600000
+        rows = [[str(i * interval), "100", "101", "99", "100", "10"]
+                for i in range(230)]
+        rows.insert(50, rows[49][:])
+        with patch("exchange_data.time.time", return_value=1000000000):
+            with self.assertRaisesRegex(ValueError, "Duplicate Bitget"):
+                validate_candles(rows, "1H")
+
     def test_default_only_calls_bitget(self):
         rows = [{"timestamp": i * 3600000, "open": 100, "high": 101,
                  "low": 99, "close": 100, "volume": 10} for i in range(230)]
