@@ -262,6 +262,8 @@ def fastest_candles(
         raise ValueError("Bitget-only mode: exchanges must be a sequence")
     if not exchanges or any(name != "bitget" for name in exchanges):
         raise ValueError("Bitget-only mode: other exchanges disabled")
+    if len(exchanges) != 1:
+        raise ValueError("Bitget-only mode: exactly one provider required")
 
     providers = {
         "bitget": bitget_candles,
