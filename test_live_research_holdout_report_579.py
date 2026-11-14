@@ -16,7 +16,7 @@ class LiveHoldoutReportTests(unittest.TestCase):
     def test_public_report_has_separate_unverified_holdout(self):
         def market(symbol,frame):
             return snapshot(frame)
-        with patch.object(m,"fastest_candles",side_effect=market),patch.object(m,"research_engine_backtest",return_value={"trades":[],"summary":None,"skipped_overlaps":0}),patch.object(m,"chronological_support_holdout",return_value={"status":"ok","trading_ready":False,"train":{"event_count":0,"resolved_count":0,"by_evidence_grade":{}},"holdout":{"event_count":0,"resolved_count":0,"by_evidence_grade":{}}}) as support_mock:
+        with patch.object(m,"fastest_candles",side_effect=market),patch.object(m,"research_engine_backtest",return_value={"trades":[],"summary":None,"skipped_overlaps":0}),patch.object(m,"chronological_support_holdout",return_value={"status":"ok","trading_ready":False,"train":{"event_count":0,"resolved_count":0,"by_evidence_grade":{},"by_pre_touch_regime":{}},"holdout":{"event_count":0,"resolved_count":0,"by_evidence_grade":{},"by_pre_touch_regime":{}}}) as support_mock:
             output=io.StringIO()
             with redirect_stdout(output):m.main()
         report=json.loads(output.getvalue().split("LIVE_HISTORICAL_RESEARCH_SUMMARY ",1)[1])
@@ -48,7 +48,9 @@ class LiveHoldoutReportTests(unittest.TestCase):
                               grade_events=grade_events,grade_resolved=grade_resolved):
                 section={"event_count":event_count,"resolved_count":resolved_count,
                          "by_evidence_grade":{"limited_evidence":{
-                             "events":grade_events,"resolved":grade_resolved}}}
+                             "events":grade_events,"resolved":grade_resolved}},
+                         "by_pre_touch_regime":{"sideways":{
+                             "events":event_count,"resolved":resolved_count}}}
                 support={"status":"ok","trading_ready":False,
                          "train":section,"holdout":section}
                 with patch.object(m,"fastest_candles",side_effect=market),\
@@ -56,6 +58,24 @@ class LiveHoldoutReportTests(unittest.TestCase):
                          "trades":[],"summary":None,"skipped_overlaps":0}),\
                      patch.object(m,"chronological_support_holdout",return_value=support):
                     with self.assertRaisesRegex(ValueError,"Support grade"):
+                        with redirect_stdout(io.StringIO()):m.main()
+
+    def test_rejects_inconsistent_market_regime_accounting(self):
+        def market(symbol,frame):
+            return snapshot(frame)
+        for regime_events,regime_resolved in ((0,1),(2,1),(1,0),(1,2)):
+            with self.subTest(regime_events=regime_events,regime_resolved=regime_resolved):
+                section={"event_count":1,"resolved_count":1,
+                         "by_evidence_grade":{"limited_evidence":{"events":1,"resolved":1}},
+                         "by_pre_touch_regime":{"sideways":{
+                             "events":regime_events,"resolved":regime_resolved}}}
+                support={"status":"ok","trading_ready":False,
+                         "train":section,"holdout":section}
+                with patch.object(m,"fastest_candles",side_effect=market),\
+                     patch.object(m,"research_engine_backtest",return_value={
+                         "trades":[],"summary":None,"skipped_overlaps":0}),\
+                     patch.object(m,"chronological_support_holdout",return_value=support):
+                    with self.assertRaisesRegex(ValueError,"Support regime"):
                         with redirect_stdout(io.StringIO()):m.main()
 
 if __name__=="__main__":unittest.main()
