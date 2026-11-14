@@ -89,7 +89,7 @@ class HoldoutTests(unittest.TestCase):
             {"horizon": True}, {"horizon": 1.5}, {"horizon": 0},
             {"warmup": True}, {"warmup": 60.5}, {"warmup": 59},
             {"rebound_pct": True}, {"rebound_pct": float("nan")},
-            {"rebound_pct": float("inf")}, {"rebound_pct": 0},
+            {"rebound_pct": float("inf")}, {"rebound_pct": 10**1000}, {"rebound_pct": 0},
         ]
         for overrides in cases:
             with self.subTest(overrides=overrides):
