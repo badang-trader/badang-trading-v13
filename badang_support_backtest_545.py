@@ -91,11 +91,24 @@ def support_touch_backtest(candles, symbol, timeframe, mode="scalp",
     counts = {name: sum(e["outcome"] == name for e in events)
               for name in ("rebound", "breakdown", "breakdown_on_touch", "ambiguous", "unresolved")}
     resolved = counts["rebound"] + counts["breakdown"] + counts["breakdown_on_touch"]
+    # Separate adverse excursions by realized first outcome; no pooling
+    # successes with failed supports.
+    adverse_by_outcome = {}
+    for label in ("rebound", "breakdown", "breakdown_on_touch", "unresolved"):
+        values = [e["pre_outcome_max_adverse_excursion_pct"]
+                  for e in events if e["outcome"] == label]
+        adverse_by_outcome[label] = {
+            "count": len(values),
+            "mean_pre_outcome_mae_pct": (
+                round(sum(values) / len(values), 4) if values else None),
+            "max_pre_outcome_mae_pct": max(values) if values else None,
+        }
     return {"status": "ok", "symbol": symbol, "timeframe": timeframe,
             "horizon_bars": horizon, "rebound_threshold_pct": rebound_pct,
             "outcome_basis": "confirmed close only; no intrabar wick credit",
             "events": events, "counts": counts,
             "resolved_events": resolved,
+            "adverse_excursion_by_outcome": adverse_by_outcome,
             "mean_pre_outcome_max_adverse_excursion_pct": (
                 round(sum(e["pre_outcome_max_adverse_excursion_pct"] for e in events) / len(events), 4)
                 if events else None),
