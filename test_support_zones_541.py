@@ -84,6 +84,12 @@ class SupportZonesTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             support_zones(candles(), "BTC", "1d", "scalp")
 
+    def test_malformed_symbol_is_rejected_cleanly(self):
+        for symbol in (None, 123, True, "", "   ", []):
+            with self.subTest(symbol=symbol):
+                with self.assertRaises(ValueError):
+                    support_zones(candles(), symbol, "15m")
+
     def test_rejects_unsupported_symbol(self):
         with self.assertRaises(ValueError):
             support_zones(candles(), "SOL", "15m")
