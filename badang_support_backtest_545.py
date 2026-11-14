@@ -12,7 +12,7 @@ from badang_support_zones_541 import _candle
 
 def support_touch_backtest(candles, symbol, timeframe, mode="scalp",
                            *, horizon=8, warmup=90, rebound_pct=0.5,
-                           max_events=300):
+                           max_events=300, exchange_now_ms=None):
     if not isinstance(horizon, int) or not 1 <= horizon <= 48:
         raise ValueError("invalid horizon")
     if not isinstance(warmup, int) or warmup < 60:
@@ -25,10 +25,12 @@ def support_touch_backtest(candles, symbol, timeframe, mode="scalp",
         raise ValueError("unsupported timeframe")
     if len(candles) < warmup + horizon + 1:
         return {"status": "insufficient_history", "events": [], "trading_ready": False}
+    if exchange_now_ms is None:
+        return {"status": "missing_exchange_clock", "events": [], "trading_ready": False}
     # Validate the *entire* sample before measuring anything.
     validation = validated_support_reliability(
         candles, symbol, timeframe, mode,
-        exchange_now_ms=_end_of_last_bar(candles, timeframe))
+        exchange_now_ms=exchange_now_ms)
     if validation["status"] != "ok":
         return {"status": validation["status"], "events": [], "trading_ready": False}
     rows = [_candle(c) for c in candles]
@@ -53,22 +55,21 @@ def support_touch_backtest(candles, symbol, timeframe, mode="scalp",
         zone = min(touched, key=lambda z: abs(z["center"] - rows[i-1]["close"]))
         rebound_level = zone["upper"] * (1 + rebound_pct / 100)
         # A break is a confirmed close below zone lower, not intrabar wick.
-        outcome = "unresolved"
-        for j in range(i + 1, i + horizon + 1):
-            bar = rows[j]
-            rebound = bar["high"] >= rebound_level
-            break_down = bar["close"] < zone["lower"]
-            if rebound and break_down:
-                outcome = "ambiguous"
-                break
-            if break_down:
-                outcome = "breakdown"
-                break
-            if rebound:
-                outcome = "rebound"
-                break
-        if rows[i]["close"] < zone["lower"]:
-            outcome = "breakdown_on_touch"
+        outcome = "breakdown_on_touch" if rows[i]["close"] < zone["lower"] else "unresolved"
+        if outcome != "breakdown_on_touch":
+            for j in range(i + 1, i + horizon + 1):
+                bar = rows[j]
+                rebound = bar["high"] >= rebound_level
+                break_down = bar["close"] < zone["lower"]
+                if rebound and break_down:
+                    outcome = "ambiguous"
+                    break
+                if break_down:
+                    outcome = "breakdown"
+                    break
+                if rebound:
+                    outcome = "rebound"
+                    break
         events.append({"touch_bar_index": i, "zone_lower": zone["lower"],
                        "zone_upper": zone["upper"],
                        "evidence_score_at_touch": zone["evidence_score"],
