@@ -35,6 +35,25 @@ class EvidenceGradeHoldoutTests(unittest.TestCase):
         self.assertEqual(groups["ungraded"]["resolved"],2)
         self.assertIsNone(groups["ungraded"]["rebound_fraction"])
 
+    def test_pre_touch_regime_groups_preserve_all_events(self):
+        events=[
+            {"outcome":"rebound","regime_before_touch":"up",
+             "pre_outcome_max_adverse_excursion_pct":0.2},
+            {"outcome":"breakdown","regime_before_touch":"down",
+             "pre_outcome_max_adverse_excursion_pct":1.0},
+            {"outcome":"unresolved","regime_before_touch":"sideways",
+             "pre_outcome_max_adverse_excursion_pct":0.4},
+            {"outcome":"breakdown_on_touch",
+             "pre_outcome_max_adverse_excursion_pct":1.2},
+        ]
+        result=_summary(events,30)["by_pre_touch_regime"]
+        self.assertEqual(sum(g["events"] for g in result.values()),4)
+        self.assertEqual(result["up"]["rebound"],1)
+        self.assertEqual(result["down"]["breakdown"],1)
+        self.assertEqual(result["sideways"]["resolved"],0)
+        self.assertEqual(result["unclassified"]["breakdown"],1)
+        self.assertTrue(all(g["rebound_fraction"] is None for g in result.values()))
+
     def test_probability_only_when_threshold_met(self):
         events=[{"outcome":"rebound" if i<18 else "breakdown",
                  "evidence_grade_at_touch":"strong_evidence",
