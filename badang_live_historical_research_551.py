@@ -95,7 +95,10 @@ def main():
                         "max_drawdown":metrics["max_drawdown"] if metrics else None,
                         "fee_per_side_assumed":0.0006,
                         "slippage_per_side_assumed":0.0005})
-    print("LIVE_HISTORICAL_RESEARCH_SUMMARY "+json.dumps(
-        {"read_only":True,"trading_enabled":False,"results":reports},allow_nan=False))
+    report={"read_only":True,"trading_enabled":False,"results":reports}
+    encoded=json.dumps(report,allow_nan=False)
+    from pathlib import Path
+    Path("badang-live-historical-research.json").write_text(encoded+"\n",encoding="utf-8")
+    print("LIVE_HISTORICAL_RESEARCH_SUMMARY "+encoded)
 if __name__=="__main__":
     main()
