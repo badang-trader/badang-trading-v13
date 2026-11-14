@@ -16,6 +16,22 @@ def bars(n=120):
 
 
 class TimestampGateTests(unittest.TestCase):
+    def test_invalid_timeframe_types_rejected(self):
+        for timeframe in (None, [], {}, 123, True, ""):
+            with self.subTest(timeframe=timeframe):
+                with self.assertRaises(ValueError):
+                    validated_support_reliability(
+                        bars(), "BTC", timeframe,
+                        exchange_now_ms=120*STEP)
+
+    def test_exchange_clock_must_be_finite_epoch_milliseconds(self):
+        for clock in (None, True, float("nan"), float("inf"),
+                      120*STEP - 0.5, "not-a-timestamp"):
+            with self.subTest(clock=clock):
+                with self.assertRaises(ValueError):
+                    validated_support_reliability(
+                        bars(), "BTC", "15m", exchange_now_ms=clock)
+
     def test_closed_contiguous(self):
         data = bars()
         r = validated_support_reliability(data, "BTC", "15m",
