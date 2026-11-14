@@ -52,6 +52,11 @@ class EvidenceGradeHoldoutTests(unittest.TestCase):
         self.assertEqual(result["up"]["pre_outcome_mae_by_outcome"]["rebound"]["mean_pre_outcome_mae_pct"],0.2)
         self.assertEqual(result["down"]["pre_outcome_mae_by_outcome"]["breakdown"]["max_pre_outcome_mae_pct"],1.0)
         self.assertEqual(result["unclassified"]["pre_outcome_mae_by_outcome"]["breakdown_on_touch"]["count"],1)
+        for outcome in ("rebound","breakdown","breakdown_on_touch","unresolved"):
+            self.assertEqual(
+                sum(group["pre_outcome_mae_by_outcome"][outcome]["count"]
+                    for group in result.values()),
+                sum(e["outcome"] == outcome for e in events))
         self.assertEqual(result["down"]["breakdown"],1)
         self.assertEqual(result["sideways"]["resolved"],0)
         self.assertEqual(result["unclassified"]["breakdown"],1)
