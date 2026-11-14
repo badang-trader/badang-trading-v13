@@ -27,6 +27,9 @@ class HoldoutTests(unittest.TestCase):
         self.assertEqual(r["train"]["event_count"], 1)
         self.assertEqual(r["holdout"]["event_count"], 2)
         self.assertEqual(r["holdout"]["rebound_fraction"], 0.5)
+        self.assertTrue(r["holdout_sample_adequate"])
+        self.assertEqual(r["holdout_event_coverage"]["first_touch_index"], 140)
+        self.assertEqual(r["holdout_event_coverage"]["last_touch_index"], 150)
 
     def test_low_sample_hides_fraction(self):
         with patch("badang_support_holdout_550.support_touch_backtest",
@@ -35,6 +38,7 @@ class HoldoutTests(unittest.TestCase):
                 bars(), "ETH", "15m", exchange_now_ms=200*STEP)
         self.assertIsNone(r["holdout"]["rebound_fraction"])
         self.assertFalse(r["holdout"]["adequate_sample"])
+        self.assertFalse(r["holdout_sample_adequate"])
 
     def test_event_cap_refuses_biased_holdout(self):
         events = [event(100)] * 1000
