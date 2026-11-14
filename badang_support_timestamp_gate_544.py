@@ -6,6 +6,7 @@ exchange/server clock. A local wall clock is not a substitute for exchange time.
 from __future__ import annotations
 from datetime import datetime, timezone
 from badang_support_reliability_543 import evaluate_support_reliability
+from badang_support_zones_541 import TIMEFRAMES, SYMBOLS
 
 FRAME_MS = {"15m": 900000, "30m": 1800000, "1h": 3600000,
             "4h": 14400000, "1d": 86400000}
@@ -33,6 +34,12 @@ def validated_support_reliability(candles, symbol, timeframe, mode="scalp",
     """
     if not isinstance(timeframe, str) or timeframe not in FRAME_MS:
         raise ValueError("unsupported timeframe")
+    if (not isinstance(mode, str) or mode not in TIMEFRAMES or
+            timeframe not in TIMEFRAMES[mode]):
+        raise ValueError("unsupported mode/timeframe")
+    if (not isinstance(symbol, str) or
+            symbol.upper().split("-")[0].split("/")[0] not in SYMBOLS):
+        raise ValueError("unsupported symbol")
     now = _timestamp_ms(exchange_now_ms)
     if now < 0:
         raise ValueError("exchange clock must be nonnegative")
