@@ -56,6 +56,7 @@ def support_touch_backtest(candles, symbol, timeframe, mode="scalp",
         rebound_level = zone["upper"] * (1 + rebound_pct / 100)
         # A break is a confirmed close below zone lower, not intrabar wick.
         outcome = "breakdown_on_touch" if rows[i]["close"] < zone["lower"] else "unresolved"
+        outcome_bar_index = i if outcome == "breakdown_on_touch" else None
         if outcome != "breakdown_on_touch":
             for j in range(i + 1, i + horizon + 1):
                 bar = rows[j]
@@ -63,19 +64,27 @@ def support_touch_backtest(candles, symbol, timeframe, mode="scalp",
                 break_down = bar["close"] < zone["lower"]
                 if break_down:
                     outcome = "breakdown"
+                    outcome_bar_index = j
                     break
                 if rebound:
                     outcome = "rebound"
+                    outcome_bar_index = j
                     break
-        # Worst adverse excursion from the touched support upper boundary,
-        # including the touch bar and every evaluated forward bar.
+        # Fixed-horizon MAE includes all bars; pre-outcome MAE stops at
+        # the first confirmed rebound or breakdown, including its candle.
         window = rows[i:i + horizon + 1]
         worst_low = min(bar["low"] for bar in window)
         adverse_pct = max(0.0, (zone["upper"] - worst_low) / zone["upper"] * 100)
+        end = outcome_bar_index if outcome_bar_index is not None else i + horizon
+        pre_outcome_low = min(bar["low"] for bar in rows[i:end + 1])
+        pre_outcome_adverse_pct = max(
+            0.0, (zone["upper"] - pre_outcome_low) / zone["upper"] * 100)
         events.append({"touch_bar_index": i, "zone_lower": zone["lower"],
                        "zone_upper": zone["upper"],
                        "evidence_score_at_touch": zone["evidence_score"],
                        "outcome": outcome,
+                       "outcome_bar_index": outcome_bar_index,
+                       "pre_outcome_max_adverse_excursion_pct": round(pre_outcome_adverse_pct, 4),
                        "max_adverse_excursion_pct": round(adverse_pct, 4)})
         # Non-overlapping evaluation windows avoid repeated counting.
         i += horizon + 1
@@ -87,6 +96,9 @@ def support_touch_backtest(candles, symbol, timeframe, mode="scalp",
             "outcome_basis": "confirmed close only; no intrabar wick credit",
             "events": events, "counts": counts,
             "resolved_events": resolved,
+            "mean_pre_outcome_max_adverse_excursion_pct": (
+                round(sum(e["pre_outcome_max_adverse_excursion_pct"] for e in events) / len(events), 4)
+                if events else None),
             "mean_max_adverse_excursion_pct": (
                 round(sum(e["max_adverse_excursion_pct"] for e in events) / len(events), 4)
                 if events else None),
