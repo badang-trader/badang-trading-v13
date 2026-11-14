@@ -85,6 +85,19 @@ def main():
                 closed,symbol.removesuffix("USDT"),support_frame,mode,
                 exchange_now_ms=closed[-1]["timestamp"]+FRAME_INTERVAL_MS[frame],
                 horizon=8,warmup=90,rebound_pct=0.5,min_resolved=30)
+        if support_research is not None and support_research.get("status") == "ok":
+            for partition in ("train", "holdout"):
+                section = support_research[partition]
+                grade_total = sum(group["events"] for group in
+                                  section["by_evidence_grade"].values())
+                if grade_total != section["event_count"]:
+                    raise ValueError("Support grade event accounting mismatch: "+
+                                     symbol+" "+frame+" "+partition)
+                grade_resolved = sum(group["resolved"] for group in
+                                     section["by_evidence_grade"].values())
+                if grade_resolved != section["resolved_count"]:
+                    raise ValueError("Support grade resolved accounting mismatch: "+
+                                     symbol+" "+frame+" "+partition)
         metrics=result["summary"]
         reports.append({"symbol":symbol,"frame":frame,"mode":mode,
                         "confirmed_bars":len(closed),
