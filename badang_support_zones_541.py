@@ -113,5 +113,22 @@ def multi_timeframe_support(series_by_timeframe, symbol, mode="scalp"):
     """Input is a mapping of timeframe to independently confirmed candles."""
     if mode not in TIMEFRAMES:
         raise ValueError("unsupported mode")
-    return {tf: support_zones(series_by_timeframe.get(tf, []), symbol, tf, mode)
-            for tf in TIMEFRAMES[mode]}
+    results = {tf: support_zones(series_by_timeframe.get(tf, []), symbol, tf, mode)
+               for tf in TIMEFRAMES[mode]}
+    # Annotate only confirmed, independently computed overlapping zones.
+    # Never invent an additional price level or imply a guaranteed rebound.
+    for tf, result in results.items():
+        if result["status"] != "ok":
+            continue
+        for zone in result["zones"]:
+            overlaps = []
+            for other_tf, other_result in results.items():
+                if other_tf == tf or other_result["status"] != "ok":
+                    continue
+                if any(other["lower"] <= zone["upper"] and
+                       zone["lower"] <= other["upper"]
+                       for other in other_result["zones"]):
+                    overlaps.append(other_tf)
+            zone["overlapping_timeframes"] = overlaps
+            zone["timeframe_confluence_count"] = 1 + len(overlaps)
+    return results
