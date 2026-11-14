@@ -67,10 +67,16 @@ def support_touch_backtest(candles, symbol, timeframe, mode="scalp",
                 if rebound:
                     outcome = "rebound"
                     break
+        # Worst adverse excursion from the touched support upper boundary,
+        # including the touch bar and every evaluated forward bar.
+        window = rows[i:i + horizon + 1]
+        worst_low = min(bar["low"] for bar in window)
+        adverse_pct = max(0.0, (zone["upper"] - worst_low) / zone["upper"] * 100)
         events.append({"touch_bar_index": i, "zone_lower": zone["lower"],
                        "zone_upper": zone["upper"],
                        "evidence_score_at_touch": zone["evidence_score"],
-                       "outcome": outcome})
+                       "outcome": outcome,
+                       "max_adverse_excursion_pct": round(adverse_pct, 4)})
         # Non-overlapping evaluation windows avoid repeated counting.
         i += horizon + 1
     counts = {name: sum(e["outcome"] == name for e in events)
@@ -80,7 +86,8 @@ def support_touch_backtest(candles, symbol, timeframe, mode="scalp",
             "horizon_bars": horizon, "rebound_threshold_pct": rebound_pct,
             "outcome_basis": "confirmed close only; no intrabar wick credit",
             "events": events, "counts": counts,
-            "resolved_events": resolved,
+            "resolved_events": resolved,\n            "mean_max_adverse_excursion_pct": (
+                round(sum(e["max_adverse_excursion_pct"] for e in events) / len(events), 4)\n                if events else None),
             "observed_rebound_fraction": (
                 round(counts["rebound"] / resolved, 4) if resolved >= 30 else None),
             "sample_adequate": resolved >= 30,
