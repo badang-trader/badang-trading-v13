@@ -23,6 +23,7 @@ class LiveHoldoutReportTests(unittest.TestCase):
         self.assertFalse(report["trading_enabled"])
         self.assertEqual(len(report["results"]),len(m.TARGETS))
         self.assertEqual(support_mock.call_count,2)
+        self.assertEqual({call.args[1] for call in support_mock.call_args_list},{"BTC","ETH"})
         for result in report["results"]:
             self.assertLess(result["research_window_start_ms"], result["research_window_end_ms"])
             self.assertFalse(result["mode_specific_strategy_verified"])
