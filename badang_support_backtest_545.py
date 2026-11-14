@@ -6,6 +6,7 @@ Rebound and breakdown require confirmed closes, not intrabar wick highs.
 Not a calibrated trading signal or win-rate claim without adequate samples.
 """
 from __future__ import annotations
+import math
 from badang_support_timestamp_gate_544 import validated_support_reliability, FRAME_MS
 from badang_support_zones_541 import _candle
 
@@ -13,13 +14,15 @@ from badang_support_zones_541 import _candle
 def support_touch_backtest(candles, symbol, timeframe, mode="scalp",
                            *, horizon=8, warmup=90, rebound_pct=0.5,
                            max_events=300, exchange_now_ms=None):
-    if not isinstance(horizon, int) or not 1 <= horizon <= 48:
+    if isinstance(horizon, bool) or not isinstance(horizon, int) or not 1 <= horizon <= 48:
         raise ValueError("invalid horizon")
-    if not isinstance(warmup, int) or warmup < 60:
+    if isinstance(warmup, bool) or not isinstance(warmup, int) or warmup < 60:
         raise ValueError("invalid warmup")
-    if not isinstance(max_events, int) or not 1 <= max_events <= 1000:
+    if isinstance(max_events, bool) or not isinstance(max_events, int) or not 1 <= max_events <= 1000:
         raise ValueError("invalid event cap")
-    if not 0 < rebound_pct <= 20:
+    if (isinstance(rebound_pct, bool) or
+            not isinstance(rebound_pct, (int, float)) or
+            not math.isfinite(rebound_pct) or not 0 < rebound_pct <= 20):
         raise ValueError("invalid rebound threshold")
     if timeframe not in FRAME_MS:
         raise ValueError("unsupported timeframe")
