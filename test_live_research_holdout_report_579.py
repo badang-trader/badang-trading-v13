@@ -22,13 +22,13 @@ class LiveHoldoutReportTests(unittest.TestCase):
         report=json.loads(output.getvalue().split("LIVE_HISTORICAL_RESEARCH_SUMMARY ",1)[1])
         self.assertFalse(report["trading_enabled"])
         self.assertEqual(len(report["results"]),len(m.TARGETS))
-        self.assertEqual(support_mock.call_count,2)
+        self.assertEqual(support_mock.call_count,4)
         self.assertEqual({call.args[1] for call in support_mock.call_args_list},{"BTC","ETH"})
         for result in report["results"]:
             self.assertLess(result["research_window_start_ms"], result["research_window_end_ms"])
             self.assertFalse(result["mode_specific_strategy_verified"])
             self.assertEqual(result["mode_comparison_warning"], "SCALP_SWING_SHARE_SIGNAL_RULES_AND_HORIZON")
-            if (result["symbol"],result["frame"],result["mode"]) in (("BTCUSDT","15m","scalp"),("ETHUSDT","4H","swing")):
+            if (result["symbol"],result["frame"],result["mode"]) in (("BTCUSDT","15m","scalp"),("BTCUSDT","30m","scalp"),("ETHUSDT","30m","scalp"),("ETHUSDT","4H","swing")):
                 self.assertFalse(result["support_holdout_research"]["trading_ready"])
             else:
                 self.assertIsNone(result["support_holdout_research"])
