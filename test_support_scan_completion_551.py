@@ -15,6 +15,21 @@ def zones(*args, **kwargs):
             "evidence_score": 70}]}
 
 class ScanCompletionTests(unittest.TestCase):
+    def test_invalid_direct_backtest_parameters(self):
+        cases = [
+            {"horizon": True}, {"horizon": 1.5},
+            {"warmup": False}, {"warmup": 60.5},
+            {"max_events": True}, {"max_events": 0},
+            {"rebound_pct": True}, {"rebound_pct": float("nan")},
+            {"rebound_pct": float("inf")}, {"rebound_pct": "0.5"},
+        ]
+        for overrides in cases:
+            with self.subTest(overrides=overrides):
+                with self.assertRaises(ValueError):
+                    support_touch_backtest(
+                        bars(), "BTC", "15m", exchange_now_ms=105*STEP,
+                        **overrides)
+
     def test_early_event_cap_marks_incomplete(self):
         with patch("badang_support_backtest_545.validated_support_reliability",
                    side_effect=zones):
