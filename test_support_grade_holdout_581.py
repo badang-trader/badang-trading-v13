@@ -17,6 +17,7 @@ class EvidenceGradeHoldoutTests(unittest.TestCase):
         self.assertFalse(strong["sample_adequate"])
         self.assertEqual(result["by_evidence_grade"]["moderate_evidence"]["breakdown"],1)
         self.assertEqual(result["by_evidence_grade"]["limited_evidence"]["resolved"],0)
+        self.assertEqual(result["by_evidence_grade"][None]["events"],0)
 
     def test_probability_only_when_threshold_met(self):
         events=[{"outcome":"rebound" if i<18 else "breakdown",
