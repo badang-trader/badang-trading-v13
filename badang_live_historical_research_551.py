@@ -58,12 +58,22 @@ def convert_closed_candles(snapshot):
                      "open":op,"high":hi,"low":lo,"close":cl,"volume":vol})
     return rows
 
+TARGETS = tuple(
+    (symbol, frame, mode)
+    for symbol in ("BTCUSDT", "ETHUSDT")
+    for frame, mode in (("15m", "scalp"), ("30m", "scalp"),
+                        ("1H", "scalp"), ("1H", "swing"),
+                        ("4H", "swing"), ("1D", "swing"))
+)
+FRAME_INTERVAL_MS = {"15m": 900000, "30m": 1800000, "1H": 3600000,
+                     "4H": 14400000, "1D": 86400000}
+
 def main():
     reports=[]
-    for symbol,frame,mode in (("BTCUSDT","15m","scalp"),("ETHUSDT","1D","swing")):
+    for symbol,frame,mode in TARGETS:
         snapshot=fastest_candles(symbol,frame)
         closed=convert_closed_candles(snapshot)
-        validate_research_timestamps(closed,{"15m":900000,"1D":86400000}[frame])
+        validate_research_timestamps(closed,FRAME_INTERVAL_MS[frame])
         if len(closed)<210:
             raise ValueError("Too few confirmed historical bars: "+symbol+" "+frame)
         result=research_engine_backtest(closed,mode=mode,horizon=3)
