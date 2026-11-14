@@ -119,7 +119,17 @@ def main():
                         "max_drawdown":metrics["max_drawdown"] if metrics else None,
                         "fee_per_side_assumed":0.0006,
                         "slippage_per_side_assumed":0.0005})
-    report={"read_only":True,"trading_enabled":False,"results":reports}
+    insufficient = [r for r in reports if not r["sample_assessment"]["sample_adequate_for_preliminary_review"]]
+    report={"read_only":True,"trading_enabled":False,
+            "historical_sample_coverage":{
+                "target_count":len(reports),
+                "insufficient_target_count":len(insufficient),
+                "all_targets_preliminary_sample_adequate":not insufficient,
+                "minimum_bars_required":1000,
+                "minimum_completed_trades_required":30,
+                "warnings":["Insufficient history or completed trades in one or more timeframes"]
+                           if insufficient else []},
+            "results":reports}
     encoded=json.dumps(report,allow_nan=False)
     from pathlib import Path
     Path("badang-live-historical-research.json").write_text(encoded+"\n",encoding="utf-8")
