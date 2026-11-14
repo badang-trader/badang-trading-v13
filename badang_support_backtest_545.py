@@ -67,7 +67,9 @@ def support_touch_backtest(candles, symbol, timeframe, mode="scalp",
             if rebound:
                 outcome = "rebound"
                 break
-        if rows[i]["close"] < zone["lower"]:\n            outcome = "breakdown_on_touch"\n        events.append({"touch_bar_index": i, "zone_lower": zone["lower"],
+        if rows[i]["close"] < zone["lower"]:
+            outcome = "breakdown_on_touch"
+        events.append({"touch_bar_index": i, "zone_lower": zone["lower"],
                        "zone_upper": zone["upper"],
                        "evidence_score_at_touch": zone["evidence_score"],
                        "outcome": outcome})
