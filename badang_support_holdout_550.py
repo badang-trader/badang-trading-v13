@@ -95,6 +95,10 @@ def _summary(events, minimum):
         "event_count": len(events),
         "resolved_count": resolved,
         "counts": counts,
+        "by_evidence_grade": {
+            grade: _grade_summary(events, grade, minimum)
+            for grade in ("strong_evidence", "moderate_evidence", "limited_evidence")
+        },
         "adequate_sample": resolved >= minimum,
         "rebound_fraction": (
             round(counts["rebound"] / resolved, 4) if resolved >= minimum else None),
@@ -102,3 +106,12 @@ def _summary(events, minimum):
             round(sum(rebound_mae) / len(rebound_mae), 4)
             if rebound_mae and resolved >= minimum else None),
     }
+\n\ndef _grade_summary(events, grade, minimum):
+    selected = [e for e in events if e.get("evidence_grade_at_touch") == grade]
+    rebound = sum(e["outcome"] == "rebound" for e in selected)
+    breakdown = sum(e["outcome"] in ("breakdown", "breakdown_on_touch") for e in selected)
+    resolved = rebound + breakdown
+    return {"events": len(selected), "resolved": resolved,
+            "rebound": rebound, "breakdown": breakdown,
+            "rebound_fraction": round(rebound / resolved, 4) if resolved >= minimum else None,
+            "sample_adequate": resolved >= minimum}
