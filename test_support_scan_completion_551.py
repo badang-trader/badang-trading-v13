@@ -34,8 +34,8 @@ class ScanCompletionTests(unittest.TestCase):
         with patch("badang_support_backtest_545.validated_support_reliability",
                    side_effect=zones):
             r = support_touch_backtest(
-                bars(), "BTC", "15m", max_events=1,
-                exchange_now_ms=105*STEP)
+                bars(120), "BTC", "15m", max_events=1,
+                exchange_now_ms=120*STEP)
         self.assertEqual(len(r["events"]), 1)
         self.assertFalse(r["scan_complete"])
         self.assertTrue(r["event_cap_reached"])
