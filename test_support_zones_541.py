@@ -1,0 +1,52 @@
+"""Regression tests for informational BTC/ETH support zones."""
+import unittest
+from badang_support_zones_541 import support_zones, multi_timeframe_support
+
+
+def candles(n=120):
+    rows = []
+    for i in range(n):
+        # Repeated local swing lows below a gently rising reference close.
+        base = 100 + i * 0.02
+        dip = 3 if i % 15 == 7 else 0
+        close = base - dip
+        rows.append({"open": close, "high": close + 1,
+                     "low": close - 1, "close": close, "volume": 100})
+    return rows
+
+
+class SupportZonesTests(unittest.TestCase):
+    def test_multiple_levels_are_below_price_and_ordered(self):
+        result = support_zones(candles(), "BTC-USDT", "15m")
+        self.assertEqual(result["status"], "ok")
+        self.assertFalse(result["trading_ready"])
+        self.assertTrue(result["zones"])
+        self.assertLessEqual(len(result["zones"]), 5)
+        centers = [z["center"] for z in result["zones"]]
+        self.assertEqual(centers, sorted(centers, reverse=True))
+        self.assertTrue(all(z["upper"] < result["reference_close"] for z in result["zones"]))
+
+    def test_invalid_middle_bar_fails_closed(self):
+        data = candles()
+        data[44]["high"] = 0
+        self.assertEqual(support_zones(data, "ETH", "1h")["status"], "invalid_data")
+
+    def test_unconfirmed_candles_not_analyzed(self):
+        self.assertEqual(support_zones(candles(), "BTC", "1h", confirmed=False)["zones"], [])
+
+    def test_mode_timeframes(self):
+        self.assertEqual(set(multi_timeframe_support({}, "ETH", "swing")),
+                         {"1h", "4h", "1d"})
+        with self.assertRaises(ValueError):
+            support_zones(candles(), "BTC", "1d", "scalp")
+
+    def test_rejects_unsupported_symbol(self):
+        with self.assertRaises(ValueError):
+            support_zones(candles(), "SOL", "15m")
+
+    def test_short_history_returns_no_levels(self):
+        self.assertEqual(support_zones(candles(20), "ETH", "4h", "swing")["zones"], [])
+
+
+if __name__ == "__main__":
+    unittest.main()
