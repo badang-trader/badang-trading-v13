@@ -164,6 +164,8 @@ jobs:
         run: python -m unittest -v test_support_backtest_545.py
       - name: Confirmed-close support rebound regression
         run: python -m unittest -v test_support_close_outcomes_546.py
+      - name: Support adverse excursion regression
+        run: python -m unittest -v test_support_mae_547.py
       - name: Live public Bitget historical research BTC ETH
         run: python badang_live_historical_research_551.py
       - name: Bounded live read-only memory benchmark
