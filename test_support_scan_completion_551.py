@@ -21,7 +21,7 @@ class ScanCompletionTests(unittest.TestCase):
             {"warmup": False}, {"warmup": 60.5},
             {"max_events": True}, {"max_events": 0},
             {"rebound_pct": True}, {"rebound_pct": float("nan")},
-            {"rebound_pct": float("inf")}, {"rebound_pct": "0.5"},
+            {"rebound_pct": float("inf")}, {"rebound_pct": 10**1000}, {"rebound_pct": "0.5"},
         ]
         for overrides in cases:
             with self.subTest(overrides=overrides):
