@@ -54,7 +54,7 @@ def support_touch_backtest(candles, symbol, timeframe, mode="scalp",
         rebound_level = zone["upper"] * (1 + rebound_pct / 100)
         # A break is a confirmed close below zone lower, not intrabar wick.
         outcome = "unresolved"
-        for j in range(i, i + horizon + 1):
+        for j in range(i + 1, i + horizon + 1):
             bar = rows[j]
             rebound = bar["high"] >= rebound_level
             break_down = bar["close"] < zone["lower"]
@@ -67,15 +67,15 @@ def support_touch_backtest(candles, symbol, timeframe, mode="scalp",
             if rebound:
                 outcome = "rebound"
                 break
-        events.append({"touch_bar_index": i, "zone_lower": zone["lower"],
+        if rows[i]["close"] < zone["lower"]:\n            outcome = "breakdown_on_touch"\n        events.append({"touch_bar_index": i, "zone_lower": zone["lower"],
                        "zone_upper": zone["upper"],
                        "evidence_score_at_touch": zone["evidence_score"],
                        "outcome": outcome})
         # Non-overlapping evaluation windows avoid repeated counting.
         i += horizon + 1
     counts = {name: sum(e["outcome"] == name for e in events)
-              for name in ("rebound", "breakdown", "ambiguous", "unresolved")}
-    resolved = counts["rebound"] + counts["breakdown"]
+              for name in ("rebound", "breakdown", "breakdown_on_touch", "ambiguous", "unresolved")}
+    resolved = counts["rebound"] + counts["breakdown"] + counts["breakdown_on_touch"]
     return {"status": "ok", "symbol": symbol, "timeframe": timeframe,
             "horizon_bars": horizon, "rebound_threshold_pct": rebound_pct,
             "events": events, "counts": counts,
