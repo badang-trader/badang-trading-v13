@@ -33,9 +33,11 @@ def validated_support_reliability(candles, symbol, timeframe, mode="scalp",
     """
     if not isinstance(timeframe, str) or timeframe not in FRAME_MS:
         raise ValueError("unsupported timeframe")
+    now = _timestamp_ms(exchange_now_ms)
+    if now < 0:
+        raise ValueError("exchange clock must be nonnegative")
     if not isinstance(candles, (list, tuple)) or len(candles) < 60:
         return {"status": "insufficient_history", "zones": [], "trading_ready": False}
-    now = _timestamp_ms(exchange_now_ms)
     interval = FRAME_MS[timeframe]
     times = []
     for row in candles:
