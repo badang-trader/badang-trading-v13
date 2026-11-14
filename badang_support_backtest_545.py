@@ -2,7 +2,7 @@
 
 At each bar t, build zones ONLY from bars before t. Evaluate whether a
 subsequent touch was followed by a rebound or breakdown within a fixed horizon.
-OHLC ambiguity (both thresholds touched in same candle) is reported separately.
+Rebound and breakdown require confirmed closes, not intrabar wick highs.
 Not a calibrated trading signal or win-rate claim without adequate samples.
 """
 from __future__ import annotations
@@ -59,11 +59,8 @@ def support_touch_backtest(candles, symbol, timeframe, mode="scalp",
         if outcome != "breakdown_on_touch":
             for j in range(i + 1, i + horizon + 1):
                 bar = rows[j]
-                rebound = bar["high"] >= rebound_level
+                rebound = bar["close"] >= rebound_level
                 break_down = bar["close"] < zone["lower"]
-                if rebound and break_down:
-                    outcome = "ambiguous"
-                    break
                 if break_down:
                     outcome = "breakdown"
                     break
@@ -81,6 +78,7 @@ def support_touch_backtest(candles, symbol, timeframe, mode="scalp",
     resolved = counts["rebound"] + counts["breakdown"] + counts["breakdown_on_touch"]
     return {"status": "ok", "symbol": symbol, "timeframe": timeframe,
             "horizon_bars": horizon, "rebound_threshold_pct": rebound_pct,
+            "outcome_basis": "confirmed close only; no intrabar wick credit",
             "events": events, "counts": counts,
             "resolved_events": resolved,
             "observed_rebound_fraction": (
