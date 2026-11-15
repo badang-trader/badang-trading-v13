@@ -111,6 +111,14 @@ class ActiveBitgetContinuityTests(unittest.TestCase):
                     market.fastest_candles("BTCUSDT", "15m", exchanges=["bitget"])
         self.assertGreaterEqual(getter.call_count, 2)
 
+    def test_oversized_exchange_page_is_rejected_before_pagination(self):
+        oversized = [[str(i*self.STEP), "100", "102", "98", "100", "10"]
+                     for i in range(1001)]
+        with patch.object(market, "_get", return_value=oversized) as getter:
+            with self.assertRaisesRegex(ValueError, "페이지 크기 비정상"):
+                market.fastest_candles("BTCUSDT", "15m", exchanges=["bitget"])
+        self.assertEqual(getter.call_count, 1)
+
     def test_stale_history_rejected_even_when_contiguous(self):
         rows = self.rows()
         with patch.object(market, "_get", return_value=rows):
