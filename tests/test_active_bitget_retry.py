@@ -1,5 +1,6 @@
 """Tests for the actual Bitget adapter imported by app.py."""
 import unittest
+from concurrent.futures import ThreadPoolExecutor
 from unittest.mock import Mock, patch
 import bitget_market_data as market
 
@@ -69,6 +70,29 @@ class ActiveBitgetRetryTests(unittest.TestCase):
         self.assertEqual(len(delays), 2)
         self.assertAlmostEqual(delays[0], 0.16, places=6)
         self.assertAlmostEqual(delays[1], 0.32, places=6)
+
+    def test_parallel_requests_reserve_distinct_pacing_slots(self):
+        ok = Mock(status_code=200, headers={})
+        ok.json.return_value = {"code": "00000", "data": []}
+        delays = []
+        from threading import Lock
+        delays_lock = Lock()
+
+        def record_sleep(duration):
+            with delays_lock:
+                delays.append(duration)
+
+        with patch.object(market.SESSION, "get", return_value=ok) as getter:
+            with patch.object(market.time, "sleep", side_effect=record_sleep):
+                with patch.object(market.time, "monotonic", return_value=100.0):
+                    with patch.object(market, "_LAST_REQUEST", [0.0]):
+                        with ThreadPoolExecutor(max_workers=8) as pool:
+                            results = list(pool.map(lambda _: market._get("/test", {}), range(8)))
+        self.assertEqual(results, [[] for _ in range(8)])
+        self.assertEqual(getter.call_count, 8)
+        self.assertEqual(len(delays), 7)
+        for index, delay in enumerate(sorted(delays), start=1):
+            self.assertAlmostEqual(delay, index*0.16, places=5)
 
     def test_transient_503_recovers(self):
         busy = Mock(status_code=503, headers={})
