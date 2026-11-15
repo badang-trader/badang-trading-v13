@@ -171,6 +171,21 @@ def decision_review(item,structures,mode):
             # A materially larger claimed net R:R is inconsistent with the prices.
             if rr1 is not None and rr1 > gross_rr + 1e-6:
                 reasons.append('수수료 반영 손익비가 가격 기준 손익비보다 큼')
+    tp2 = _f(old.get('tp2'))
+    rr2 = _f(old.get('rr2_net_estimate'))
+    if old.get('tp2') is not None:
+        if tp2 is None or tp2 <= 0:
+            reasons.append('2차 목표 가격 오류')
+        elif all(v is not None and v > 0 for v in (entry, stop, tp1)) and side in ('LONG', 'SHORT'):
+            if (side == 'LONG' and tp2 < tp1) or (side == 'SHORT' and tp2 > tp1):
+                reasons.append('2차 목표가가 1차 목표보다 불리함')
+    if old.get('rr2_net_estimate') is not None:
+        if rr2 is None or rr2 < 0:
+            reasons.append('2차 목표 손익비 오류')
+        elif tp2 is not None and entry is not None and stop is not None and entry != stop:
+            gross_rr2 = abs(tp2 - entry) / abs(entry - stop)
+            if rr2 > gross_rr2 + 1e-6:
+                reasons.append('2차 수수료 반영 손익비가 가격 기준 손익비보다 큼')
     if old.get('state')!='READY_REVIEW':reasons.append('기존 진입 검증 미충족')
     # Reconcile current multi-timeframe wave ambiguity as contextual warning, not fake confidence.
     primary='15m' if mode=='scalp' else '4H'
@@ -181,7 +196,7 @@ def decision_review(item,structures,mode):
     return {'state':'READY_REVIEW' if ready else 'WAIT',
             'label':'진입 검토 가능 · 주문 전 실시간 확인' if ready else '관망 · 진입 조건 미충족',
             'side':side,'score':score,'reasons':unique,'wave_context':wave_note,
-            'plan':{'entry':entry,'stop':stop,'tp1':tp1,'tp2':_f(old.get('tp2')),
-                    'rr1_net_estimate':rr1,'rr2_net_estimate':_f(old.get('rr2_net_estimate'))},
+            'plan':{'entry':entry,'stop':stop,'tp1':tp1,'tp2':tp2,
+                    'rr1_net_estimate':rr1,'rr2_net_estimate':rr2},
             'data_is_live_quote':False,'win_probability':None,
             'note':'확정봉 스냅샷 기반. 주문호가/청산가/체결·슬리피지 미반영'}
