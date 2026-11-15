@@ -31,7 +31,6 @@ def evaluate_wave_target(symbol, frame, *, fetch=None, replay=None):
         raise ValueError("Empty causal wave replay")
     by_direction = {"up": 0, "down": 0}
     patterns = {}
-    invalidated = 0
     for observation in observations:
         for candidate in observation["scenarios"]:
             direction = candidate["direction"]
@@ -40,7 +39,6 @@ def evaluate_wave_target(symbol, frame, *, fetch=None, replay=None):
             by_direction[direction] += 1
             pattern = candidate["pattern"]
             patterns[pattern] = patterns.get(pattern, 0) + 1
-            invalidated += candidate["invalidation_status"] == "crossed_or_at_level"
     return {"symbol": symbol, "frame": frame, "status": "evaluated",
             "confirmed_bars": len(closed),
             "observations": len(observations),
@@ -48,7 +46,8 @@ def evaluate_wave_target(symbol, frame, *, fetch=None, replay=None):
                 bool(o["candidate_count"]) for o in observations),
             "candidate_observation_counts_by_direction": by_direction,
             "candidate_observation_counts_by_pattern": patterns,
-            "invalidation_rules_verified": False,\n            "invalidation_events": None,
+            "invalidation_rules_verified": False,
+            "invalidation_events": None,
             "counts_are_repeated_observations_not_independent_trades": True,
             "prediction_accuracy_verified": False,
             "profitability_verified": False,
@@ -66,7 +65,8 @@ def main():
                             "trading_ready": False})
     report = {"read_only": True, "trading_ready": False, "results": results}
     Path("badang-wave-live-research.json").write_text(
-        json.dumps(report, indent=2, ensure_ascii=False, allow_nan=False) + "\n",
+        json.dumps(report, indent=2, ensure_ascii=False, allow_nan=False) + "
+",
         encoding="utf-8")
     print("BADANG_WAVE_RESEARCH " + json.dumps(
         [{"symbol": r["symbol"], "frame": r["frame"], "status": r["status"]}
