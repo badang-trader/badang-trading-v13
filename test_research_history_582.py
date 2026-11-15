@@ -43,6 +43,32 @@ class ResearchHistoryTests(unittest.TestCase):
         self.assertEqual(r["stop_reason"], "historical_gap")
         self.assertEqual(r["confirmed_bars"], 49)
 
+    def test_empty_page_stops_with_insufficient_history(self):
+        calls = []
+        def fetch(path, params):
+            calls.append(params)
+            return []
+        r = research_history("BTCUSDT", "15m", target_bars=1000,
+                             max_pages=6, now_ms=NOW, fetch=fetch)
+        self.assertEqual(r["status"], "insufficient_history")
+        self.assertEqual(r["stop_reason"], "empty_page")
+        self.assertEqual(r["pages"], 1)
+        self.assertEqual(len(calls), 1)
+        self.assertFalse(r["trading_ready"])
+
+    def test_repeated_page_stops_without_claiming_1000_bars(self):
+        calls = []
+        def fetch(path, params):
+            calls.append(params)
+            return [candle(i) for i in range(1999800, 2000000)]
+        r = research_history("BTCUSDT", "15m", target_bars=1000,
+                             max_pages=6, now_ms=NOW, fetch=fetch)
+        self.assertEqual(r["status"], "insufficient_history")
+        self.assertEqual(r["stop_reason"], "no_older_confirmed_candles")
+        self.assertEqual(r["pages"], 2)
+        self.assertEqual(len(calls), 2)
+        self.assertFalse(r["trading_ready"])
+
     def test_page_boundary_gap_rejects_1000_bar_sample(self):
         def fetch(path, params):
             end = int(params["endTime"]) // STEP
