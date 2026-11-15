@@ -43,6 +43,18 @@ class ResearchHistoryTests(unittest.TestCase):
         self.assertEqual(r["stop_reason"], "historical_gap")
         self.assertEqual(r["confirmed_bars"], 49)
 
+    def test_page_boundary_gap_rejects_1000_bar_sample(self):
+        def fetch(path, params):
+            end = int(params["endTime"]) // STEP
+            return [candle(i) for i in range(end - 200, end)
+                    if i != 1999600]
+        r = research_history("BTCUSDT", "15m", target_bars=1000,
+                             max_pages=6, now_ms=NOW, fetch=fetch)
+        self.assertEqual(r["status"], "insufficient_history")
+        self.assertEqual(r["stop_reason"], "historical_gap")
+        self.assertLess(r["confirmed_bars"], 1000)
+        self.assertFalse(r["trading_ready"])
+
     def test_conflicting_overlap_fails_closed(self):
         def fetch(path, params):
             end = int(params["endTime"]) // STEP
