@@ -16,6 +16,17 @@ class ExchangeCandleValidationTests(unittest.TestCase):
             result = validate_candles(rows, "15m")
         self.assertEqual(len(result), 205)
 
+    def test_stale_completed_history_is_rejected(self):
+        rows = sample_rows()
+        with patch("exchange_data.time.time", return_value=(210 * STEP) / 1000):
+            with self.assertRaisesRegex(ValueError, "Stale"):
+                validate_candles(rows, "15m")
+
+    def test_recent_completed_history_is_accepted(self):
+        rows = sample_rows()
+        with patch("exchange_data.time.time", return_value=(208 * STEP) / 1000):
+            self.assertEqual(len(validate_candles(rows, "15m")), 205)
+
     def test_nonfinite_prices_cannot_pass_minimum(self):
         for column, value in ((1, float("nan")), (2, float("inf")),
                               (3, -float("inf")), (4, float("nan")),
