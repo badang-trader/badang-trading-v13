@@ -2126,10 +2126,10 @@ def v13_scan():
         ), 400
 
     try:
-        offset = max(
-            0,
-            int(request.args.get('offset', 0))
-        )
+        offset_raw = request.args.get('offset', '0')
+        if not re.fullmatch(r'[0-9]{1,8}', offset_raw):
+            return jsonify(error='offset은 0 이상의 정수여야 합니다'), 400
+        offset = int(offset_raw)
 
         requested_symbol = request.args.get('symbol', '').strip().upper()
         if requested_symbol:
