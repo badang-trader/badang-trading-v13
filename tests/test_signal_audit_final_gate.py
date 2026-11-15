@@ -23,7 +23,7 @@ class FinalAuditGateTests(unittest.TestCase):
         item["decision_427"]={"state": "READY_REVIEW"}
         result=reconcile(item)
         self.assertEqual(result["status"], "WAIT")
-        self.assertEqual(result["caveats"], [])
+        self.assertTrue(any("출처 미확인" in c for c in result["caveats"]))
         self.assertFalse(result["order_authorized"])
 
     def test_missing_item_fails_closed(self):
