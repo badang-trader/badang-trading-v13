@@ -20,6 +20,21 @@ class ResearchPilotTests(unittest.TestCase):
         self.assertEqual(len(set(calls)), 4)
         self.assertTrue(all(t == 1000 and p == 6 for _, _, t, p in calls))
 
+    def test_rate_limit_is_distinguished_from_insufficient_history(self):
+        def fake(symbol, frame, **kw):
+            if symbol == "ETHUSDT":
+                raise ValueError("Bitget 요청 제한(HTTP 429): 재시도 3회 실패")
+            return {"status": "insufficient_history", "confirmed_bars": 400,
+                    "pages": 6, "fresh": False}
+        with patch("badang_research_history_pilot_583.research_history",
+                   side_effect=fake):
+            report = pilot()
+        categories = [r["result_category"] for r in report["results"]]
+        self.assertEqual(categories.count("rate_limited"), 2)
+        self.assertEqual(categories.count("insufficient_or_stale_history"), 2)
+        self.assertEqual(report["adequate_targets"], 0)
+        self.assertFalse(report["trading_ready"])
+
     def test_partial_failure_is_not_marked_adequate(self):
         def fake(symbol, frame, **kw):
             if symbol == "ETHUSDT":
