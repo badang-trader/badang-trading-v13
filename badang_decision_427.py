@@ -86,7 +86,7 @@ def confirmed_turns(bars,window=3):
         else:turns.append({'i':i,'time':bars[i][0], 'confirmed_at':bars[i+window][0], 'kind':kind,'price':price})
     return turns
 
-def impulse_state(turns, current, atr):
+def impulse_state(turns, current, atr, as_of_open=None):
     """Assess current candidate wave number from last alternating turns; not a prediction."""
     # Never label a wave from invalid prices, volatility or untrusted pivots.
     fallback={'status':'UNDETERMINED','label':'현재 3파·5파 판별 불가',
@@ -114,6 +114,14 @@ def impulse_state(turns, current, atr):
             if (confirmed is None or not confirmed.is_integer()
                     or confirmed<_f(t['time'])):
                 return fallback
+    if as_of_open is not None:
+        as_of=_f(as_of_open)
+        if as_of is None or not as_of.is_integer() or as_of<0:
+            return fallback
+        if any(_f(t['time'])>as_of or
+               (t.get('confirmed_at') is not None and
+                _f(t['confirmed_at'])>as_of) for t in turns):
+            return fallback
     turns=[dict(t,price=float(t['price']),time=int(float(t['time'])))
            for t in turns]
     current=current_value
@@ -196,7 +204,7 @@ def structure_review(raw,tf,now_ms=None):
     # previous swing highs/lows only; no forward-looking values
     supports=sorted({round(t['price'],8) for t in turns if t['kind']=='L' and t['price']<current},reverse=True)
     resistances=sorted({round(t['price'],8) for t in turns if t['kind']=='H' and t['price']>current})
-    wave=impulse_state(turns,current,atr)
+    wave=impulse_state(turns,current,atr,as_of_open=recent[-1][0])
     return {'status':'OK','timeframe':tf,'last_closed_time':recent[-1][0],
             'last_closed_price':current,'atr14':round(atr,8),
             'support_levels':supports[:3], 'resistance_levels':resistances[:3],
