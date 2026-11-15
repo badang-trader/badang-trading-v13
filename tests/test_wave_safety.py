@@ -214,6 +214,17 @@ class WaveSafetyTests(unittest.TestCase):
         self.assertEqual(result["state"], "WAIT")
         self.assertTrue(any("2차 순손익비" in reason for reason in result["reasons"]))
 
+    def test_scanner_cannot_omit_all_cost_assumptions(self):
+        structures = {tf: {"status": "OK"} for tf in ("15m", "30m", "1H")}
+        item = {"recommendation": "LONG", "decision_plan_425": {
+            "side": "LONG", "score": 95, "entry": 100, "stop": 98,
+            "tp1": 104, "tp2": 106, "state": "READY_REVIEW",
+            "rr1_net_estimate": 1.70, "rr2_net_estimate": 2.60}}
+        result = decision_review(item, structures, "scalp")
+        self.assertEqual(result["state"], "WAIT")
+        self.assertTrue(any("스캔 비용 가정 누락" in reason
+                            for reason in result["reasons"]))
+
     def test_declared_costs_require_second_target_price(self):
         structures = {tf: {"status": "OK"} for tf in ("15m", "30m", "1H")}
         item = {"decision_plan_425": {
