@@ -43,6 +43,16 @@ class ExcludedAddEntryUiTests(unittest.TestCase):
         self.assertIn("item.get('decision_427',{}).get('state')=='READY_REVIEW'", source)
         self.assertIn("item.get('integrated_audit_439',{}).get('status')=='REVIEW_ONLY'", source)
 
+    def test_decision_plan_excludes_add_entry_fields_and_models_slippage(self):
+        source = (ROOT / "app.py").read_text(encoding="utf-8")
+        start = source.index("def build_decision_plan_425(")
+        end = source.index("\\ndef scan_one(", start)
+        body = source[start:end]
+        self.assertNotIn("'add_entry':", body)
+        self.assertNotIn("'add_condition':", body)
+        self.assertIn("'slippage_assumption_roundtrip_pct':0.10", body)
+        self.assertIn("execution_cost=entry*(0.0012+0.0010)", body)
+
     def test_structure_and_wave_panel_remain(self):
         source = (ROOT / "app.py").read_text(encoding="utf-8")
         self.assertIn("function unifiedPanel427(x)", source)
