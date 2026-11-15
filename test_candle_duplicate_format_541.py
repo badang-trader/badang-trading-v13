@@ -29,7 +29,7 @@ class DuplicateFormattingTests(unittest.TestCase):
         candles=[[str(current-i*step),"100","101","99","100","10"] for i in range(220)]
         candles.append([str(current-10*step),"100","101","99","nan","10"])
         with patch("bitget_market_data.time.time",return_value=now/1000),patch("bitget_market_data._get",return_value=candles):
-            with self.assertRaisesRegex(ValueError,"Conflicting"):
+            with self.assertRaisesRegex(ValueError,"잘못된 OHLCV"):
                 fastest_candles("BTCUSDT","15m")
 
 if __name__=="__main__":unittest.main()
