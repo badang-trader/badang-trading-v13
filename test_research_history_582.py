@@ -64,11 +64,11 @@ class ResearchHistoryTests(unittest.TestCase):
                              max_pages=6, now_ms=NOW, fetch=fetch)
         self.assertEqual(r["status"], "ok")
         self.assertEqual(r["confirmed_bars"], 1000)
-        self.assertEqual(r["pages"], 6)
+        self.assertEqual(r["pages"], 5)
         self.assertEqual(len({x[0] for x in r["candles"]}), 1000)
         self.assertTrue(all(int(b[0]) - int(a[0]) == STEP
                             for a, b in zip(r["candles"], r["candles"][1:])))
-        self.assertEqual(len(requests), 6)
+        self.assertEqual(len(requests), 5)
 
     def test_rate_limit_propagates_without_unbounded_retry(self):
         calls = []
