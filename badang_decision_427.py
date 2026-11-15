@@ -164,6 +164,13 @@ def decision_review(item,structures,mode):
         reasons.append('롱 진입·손절·목표 가격 순서 오류')
     elif side == 'SHORT' and not (tp1 < entry < stop):
         reasons.append('숏 진입·손절·목표 가격 순서 오류')
+    if all(v is not None and v > 0 for v in (entry, stop, tp1)) and side in ('LONG', 'SHORT'):
+        if (side == 'LONG' and stop < entry < tp1) or (side == 'SHORT' and tp1 < entry < stop):
+            gross_rr = abs(tp1 - entry) / abs(entry - stop)
+            # Fees and slippage cannot increase a net R:R above the gross price R:R.
+            # A materially larger claimed net R:R is inconsistent with the prices.
+            if rr1 is not None and rr1 > gross_rr + 1e-6:
+                reasons.append('수수료 반영 손익비가 가격 기준 손익비보다 큼')
     if old.get('state')!='READY_REVIEW':reasons.append('기존 진입 검증 미충족')
     # Reconcile current multi-timeframe wave ambiguity as contextual warning, not fake confidence.
     primary='15m' if mode=='scalp' else '4H'
