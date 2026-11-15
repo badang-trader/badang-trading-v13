@@ -59,6 +59,8 @@ def closed_bars(raw, tf, now_ms=None):
 
 def confirmed_turns(bars,window=3):
     """Symmetric fractal pivots; confirmed_at is the OPEN timestamp of the last right-hand confirming bar.\n\n    Historical pivot time is not the time it became knowable. Backtests must\n    use confirmed_at + the candle duration, never the pivot timestamp.\n    """
+    if not isinstance(window,int) or isinstance(window,bool) or window<1:
+        raise ValueError('Pivot confirmation window must be a positive integer')
     turns=[]
     for i in range(window,len(bars)-window):
         hi=bars[i][2];lo=bars[i][3]
