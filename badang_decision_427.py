@@ -148,9 +148,18 @@ def structure_review(raw,tf,now_ms=None):
 
 def decision_review(item,structures,mode):
     """One authoritative decision state; conservative fail closed."""
+    if not isinstance(item,dict): item={}
+    if not isinstance(structures,dict): structures={}
     old=item.get('decision_plan_425') or {}
+    if not isinstance(old,dict): old={}
     side=old.get('side');score=_f(old.get('score'))
-    reasons=list(old.get('reasons') or [])
+    raw_reasons=old.get('reasons')
+    if isinstance(raw_reasons,(list,tuple)):
+        reasons=[str(r)[:200] for r in raw_reasons[:30]]
+    elif isinstance(raw_reasons,str):
+        reasons=[raw_reasons[:200]]
+    else:
+        reasons=[]
     if mode not in ('scalp', 'swing'):
         return {'state':'WAIT','label':'관망 · 분석 모드 오류',
                 'side':side,'score':score,'reasons':['지원하지 않는 분석 모드'],
@@ -158,7 +167,9 @@ def decision_review(item,structures,mode):
                 'win_probability':None,'note':'지원하지 않는 분석 모드에서는 진입 검토를 진행하지 않음'}
     required=('15m','30m','1H') if mode=='scalp' else ('1H','4H','1D')
     for tf in required:
-        if structures.get(tf,{}).get('status')!='OK':reasons.append(tf+' 확정봉·구조 검증 불가')
+        structure=structures.get(tf)
+        if not isinstance(structure,dict) or structure.get('status')!='OK':
+            reasons.append(tf+' 확정봉·구조 검증 불가')
     if side not in ('LONG','SHORT'):reasons.append('가격 행동 진입 방향 미확정')
     if score is None or score<80:reasons.append('진입 검토 기준 80점 미달')
     rr1 = _f(old.get('rr1_net_estimate'))
@@ -196,8 +207,12 @@ def decision_review(item,structures,mode):
     if old.get('state')!='READY_REVIEW':reasons.append('기존 진입 검증 미충족')
     # Reconcile current multi-timeframe wave ambiguity as contextual warning, not fake confidence.
     primary='15m' if mode=='scalp' else '4H'
-    wave=structures.get(primary,{}).get('wave') or {}
+    primary_structure=structures.get(primary)
+    primary_structure=primary_structure if isinstance(primary_structure,dict) else {}
+    wave=primary_structure.get('wave')
+    wave=wave if isinstance(wave,dict) else {}
     wave_note=wave.get('label','파동 분석 불가')
+    if not isinstance(wave_note,str): wave_note='파동 분석 불가'
     unique=list(dict.fromkeys(reasons))
     ready=not unique
     return {'state':'READY_REVIEW' if ready else 'WAIT',
