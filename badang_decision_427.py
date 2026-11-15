@@ -114,6 +114,10 @@ def impulse_state(turns, current, atr):
             if (confirmed is None or not confirmed.is_integer()
                     or confirmed<_f(t['time'])):
                 return fallback
+            # A pivot cannot have been confirmed using candles after the
+            # latest pivot's timestamp; this would leak future information.
+            if confirmed > _f(turns[-1]['time']):
+                return fallback
     turns=[dict(t,price=float(t['price']),time=int(float(t['time'])))
            for t in turns]
     current=current_value
