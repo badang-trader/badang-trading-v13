@@ -100,7 +100,11 @@ def impulse_state(turns, current, atr):
            or _f(t.get('price'))<=0 or _f(t.get('time')) is None
            for t in turns):
         return fallback
-    turns=[dict(t,price=float(t['price'])) for t in turns]
+    if any(not _f(t.get('time')).is_integer() or _f(t.get('time'))<0
+           for t in turns):
+        return fallback
+    turns=[dict(t,price=float(t['price']),time=int(float(t['time'])))
+           for t in turns]
     current=current_value
     atr=atr_value
     possibilities=[]
