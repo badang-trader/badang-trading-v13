@@ -31,5 +31,15 @@ class ActiveBitgetRetryTests(unittest.TestCase):
         self.assertIn(4.0, [call.args[0] for call in sleep.call_args_list])
 
 
+class ActiveBitgetTimestampTests(unittest.TestCase):
+    def test_invalid_exchange_timestamp_rejected_before_pagination(self):
+        for stamp in ("NaN", "Infinity", "-1", "900000.5", None):
+            with self.subTest(timestamp=stamp):
+                page = [[stamp, "100", "102", "98", "100", "10"]]
+                with patch.object(market, "_get", return_value=page) as getter:
+                    with self.assertRaisesRegex(ValueError, "캔들 시각"):
+                        market.fastest_candles("BTCUSDT", "15m", exchanges=["bitget"])
+                self.assertEqual(getter.call_count, 1)
+
 if __name__ == "__main__":
     unittest.main()
