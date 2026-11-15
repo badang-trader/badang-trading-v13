@@ -19,9 +19,13 @@ def closed_bars(raw, tf, now_ms=None):
     if len(rows)<65: return None,'완료봉 최소 64개 필요'
     bars=[]
     for r in rows[:-1]:
-        if len(r)<6: return None,'OHLCV 형식 누락'
+        if not isinstance(r, (list, tuple)) or len(r)<6:
+            return None,'OHLCV 형식 누락'
         t=_f(r[0]); o,h,l,c,v=(_f(r[i]) for i in (1,2,3,4,5))
-        if any(x is None for x in (t,o,h,l,c,v)) or min(o,h,l,c)<=0 or v<0 or h<max(o,c,l) or l>min(o,c):
+        if (t is None or t < 0 or not t.is_integer()
+                or any(x is None for x in (o,h,l,c,v))
+                or min(o,h,l,c)<=0 or v<0
+                or h<max(o,c,l) or l>min(o,c)):
             return None,'OHLCV 값 이상'
         bars.append((int(t),o,h,l,c,v))
     step=FRAME_MS.get(tf)
