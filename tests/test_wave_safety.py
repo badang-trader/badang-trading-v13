@@ -302,6 +302,21 @@ class WaveSafetyTests(unittest.TestCase):
                {"price":"105","time":3,"kind":"L"}]
         self.assertEqual(impulse_state(turns,115,2)["status"],"HYPOTHESIS")
 
+    def test_as_of_requires_explicit_pivot_confirmation(self):
+        turns=[{"price":100,"time":1,"confirmed_at":4},
+               {"price":110,"time":2,"confirmed_at":5},
+               {"price":105,"time":3}]
+        result=impulse_state(turns,115,2,as_of_open=6)
+        self.assertEqual(result["status"],"UNDETERMINED")
+        self.assertEqual(result["alternatives"],[])
+
+    def test_legacy_wave_without_as_of_does_not_invent_confirmation(self):
+        turns=[{"price":100,"time":1},{"price":110,"time":2},
+               {"price":105,"time":3}]
+        result=impulse_state(turns,115,2)
+        self.assertEqual(result["status"],"HYPOTHESIS")
+        self.assertIsNone(result["alternatives"][0]["last_pivot_confirmed_at"])
+
     def test_insufficient_pivots_not_claimed_as_wave(self):
         wave = impulse_state([], 100, 1)
         self.assertEqual(wave["status"], "UNDETERMINED")
