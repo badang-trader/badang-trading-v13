@@ -65,5 +65,28 @@ class ActiveBitgetTimestampTests(unittest.TestCase):
                         market.fastest_candles("BTCUSDT", "15m", exchanges=["bitget"])
                 self.assertEqual(getter.call_count, 1)
 
+class ActiveBitgetContinuityTests(unittest.TestCase):
+    STEP = 900_000
+
+    def rows(self):
+        return [[str(i*self.STEP), "100", "102", "98", "100", "10"]
+                for i in range(10, 230)]
+
+    def test_220_recent_contiguous_bars_return_with_disposable_marker(self):
+        with patch.object(market, "_get", return_value=self.rows()) as getter:
+            with patch.object(market.time, "time", return_value=230*self.STEP/1000):
+                result = market.fastest_candles("BTCUSDT", "15m", exchanges=["bitget"])
+        self.assertEqual(getter.call_count, 1)
+        self.assertEqual(len(result["candles"][:-1]), 220)
+        self.assertEqual(int(result["candles"][-1][0]), 230*self.STEP)
+
+    def test_missing_recent_bar_cannot_be_fabricated(self):
+        rows = [r for r in self.rows() if int(r[0]) != 220*self.STEP]
+        with patch.object(market, "_get", side_effect=[rows, [], []]) as getter:
+            with patch.object(market.time, "time", return_value=230*self.STEP/1000):
+                with self.assertRaisesRegex(ValueError, "연속 확정봉 부족"):
+                    market.fastest_candles("BTCUSDT", "15m", exchanges=["bitget"])
+        self.assertGreaterEqual(getter.call_count, 2)
+
 if __name__ == "__main__":
     unittest.main()
