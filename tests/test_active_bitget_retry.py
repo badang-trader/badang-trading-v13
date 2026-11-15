@@ -37,6 +37,39 @@ class ActiveBitgetRetryTests(unittest.TestCase):
                     self.assertEqual(market._get("/test", {}), ["ok"])
         self.assertEqual(observed, [True])
 
+    def test_rate_limit_sleep_does_not_hold_global_lock(self):
+        ok = Mock(status_code=200, headers={})
+        ok.json.return_value = {"code": "00000", "data": []}
+        lock_available_during_sleep = []
+
+        def check_sleep(_duration):
+            acquired = market._REQUEST_LOCK.acquire(blocking=False)
+            lock_available_during_sleep.append(acquired)
+            if acquired:
+                market._REQUEST_LOCK.release()
+
+        with patch.object(market.SESSION, "get", return_value=ok):
+            with patch.object(market.time, "sleep", side_effect=check_sleep):
+                with patch.object(market.time, "monotonic", return_value=100.0):
+                    with patch.object(market, "_LAST_REQUEST", [100.0]):
+                        self.assertEqual(market._get("/test", {}), [])
+        self.assertEqual(lock_available_during_sleep, [True])
+
+    def test_sequential_request_slots_are_reserved_in_order(self):
+        ok = Mock(status_code=200, headers={})
+        ok.json.return_value = {"code": "00000", "data": []}
+        delays = []
+        with patch.object(market.SESSION, "get", return_value=ok) as getter:
+            with patch.object(market.time, "sleep", side_effect=delays.append):
+                with patch.object(market.time, "monotonic", return_value=100.0):
+                    with patch.object(market, "_LAST_REQUEST", [0.0]):
+                        for _ in range(3):
+                            self.assertEqual(market._get("/test", {}), [])
+        self.assertEqual(getter.call_count, 3)
+        self.assertEqual(len(delays), 2)
+        self.assertAlmostEqual(delays[0], 0.16, places=6)
+        self.assertAlmostEqual(delays[1], 0.32, places=6)
+
     def test_transient_503_recovers(self):
         busy = Mock(status_code=503, headers={})
         ok = Mock(status_code=200, headers={})
