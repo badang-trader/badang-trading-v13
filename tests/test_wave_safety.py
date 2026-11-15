@@ -206,6 +206,37 @@ class WaveSafetyTests(unittest.TestCase):
         result = decision_review(item, structures, "scalp")
         self.assertEqual(result["state"], "READY_REVIEW")
 
+    def test_second_target_must_not_be_worse_than_first(self):
+        structures = {tf: {"status": "OK"} for tf in ("15m", "30m", "1H")}
+        for side, stop, tp1, tp2 in (("LONG", 98, 104, 103),
+                                     ("SHORT", 102, 96, 97)):
+            with self.subTest(side=side):
+                item = {"decision_plan_425": {"side": side, "score": 95,
+                        "entry": 100, "stop": stop, "tp1": tp1, "tp2": tp2,
+                        "rr1_net_estimate": 1.8, "state": "READY_REVIEW"}}
+                result = decision_review(item, structures, "scalp")
+                self.assertEqual(result["state"], "WAIT")
+                self.assertTrue(any("2차 목표가" in r for r in result["reasons"]))
+
+    def test_second_target_net_ratio_cannot_exceed_gross(self):
+        structures = {tf: {"status": "OK"} for tf in ("15m", "30m", "1H")}
+        item = {"decision_plan_425": {"side": "LONG", "score": 95,
+                "entry": 100, "stop": 98, "tp1": 104, "tp2": 106,
+                "rr1_net_estimate": 1.8, "rr2_net_estimate": 4,
+                "state": "READY_REVIEW"}}
+        result = decision_review(item, structures, "scalp")
+        self.assertEqual(result["state"], "WAIT")
+        self.assertTrue(any("2차 수수료" in r for r in result["reasons"]))
+
+    def test_valid_second_target_remains_eligible(self):
+        structures = {tf: {"status": "OK"} for tf in ("15m", "30m", "1H")}
+        item = {"decision_plan_425": {"side": "SHORT", "score": 95,
+                "entry": 100, "stop": 102, "tp1": 96, "tp2": 94,
+                "rr1_net_estimate": 1.8, "rr2_net_estimate": 2.8,
+                "state": "READY_REVIEW"}}
+        result = decision_review(item, structures, "scalp")
+        self.assertEqual(result["state"], "READY_REVIEW")
+
     def test_unknown_analysis_mode_never_returns_ready(self):
         item = {"decision_plan_425": {"side": "LONG", "score": 95,
                 "rr1_net_estimate": 3.0, "state": "READY_REVIEW"}}
