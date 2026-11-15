@@ -272,7 +272,9 @@ def bitget_derivatives_snapshot(symbol,candles):
         rows=_get('/api/v2/mix/market/open-interest',
                   {'symbol':symbol,'productType':'USDT-FUTURES'})
         if isinstance(rows,dict):
-            oi=rows.get('openInterest') or rows.get('openInterestList')
+            oi=rows.get('openInterest')
+            if oi is None:
+                oi=rows.get('openInterestList')
             if isinstance(oi,list): oi=oi[0].get('size') if oi and isinstance(oi[0],dict) else None
             if oi is not None:
                 value=float(oi)
