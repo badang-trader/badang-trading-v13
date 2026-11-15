@@ -32,6 +32,19 @@ class WaveSafetyTests(unittest.TestCase):
         self.assertIsNone(bars)
         self.assertIn('시간봉', reason)
 
+    def test_contiguous_but_misaligned_candles_rejected(self):
+        rows = candles()
+        for row in rows:
+            row[0] += 1
+        bars, reason = closed_bars(rows, "15m")
+        self.assertIsNone(bars)
+        self.assertIn("경계 정렬", reason)
+
+    def test_aligned_candles_still_accepted(self):
+        bars, reason = closed_bars(candles(), "15m")
+        self.assertEqual(reason, "OK")
+        self.assertEqual(len(bars), 69)
+
     def test_duplicate_timestamp_rejected(self):
         rows = candles()
         rows[30][0] = rows[29][0]
