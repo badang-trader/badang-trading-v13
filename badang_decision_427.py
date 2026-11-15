@@ -171,6 +171,11 @@ def decision_review(item,structures,mode):
         if not isinstance(structure,dict) or structure.get('status')!='OK':
             reasons.append(tf+' 확정봉·구조 검증 불가')
     if side not in ('LONG','SHORT'):reasons.append('가격 행동 진입 방향 미확정')
+    # The final decision must never resurrect a candidate rejected by the scanner.
+    if item.get('recommendation') != side or side not in ('LONG','SHORT'):
+        reasons.append('스캔 최종 추천 방향 불일치 또는 진입 보류')
+    if item.get('entry_blockers'):
+        reasons.append('기존 스캔 진입 차단 사유 존재')
     if score is None or score<80:reasons.append('진입 검토 기준 80점 미달')
     rr1 = _f(old.get('rr1_net_estimate'))
     if rr1 is None or rr1 < 1.5:
