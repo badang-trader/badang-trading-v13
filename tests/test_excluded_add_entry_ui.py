@@ -30,6 +30,19 @@ class ExcludedAddEntryUiTests(unittest.TestCase):
         self.assertIn("n(a.rr1,2)", source)
         self.assertIn("n(a.rr2,2)", source)
 
+    def test_scanner_card_requires_final_manual_gate(self):
+        source = (ROOT / "app.py").read_text(encoding="utf-8")
+        self.assertIn("const finalReady=x.decision_427?.state===\\'READY_REVIEW\\'", source)
+        self.assertIn("x.integrated_audit_439?.status===\\'REVIEW_ONLY\\'", source)
+        self.assertIn("const d=finalReady?candidate:\\'WAIT\\'", source)
+        self.assertIn("최종 보류", source)
+
+    def test_api_recommendations_require_both_final_gates(self):
+        source = (ROOT / "app.py").read_text(encoding="utf-8")
+        self.assertIn("recommendations=top_five([item for item in results", source)
+        self.assertIn("item.get('decision_427',{}).get('state')=='READY_REVIEW'", source)
+        self.assertIn("item.get('integrated_audit_439',{}).get('status')=='REVIEW_ONLY'", source)
+
     def test_structure_and_wave_panel_remain(self):
         source = (ROOT / "app.py").read_text(encoding="utf-8")
         self.assertIn("function unifiedPanel427(x)", source)
