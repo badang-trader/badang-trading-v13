@@ -136,6 +136,16 @@ def fastest_candles(symbol,timeframe,exchanges=None):
                 raise ValueError('Bitget 미래 시각 캔들 감지: 시계 또는 거래소 데이터 오류')
             if stamp%step:
                 raise ValueError('Bitget 캔들 시각 정렬 오류: 봉 간격 경계와 불일치')
+            # Reject malformed price/volume data before requesting history.
+            # Otherwise an unusable first page may cause needless pagination.
+            try:
+                o,h,l,close,volume=(float(z) for z in item[1:6])
+                if (not all(math.isfinite(z) for z in (o,h,l,close,volume))
+                        or min(o,h,l,close)<=0 or volume<0
+                        or h<max(o,l,close) or l>min(o,close)):
+                    raise ValueError('invalid OHLCV')
+            except (TypeError,ValueError,OverflowError) as exc:
+                raise ValueError('Bitget 잘못된 OHLCV 값 감지') from exc
             # The same candle may be represented with equivalent numeric
             # strings across current and historical endpoints.
             if stamp in seen:
