@@ -88,6 +88,21 @@ def confirmed_turns(bars,window=3):
 
 def impulse_state(turns, current, atr):
     """Assess current candidate wave number from last alternating turns; not a prediction."""
+    # Never label a wave from invalid prices, volatility or untrusted pivots.
+    fallback={'status':'UNDETERMINED','label':'현재 3파·5파 판별 불가',
+              'alternatives':[],'note':'파동 입력값 또는 변동성 검증 불가'}
+    current_value=_f(current)
+    atr_value=_f(atr)
+    if (not isinstance(turns,(list,tuple)) or current_value is None
+            or current_value<=0 or atr_value is None or atr_value<=0):
+        return fallback
+    if any(not isinstance(t,dict) or _f(t.get('price')) is None
+           or _f(t.get('price'))<=0 or _f(t.get('time')) is None
+           for t in turns):
+        return fallback
+    turns=[dict(t,price=float(t['price'])) for t in turns]
+    current=current_value
+    atr=atr_value
     possibilities=[]
     # 0,1,2 -> possible active 3; 0..2,3,4 -> possible active 5
     for count,wave in ((3,3),(5,5)):
