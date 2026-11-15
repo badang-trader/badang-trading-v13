@@ -20,8 +20,11 @@ def reconcile(item):
         reasons.append('확정된 롱·숏 방향 없음')
     if item.get('exchange') != 'bitget':
         reasons.append('Bitget 단일 거래소 출처 미확인')
-    if quality.get('cross_exchange') is not False:
-        reasons.append('캔들·파생상품 동일 거래소 확인 불가')
+    venue_match=quality.get('cross_exchange')
+    if venue_match is True:
+        reasons.append('캔들과 파생상품의 거래소가 실제로 다름')
+    elif venue_match is not False:
+        caveats.append('파생상품 출처 미확인 · OI·펀딩은 진입 근거에서 제외')
     if item.get('technical_side') not in (direction,):
         reasons.append('기술적 점수 방향 불일치 또는 중립')
     if item.get('trend_aligned') is not True:
