@@ -111,7 +111,9 @@ def fastest_candles(symbol,timeframe,exchanges=None):
         # bounds during repeated scans. Normal Bitget pages are <=350 rows.
         if not isinstance(page,list) or len(page)>1000:
             raise ValueError('Bitget 캔들 페이지 크기 비정상')
-        if len(seen)+len(page)>5000:
+        # Duplicates across pagination are normal: bound actual unique candles,
+        # not the sum of raw page lengths.
+        if len(seen)>3000:
             raise ValueError('Bitget 캔들 수집 상한 초과')
         for item in page:
             if not isinstance(item,(list,tuple)) or len(item)<6:
