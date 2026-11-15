@@ -24,6 +24,14 @@ def pilot(*, fetcher=None):
             item["status"] = "error"
             item["error_type"] = type(exc).__name__
             item["error_message"] = str(exc)[:160]
+        if item["status"] == "ok":
+            item["result_category"] = "adequate"
+        elif item["status"] == "error":
+            message = str(item.get("error_message", "")).lower()
+            item["result_category"] = ("rate_limited" if "429" in message or "요청 제한" in message
+                                       else "request_or_data_error")
+        else:
+            item["result_category"] = "insufficient_or_stale_history"
         item["elapsed_ms"] = round((time.monotonic() - start) * 1000)
         results.append(item)
     return {"read_only": True, "trading_ready": False,
