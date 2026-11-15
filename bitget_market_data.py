@@ -138,6 +138,8 @@ def fastest_candles(symbol,timeframe,exchanges=None):
                     raise ValueError('Conflicting Bitget candle timestamp: '+str(stamp))
                 continue
             seen[stamp]=item
+            if len(seen)>3000:
+                raise ValueError('Bitget 캔들 수집 상한 초과')
     ingest(raw)
     cursor=None
     history_pages=0
@@ -194,7 +196,9 @@ def fastest_candles(symbol,timeframe,exchanges=None):
             except (ValueError,requests.RequestException):
                 continue
             before=len(seen)
-            if isinstance(patch,list): ingest(patch)
+            if not isinstance(patch,list):
+                raise ValueError('Unexpected Bitget gap repair response')
+            ingest(patch)
             added+=len(seen)-before
         if added==0: break
     raw=list(seen.values())
@@ -213,7 +217,7 @@ def fastest_candles(symbol,timeframe,exchanges=None):
                     and h>=max(o,l,c) and l<=min(o,c) and v>=0):
                 raise ValueError('Bitget 잘못된 OHLCV 값 감지')
             rows.append([str(t),str(o),str(h),str(l),str(c),str(v)])
-        except (TypeError,OverflowError) as exc:
+        except (TypeError,ValueError,OverflowError) as exc:
             raise ValueError('Bitget 잘못된 OHLCV 값 감지') from exc
     rows.sort(key=lambda x:int(x[0]))
     # Reject exchange timestamps beyond the current candle's opening slot.
