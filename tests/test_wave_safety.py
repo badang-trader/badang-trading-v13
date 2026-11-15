@@ -140,6 +140,25 @@ class WaveSafetyTests(unittest.TestCase):
         self.assertFalse(result["valid"])
         self.assertTrue(any("최단" in r for r in result["reasons"]))
 
+    def test_malformed_reward_risk_fails_safely(self):
+        valid_structures = {tf: {"status": "OK"} for tf in ("15m", "30m", "1H")}
+        for bad in ("not-a-number", None, float("nan"), float("inf"), -2):
+            with self.subTest(rr=bad):
+                item = {"decision_plan_425": {"side": "LONG", "score": 90,
+                        "rr1_net_estimate": bad, "state": "READY_REVIEW"}}
+                result = decision_review(item, valid_structures, "scalp")
+                self.assertEqual(result["state"], "WAIT")
+                self.assertTrue(any("손익비" in r for r in result["reasons"]))
+
+    def test_numeric_string_reward_risk_is_normalized(self):
+        valid_structures = {tf: {"status": "OK"} for tf in ("15m", "30m", "1H")}
+        item = {"decision_plan_425": {"side": "LONG", "score": "90",
+                "rr1_net_estimate": "1.7", "rr2_net_estimate": "2.2",
+                "state": "READY_REVIEW"}}
+        result = decision_review(item, valid_structures, "scalp")
+        self.assertEqual(result["state"], "READY_REVIEW")
+        self.assertEqual(result["plan"]["rr1_net_estimate"], 1.7)
+
     def test_missing_timeframe_prevents_ready_state(self):
         item = {"decision_plan_425": {"side": "LONG", "score": 90,
                 "rr1_net_estimate": 2.0, "state": "READY_REVIEW"}}
