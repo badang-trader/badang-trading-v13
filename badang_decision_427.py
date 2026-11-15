@@ -144,6 +144,11 @@ def decision_review(item,structures,mode):
     old=item.get('decision_plan_425') or {}
     side=old.get('side');score=_f(old.get('score'))
     reasons=list(old.get('reasons') or [])
+    if mode not in ('scalp', 'swing'):
+        return {'state':'WAIT','label':'관망 · 분석 모드 오류',
+                'side':side,'score':score,'reasons':['지원하지 않는 분석 모드'],
+                'wave_context':'분석 불가','plan':{},'data_is_live_quote':False,
+                'win_probability':None,'note':'지원하지 않는 분석 모드에서는 진입 검토를 진행하지 않음'}
     required=('15m','30m','1H') if mode=='scalp' else ('1H','4H','1D')
     for tf in required:
         if structures.get(tf,{}).get('status')!='OK':reasons.append(tf+' 확정봉·구조 검증 불가')
