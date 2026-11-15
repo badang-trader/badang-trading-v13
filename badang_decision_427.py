@@ -219,6 +219,8 @@ def decision_review(item,structures,mode):
         elif all(v is not None and v > 0 for v in (entry, stop, tp1)) and side in ('LONG', 'SHORT'):
             if (side == 'LONG' and tp2 < tp1) or (side == 'SHORT' and tp2 > tp1):
                 reasons.append('2차 목표가가 1차 목표보다 불리함')
+    if cost_declared and (tp2 is None or tp2 <= 0):
+        reasons.append('2차 목표 가격 누락 · 비용 반영 계획 검증 불가')
     if cost_declared and old.get('tp2') is not None and rr2 is None:
         reasons.append('2차 순손익비 누락 · 수수료·슬리피지 검증 불가')
     if old.get('rr2_net_estimate') is not None:
