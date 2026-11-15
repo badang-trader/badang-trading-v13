@@ -35,6 +35,31 @@ class ResearchPilotTests(unittest.TestCase):
         self.assertEqual(report["adequate_targets"], 0)
         self.assertFalse(report["trading_ready"])
 
+    def test_successful_targets_are_all_classified_adequate(self):
+        def fake(symbol, frame, **kw):
+            return {"status": "ok", "confirmed_bars": 1000,
+                    "pages": 5, "fresh": True, "stop_reason": "target_reached"}
+        with patch("badang_research_history_pilot_583.research_history",
+                   side_effect=fake):
+            report = pilot()
+        self.assertEqual(report["adequate_targets"], 4)
+        self.assertTrue(all(r["result_category"] == "adequate"
+                            for r in report["results"]))
+        self.assertTrue(report["read_only"])
+        self.assertFalse(report["trading_ready"])
+
+    def test_unexpected_api_error_is_not_mislabeled_as_rate_limit(self):
+        def fake(symbol, frame, **kw):
+            raise RuntimeError("Bitget invalid granularity")
+        with patch("badang_research_history_pilot_583.research_history",
+                   side_effect=fake):
+            report = pilot()
+        self.assertEqual(report["adequate_targets"], 0)
+        self.assertTrue(all(r["result_category"] == "request_or_data_error"
+                            for r in report["results"]))
+        self.assertTrue(all(r["error_type"] == "RuntimeError"
+                            for r in report["results"]))
+
     def test_partial_failure_is_not_marked_adequate(self):
         def fake(symbol, frame, **kw):
             if symbol == "ETHUSDT":
