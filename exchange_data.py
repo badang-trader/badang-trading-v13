@@ -10,13 +10,23 @@ TIMEOUT = 15
 
 
 def get_json(url, params=None):
-    response = SESSION.get(
-        url,
-        params=params,
-        timeout=TIMEOUT
-    )
-    response.raise_for_status()
-    return response.json()
+    """Bounded retries for transient exchange throttling and server failures."""
+    for attempt in range(3):
+        response = SESSION.get(url, params=params, timeout=TIMEOUT)
+        if response.status_code in (429, 500, 502, 503, 504):
+            if attempt < 2:
+                retry_after = response.headers.get("Retry-After", "")
+                try:
+                    delay = float(retry_after)
+                    if not math.isfinite(delay) or delay < 0:
+                        raise ValueError("invalid Retry-After")
+                    delay = min(delay, 8.0)
+                except (ValueError, TypeError):
+                    delay = 0.5 * (2 ** attempt)
+                time.sleep(delay)
+                continue
+        response.raise_for_status()
+        return response.json()
 
 
 def binance_symbols(min_turnover=1000000):
