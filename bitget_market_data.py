@@ -41,8 +41,13 @@ def _get(path, params):
             if attempt==2:
                 raise ValueError('Bitget 요청 제한(HTTP 429): 재시도 3회 실패')
             retry_after=r.headers.get('Retry-After','')
-            try: delay=max(0.5,min(float(retry_after),4.0))
-            except (ValueError,TypeError): delay=0.8*(attempt+1)
+            try:
+                parsed=float(retry_after)
+                if not math.isfinite(parsed) or parsed < 0:
+                    raise ValueError('invalid Retry-After')
+                delay=max(0.5,min(parsed,4.0))
+            except (ValueError,TypeError,OverflowError):
+                delay=0.8*(attempt+1)
             time.sleep(delay)
             continue
         r.raise_for_status()
