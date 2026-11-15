@@ -7,6 +7,7 @@ from badang_live_historical_research_551 import (
 from badang_engine_research_549 import research_engine_backtest
 from badang_research_sample_554 import assess_sample
 from badang_research_holdout_metrics_578 import holdout_performance
+from badang_research_direction_diagnostics_585 import direction_diagnostics
 
 TARGETS = (("BTCUSDT", "15m", "scalp"), ("ETHUSDT", "15m", "scalp"),
            ("BTCUSDT", "1H", "scalp"), ("ETHUSDT", "1H", "scalp"))
@@ -38,6 +39,7 @@ def evaluate_target(symbol, frame, mode, *, fetch=None, engine=None):
     return {"symbol": symbol, "frame": frame, "mode": mode,
             "status": "evaluated", "confirmed_bars": len(closed),
             "completed_trades": len(trades),
+            "by_direction": direction_diagnostics(trades),
             "sample_assessment": sample,
             "chronological_holdout": holdout_performance(
                 trades, int(len(closed) * 0.7), len(closed)),
