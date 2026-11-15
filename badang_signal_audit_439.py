@@ -4,13 +4,17 @@ Never upgrades a candidate, estimates probability, or places orders.
 """
 
 def reconcile(item):
+    if not isinstance(item,dict): item={}
     precision = item.get('precision_418') or item.get('signal_precision_418') or {}
+    if not isinstance(precision,dict): precision={}
     # The scanner owns the actual validation object; missing evidence is NOT approval.
     direction = item.get('candidate_side')
     if direction not in ('LONG', 'SHORT'):
         direction = None
     quality = item.get('data_quality') or {}
-    caveats = list(item.get('data_caveats') or [])
+    if not isinstance(quality,dict): quality={}
+    raw_caveats=item.get('data_caveats')
+    caveats=[str(c)[:160] for c in raw_caveats[:20]] if isinstance(raw_caveats,(list,tuple)) else []
     reasons = []
     if not direction:
         reasons.append('확정된 롱·숏 방향 없음')
@@ -26,7 +30,9 @@ def reconcile(item):
     unavailable = []
     if item.get('cvd_quality') != 'CONFIRMED_COMPLETE':
         unavailable.append('전체 체결 CVD 미검증')
-    if not (item.get('futures_data_available') or {}).get('oi_history'):
+    derivatives=item.get('futures_data_available')
+    if not isinstance(derivatives,dict): derivatives={}
+    if not derivatives.get('oi_history'):
         unavailable.append('OI 변화 자료 미확인')
     # An audit is deliberately advisory. The existing precision gate remains authoritative.
     precision_status = precision.get('status', 'UNVERIFIED')
