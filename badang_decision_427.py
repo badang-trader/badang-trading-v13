@@ -202,6 +202,10 @@ def decision_review(item,structures,mode):
     # scan planner always supplies both; partial declarations are invalid.
     cost_declared = ('fee_assumption_roundtrip_pct' in old or
                      'slippage_assumption_roundtrip_pct' in old)
+    # Scanner-produced items must never bypass cost checks by omitting
+    # both assumptions. Only legacy standalone review fixtures may omit them.
+    if 'recommendation' in item and not cost_declared:
+        reasons.append('스캔 비용 가정 누락 · 순손익비 검증 불가')
     if cost_declared and (fee_pct is None or slip_pct is None or
                           fee_pct < 0 or slip_pct < 0 or fee_pct + slip_pct > 5):
         reasons.append('수수료·슬리피지 가정 누락 또는 오류')
