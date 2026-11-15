@@ -38,7 +38,7 @@ def closed_bars(raw, tf, now_ms=None):
     return bars,'OK'
 
 def confirmed_turns(bars,window=3):
-    """Symmetric fractal pivots; last window candles cannot confirm a turn."""
+    """Symmetric fractal pivots; confirmed_at is the OPEN timestamp of the last right-hand confirming bar.\n\n    Historical pivot time is not the time it became knowable. Backtests must\n    use confirmed_at + the candle duration, never the pivot timestamp.\n    """
     turns=[]
     for i in range(window,len(bars)-window):
         hi=bars[i][2];lo=bars[i][3]
@@ -48,8 +48,8 @@ def confirmed_turns(bars,window=3):
         kind='H' if is_hi else 'L'; price=hi if is_hi else lo
         if turns and turns[-1]['kind']==kind:
             if (kind=='H' and price>turns[-1]['price']) or (kind=='L' and price<turns[-1]['price']):
-                turns[-1]={'i':i,'time':bars[i][0],'kind':kind,'price':price}
-        else:turns.append({'i':i,'time':bars[i][0],'kind':kind,'price':price})
+                turns[-1]={'i':i,'time':bars[i][0], 'confirmed_at':bars[i+window][0], 'kind':kind,'price':price}
+        else:turns.append({'i':i,'time':bars[i][0], 'confirmed_at':bars[i+window][0], 'kind':kind,'price':price})
     return turns
 
 def impulse_state(turns, current, atr):
