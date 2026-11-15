@@ -28,6 +28,12 @@ class DerivativesQualityTests(unittest.TestCase):
                 self.assertEqual(result["errors"].get("funding"), "ValueError")
                 self.assertEqual(result["oi_contracts"], 1234.0)
 
+    def test_zero_open_interest_is_preserved(self):
+        result = self.snapshot(0, "0")
+        self.assertEqual(result["oi_contracts"], 0.0)
+        self.assertEqual(result["funding_rate"], 0.0)
+        self.assertEqual(result["errors"], {})
+
     def test_valid_values_preserved(self):
         result = self.snapshot("1234.5", "-0.0002")
         self.assertEqual(result["oi_contracts"], 1234.5)
