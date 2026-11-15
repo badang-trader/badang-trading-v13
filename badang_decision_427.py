@@ -108,6 +108,16 @@ def impulse_state(turns, current, atr, as_of_open=None):
     if any(_f(turns[i]['time'])<=_f(turns[i-1]['time'])
            for i in range(1,len(turns))):
         return fallback
+    # If the pivot detector supplies H/L types, they must alternate and
+    # agree with price direction. Legacy standalone fixtures omit kind.
+    kinds=[t.get('kind') for t in turns]
+    if any(k is not None for k in kinds):
+        if (any(k not in ('H','L') for k in kinds)
+                or any(kinds[i]==kinds[i-1] for i in range(1,len(kinds)))):
+            return fallback
+        if any((turns[i]['price']>turns[i-1]['price']) != (kinds[i]=='H')
+               for i in range(1,len(turns))):
+            return fallback
     for t in turns:
         if t.get('confirmed_at') is not None:
             confirmed=_f(t['confirmed_at'])
