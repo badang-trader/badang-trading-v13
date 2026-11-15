@@ -44,6 +44,20 @@ class ActiveBitgetRetryTests(unittest.TestCase):
         self.assertIn(0.8, [call.args[0] for call in sleep.call_args_list])
         self.assertIn(1.6, [call.args[0] for call in sleep.call_args_list])
 
+    def test_persistent_503_without_raise_for_status_still_fails_closed(self):
+        busy = Mock(status_code=503, headers={})
+        with patch.object(market.SESSION, "get", return_value=busy) as getter:
+            with patch.object(market.time, "sleep") as sleep:
+                with patch.object(market.time, "monotonic", return_value=100.0):
+                    with patch.object(market, "_LAST_REQUEST", [0.0]):
+                        with self.assertRaisesRegex(ValueError, "HTTP 503"):
+                            market._get("/test", {})
+        self.assertEqual(getter.call_count, 3)
+        retry_delays = [call.args[0] for call in sleep.call_args_list]
+        self.assertIn(0.8, retry_delays)
+        self.assertIn(1.6, retry_delays)
+        self.assertNotIn(2.4, retry_delays)
+
     def test_http_429_exhaustion_does_not_return_stale_data(self):
         limited = Mock(status_code=429, headers={"Retry-After": "0"})
         with patch.object(market.SESSION, "get", return_value=limited) as getter:
