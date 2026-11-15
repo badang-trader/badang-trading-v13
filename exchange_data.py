@@ -457,6 +457,10 @@ def validate_candles(
         )
 
     timestamps = sorted(valid)
+    # A complete historical series is not necessarily a fresh market snapshot.
+    # Refuse a stale tail instead of presenting old prices as current signals.
+    if now_ms - (timestamps[-1] + interval_ms) > 2 * interval_ms:
+        raise ValueError("Stale Bitget candle history")
     if any(ts % interval_ms != 0 for ts in timestamps):
         raise ValueError("Misaligned Bitget candle timestamps")
     if any(b - a != interval_ms for a, b in zip(timestamps, timestamps[1:])):
