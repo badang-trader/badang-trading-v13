@@ -25,7 +25,7 @@ def research_history(symbol, timeframe, *, target_bars=1000, max_pages=6,
     granularity, step = FRAMES[timeframe]
     request = fetch if fetch is not None else _get
     seen = {}
-    cursor = (now_ms // step) * step + step
+    cursor = (now_ms // step) * step
     pages = 0
     stop = "page_budget"
     for _ in range(max_pages):
