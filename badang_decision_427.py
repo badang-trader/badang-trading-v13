@@ -19,6 +19,7 @@ def closed_bars(raw, tf, now_ms=None):
         return None,'OHLCV 데이터 묶음 형식 오류'
     rows=list(raw)
     if len(rows)<65: return None,'완료봉 최소 64개 필요'
+    if len(rows)>5000: return None,'OHLCV 데이터 상한 초과'
     bars=[]
     for r in rows[:-1]:
         if not isinstance(r, (list, tuple)) or len(r)<6:
@@ -102,7 +103,7 @@ def completed_impulse_rules(prices):
     This does not validate diagonals or identify wave degree. Returns reasons
     rather than converting a historical pattern into a trade recommendation.
     """
-    if len(prices) != 6:
+    if not isinstance(prices, (list, tuple)) or len(prices) != 6:
         return {'valid': False, 'reasons': ['6개 파동 경계점 필요']}
     vals = [_f(p) for p in prices]
     if any(v is None or v <= 0 for v in vals):
