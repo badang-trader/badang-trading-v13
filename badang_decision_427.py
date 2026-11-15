@@ -28,6 +28,14 @@ def closed_bars(raw, tf, now_ms=None):
     trailing_time=_f(trailing[0])
     if trailing_time is None or trailing_time<0 or not trailing_time.is_integer():
         return None,'마지막 미확정봉 시각 오류'
+    # The placeholder is excluded from indicators, but reject corrupt values
+    # rather than silently accepting a malformed exchange payload.
+    tail_values=[_f(v) for v in trailing[1:6]]
+    if (any(v is None for v in tail_values)
+            or min(tail_values[:4])<=0 or tail_values[4]<0
+            or tail_values[1]<max(tail_values[0],tail_values[2],tail_values[3])
+            or tail_values[2]>min(tail_values[0],tail_values[3])):
+        return None,'마지막 미확정봉 OHLCV 값 오류'
     bars=[]
     for r in rows[:-1]:
         if not isinstance(r, (list, tuple)) or len(r)<6:
