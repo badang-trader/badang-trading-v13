@@ -2811,7 +2811,9 @@ def v13_scan():
             offset=offset,
             next_offset=offset+len(batch),
             results=results,
-            recommendations=top_five([item for item in results\n                if item.get('decision_427',{}).get('state')=='READY_REVIEW'\n                and item.get('integrated_audit_439',{}).get('status')=='REVIEW_ONLY']),
+            recommendations=top_five([item for item in results
+                if item.get('decision_427',{}).get('state')=='READY_REVIEW'
+                and item.get('integrated_audit_439',{}).get('status')=='REVIEW_ONLY']),
             errors=errors,
             signal_storage=storage
         )
