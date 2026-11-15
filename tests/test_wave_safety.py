@@ -298,6 +298,34 @@ class WaveSafetyTests(unittest.TestCase):
         result=decision_review(item, structures, "scalp")
         self.assertEqual(result["wave_context"], "파동 분석 불가")
 
+    def test_wave_alternatives_include_invalidation_levels(self):
+        item={"decision_plan_425": {"side": "LONG", "score": 95,
+              "rr1_net_estimate": 1.8, "entry": 100, "stop": 95,
+              "tp1": 110, "state": "READY_REVIEW"}}
+        structures={tf: {"status": "OK"} for tf in ("15m", "30m", "1H")}
+        structures["15m"]["wave"]={"label": "3파·5파 복수 시나리오",
+            "alternatives": [
+                {"wave": 3, "direction": "UP", "invalidation": 94.5,
+                 "last_pivot_confirmed_at": 900000},
+                {"wave": 5, "direction": "UP", "invalidation": 96.0,
+                 "last_pivot_confirmed_at": 1800000}]}
+        result=decision_review(item, structures, "scalp")
+        self.assertEqual(result["state"], "READY_REVIEW")
+        self.assertEqual(len(result["wave_scenarios"]), 2)
+        self.assertEqual(result["wave_scenarios"][0]["invalidation"], 94.5)
+        self.assertEqual(result["wave_scenarios"][1]["wave"], 5)
+
+    def test_invalid_wave_alternatives_not_exposed(self):
+        item={"decision_plan_425": {}}
+        structures={"4H": {"status": "OK", "wave": {"alternatives": [
+            None, "bad", {"wave": 3, "direction": "UP", "invalidation": "NaN"},
+            {"wave": 5, "direction": "SIDEWAYS", "invalidation": 99},
+            {"wave": 3, "direction": "DOWN", "invalidation": 98}]}}}
+        result=decision_review(item, structures, "swing")
+        self.assertEqual(len(result["wave_scenarios"]), 1)
+        self.assertEqual(result["wave_scenarios"][0]["direction"], "DOWN")
+        self.assertEqual(result["state"], "WAIT")
+
     def test_unknown_analysis_mode_never_returns_ready(self):
         item = {"decision_plan_425": {"side": "LONG", "score": 95,
                 "rr1_net_estimate": 3.0, "state": "READY_REVIEW"}}
