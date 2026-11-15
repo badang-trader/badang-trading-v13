@@ -179,7 +179,7 @@ def decision_review(item,structures,mode):
     if score is None or score<80:reasons.append('진입 검토 기준 80점 미달')
     rr1 = _f(old.get('rr1_net_estimate'))
     if rr1 is None or rr1 < 1.5:
-        reasons.append('수수료 반영 손익비 1.5 미달 또는 산정 불가')
+        reasons.append('수수료·슬리피지 반영 손익비 1.5 미달 또는 산정 불가')
     entry, stop, tp1 = (_f(old.get(k)) for k in ('entry', 'stop', 'tp1'))
     if any(v is None or v <= 0 for v in (entry, stop, tp1)):
         reasons.append('진입·손절·1차 목표 가격 누락 또는 오류')
@@ -193,7 +193,20 @@ def decision_review(item,structures,mode):
             # Fees and slippage cannot increase a net R:R above the gross price R:R.
             # A materially larger claimed net R:R is inconsistent with the prices.
             if rr1 is not None and rr1 > gross_rr + 1e-6:
-                reasons.append('수수료 반영 손익비가 가격 기준 손익비보다 큼')
+                reasons.append('수수료·슬리피지 반영 손익비가 가격 기준 손익비보다 큼')
+    # Recalculate the displayed net ratio from price geometry and stated costs.
+    # A stale/mismatched net ratio must never pass the final manual-review gate.
+    fee_pct = _f(old.get('fee_assumption_roundtrip_pct'))
+    slip_pct = _f(old.get('slippage_assumption_roundtrip_pct'))
+    if (fee_pct is None or slip_pct is None or fee_pct < 0 or slip_pct < 0
+            or fee_pct + slip_pct > 5):
+        reasons.append('수수료·슬리피지 가정 누락 또는 오류')
+    elif (entry is not None and stop is not None and tp1 is not None
+          and entry > 0 and stop > 0 and entry != stop and tp1 > 0):
+        cost = entry * (fee_pct + slip_pct) / 100
+        expected_rr1 = round(max(0, abs(tp1-entry)-cost) / (abs(entry-stop)+cost), 2)
+        if rr1 is None or abs(rr1-expected_rr1) > 0.011:
+            reasons.append('1차 순손익비가 수수료·슬리피지 재계산 결과와 불일치')
     tp2 = _f(old.get('tp2'))
     rr2 = _f(old.get('rr2_net_estimate'))
     if old.get('tp2') is not None:
@@ -208,7 +221,7 @@ def decision_review(item,structures,mode):
         elif tp2 is not None and entry is not None and stop is not None and entry != stop:
             gross_rr2 = abs(tp2 - entry) / abs(entry - stop)
             if rr2 > gross_rr2 + 1e-6:
-                reasons.append('2차 수수료 반영 손익비가 가격 기준 손익비보다 큼')
+                reasons.append('2차 수수료·슬리피지 반영 손익비가 가격 기준 손익비보다 큼')
     if old.get('state')!='READY_REVIEW':reasons.append('기존 진입 검증 미충족')
     # A missing/invalid Elliott label is not itself a trading veto, but
     # must never be represented as a confirmed wave direction.
@@ -244,4 +257,4 @@ def decision_review(item,structures,mode):
             'plan':{'entry':entry,'stop':stop,'tp1':tp1,'tp2':tp2,
                     'rr1_net_estimate':rr1,'rr2_net_estimate':rr2},
             'data_is_live_quote':False,'win_probability':None,
-            'note':'확정봉 스냅샷 기반. 주문호가/청산가/체결·슬리피지 미반영'}
+            'note':'확정봉 스냅샷 기반. 주문호가/청산가/실제 체결·슬리피지 미검증(가정 비용만 반영)'}
