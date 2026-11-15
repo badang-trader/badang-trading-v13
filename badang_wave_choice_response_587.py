@@ -24,7 +24,7 @@ def wave_choice_response(candles):
         direction = candidate.get("direction")
         if direction not in ("up", "down"):
             continue
-        # Existing wave invalidation is not a universal stop-loss rule.
+        # Existing levels are structural reference pivots, not verified\n        # directional invalidation or automatic stop-loss thresholds.
         scenarios.append({
             "pattern": candidate["pattern"],
             "direction": direction,
