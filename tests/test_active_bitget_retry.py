@@ -106,10 +106,10 @@ class ActiveBitgetContinuityTests(unittest.TestCase):
 
     def test_two_unfinished_bars_cannot_reach_legacy_analysis(self):
         rows = self.rows() + [[str((self.BASE+230*self.STEP)), "100", "102", "98", "100", "10"],
-                              [str((self.BASE+231*self.STEP)), "100", "102", "98", "100", "10"]]
+                              [str((self.BASE+232*self.STEP)), "100", "102", "98", "100", "10"]]
         with patch.object(market, "_get", return_value=rows):
             with patch.object(market.time, "time", return_value=(self.BASE+231*self.STEP)/1000):
-                # 230 is now closed; 231 is a future bar and must be rejected.
+                # 230 is closed, 231 is current, 232 is future: reject future.
                 with self.assertRaisesRegex(ValueError, "미래 시각"):
                     market.fastest_candles("BTCUSDT", "15m", exchanges=["bitget"])
 
