@@ -19,6 +19,30 @@ class ActiveBitgetRetryTests(unittest.TestCase):
                 self.assertEqual(getter.call_count, 2)
                 self.assertIn(0.8, [call.args[0] for call in sleep.call_args_list])
 
+    def test_transient_503_recovers(self):
+        busy = Mock(status_code=503, headers={})
+        ok = Mock(status_code=200, headers={})
+        ok.json.return_value = {"code": "00000", "data": ["ok"]}
+        with patch.object(market.SESSION, "get", side_effect=[busy, ok]) as getter:
+            with patch.object(market.time, "sleep") as sleep:
+                with patch.object(market.time, "monotonic", return_value=100.0):
+                    with patch.object(market, "_LAST_REQUEST", [0.0]):
+                        self.assertEqual(market._get("/test", {}), ["ok"])
+        self.assertEqual(getter.call_count, 2)
+        self.assertIn(0.8, [call.args[0] for call in sleep.call_args_list])
+
+    def test_persistent_503_fails_after_three_attempts(self):
+        busy = Mock(status_code=503, headers={})
+        busy.raise_for_status.side_effect = RuntimeError("HTTP 503")
+        with patch.object(market.SESSION, "get", return_value=busy) as getter:
+            with patch.object(market.time, "sleep") as sleep:
+                with patch.object(market.time, "monotonic", return_value=100.0):
+                    with patch.object(market, "_LAST_REQUEST", [0.0]):
+                        with self.assertRaisesRegex(RuntimeError, "503"):
+                            market._get("/test", {})
+        self.assertEqual(getter.call_count, 3)
+        self.assertEqual(sleep.call_count, 2)
+
     def test_valid_retry_after_is_capped(self):
         limited = Mock(status_code=429, headers={"Retry-After": "100"})
         ok = Mock(status_code=200, headers={})
