@@ -1,5 +1,6 @@
 """Offline checks for exchange candle validation. No API calls or orders."""
 import unittest
+import requests
 from unittest.mock import patch, Mock
 from exchange_data import validate_candles, get_json
 
@@ -62,6 +63,25 @@ class ExchangeRetryTests(unittest.TestCase):
         with patch("exchange_data.SESSION.get", return_value=throttled) as get:
             with patch("exchange_data.time.sleep") as sleep:
                 with self.assertRaisesRegex(RuntimeError, "429"):
+                    get_json("https://api.bitget.com/test")
+        self.assertEqual(get.call_count, 3)
+        self.assertEqual(sleep.call_count, 2)
+
+    def test_timeout_retries_then_recovers(self):
+        success = Mock(status_code=200, headers={})
+        success.json.return_value = {"ok": True}
+        with patch("exchange_data.SESSION.get",
+                   side_effect=[requests.Timeout("slow"), success]) as get:
+            with patch("exchange_data.time.sleep") as sleep:
+                self.assertEqual(get_json("https://api.bitget.com/test"), {"ok": True})
+        self.assertEqual(get.call_count, 2)
+        sleep.assert_called_once_with(0.5)
+
+    def test_connection_error_stops_after_three_attempts(self):
+        with patch("exchange_data.SESSION.get",
+                   side_effect=requests.ConnectionError("offline")) as get:
+            with patch("exchange_data.time.sleep") as sleep:
+                with self.assertRaises(requests.ConnectionError):
                     get_json("https://api.bitget.com/test")
         self.assertEqual(get.call_count, 3)
         self.assertEqual(sleep.call_count, 2)
