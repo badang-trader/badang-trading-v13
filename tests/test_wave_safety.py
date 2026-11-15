@@ -42,6 +42,24 @@ class WaveSafetyTests(unittest.TestCase):
         self.assertIsNone(bars)
         self.assertIn("이상", reason)
 
+    def test_malformed_candle_rows_fail_without_crashing(self):
+        for bad in (None, 7, "bad", {"timestamp": 1}, []):
+            with self.subTest(row=bad):
+                rows = candles()
+                rows[20] = bad
+                bars, reason = closed_bars(rows, "15m")
+                self.assertIsNone(bars)
+                self.assertIn("형식", reason)
+
+    def test_fractional_and_invalid_timestamps_rejected(self):
+        for bad in (30 * STEP + 0.5, -1, "NaN", "Infinity"):
+            with self.subTest(timestamp=bad):
+                rows = candles()
+                rows[29][0] = bad
+                bars, reason = closed_bars(rows, "15m")
+                self.assertIsNone(bars)
+                self.assertIn("이상", reason)
+
     def test_future_last_closed_rejected(self):
         rows = candles()
         bars, reason = closed_bars(rows, "15m", now_ms=rows[-3][0])
