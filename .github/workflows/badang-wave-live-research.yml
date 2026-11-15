@@ -1,9 +1,6 @@
 name: BADANG wave research (read-only one-shot)
 on:
-  push:
-    branches: [badang-514-validation]
-    paths:
-      - '.github/workflows/badang-wave-live-research.yml'
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:
