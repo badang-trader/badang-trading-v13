@@ -24,16 +24,16 @@ def _get(path, params):
             wait=max(0.0, 0.16-(time.monotonic()-_LAST_REQUEST[0]))
             if wait: time.sleep(wait)
             _LAST_REQUEST[0]=time.monotonic()
-            try:
-                r=SESSION.get(API+path,params=params,timeout=12)
-            except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
-                if attempt==2:
-                    raise
-                # Back off outside the shared request lock so unrelated
-                # scan requests do not wait for this retry delay.
-                transport_retry=True
-            else:
-                transport_retry=False
+        # Reserve the request slot under the lock, but never hold the lock
+        # across network I/O (up to 12s timeout per attempt).
+        try:
+            r=SESSION.get(API+path,params=params,timeout=12)
+        except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
+            if attempt==2:
+                raise
+            transport_retry=True
+        else:
+            transport_retry=False
         if transport_retry:
             time.sleep(0.8*(attempt+1))
             continue
