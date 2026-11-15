@@ -6,6 +6,7 @@ class AuditTests(unittest.TestCase):
         return dict(candidate_side='LONG',technical_side='LONG',exchange='bitget',
                     trend_aligned=True,data_quality={'cross_exchange':False},
                     signal_precision_418={'status':'CANDIDATE'},
+                    decision_427={'state':'READY_REVIEW'},
                     futures_data_available={'oi_history':False},
                     cvd_quality='UNAVAILABLE_BITGET_UNVERIFIED')
     def test_good_direction_is_only_review(self):
@@ -16,6 +17,9 @@ class AuditTests(unittest.TestCase):
         self.assertEqual(len(x['missing_flow']),2)
     def test_missing_precision_waits(self):
         d=self.base();d.pop('signal_precision_418')
+        self.assertEqual(reconcile(d)['status'],'WAIT')
+    def test_missing_final_decision_waits(self):
+        d=self.base();d.pop('decision_427')
         self.assertEqual(reconcile(d)['status'],'WAIT')
     def test_cross_exchange_waits(self):
         d=self.base();d['data_quality']['cross_exchange']=True
