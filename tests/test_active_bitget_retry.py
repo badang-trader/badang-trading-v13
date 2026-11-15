@@ -104,6 +104,22 @@ class ActiveBitgetContinuityTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "미래 시각"):
                     market.fastest_candles("BTCUSDT", "15m", exchanges=["bitget"])
 
+    def test_future_single_row_rejected_without_history_requests(self):
+        future = [[str(self.BASE+232*self.STEP), "100", "102", "98", "100", "10"]]
+        with patch.object(market, "_get", return_value=future) as getter:
+            with patch.object(market.time, "time", return_value=(self.BASE+230*self.STEP)/1000):
+                with self.assertRaisesRegex(ValueError, "미래 시각"):
+                    market.fastest_candles("BTCUSDT", "15m", exchanges=["bitget"])
+        self.assertEqual(getter.call_count, 1)
+
+    def test_misaligned_single_row_rejected_without_history_requests(self):
+        misaligned = [[str(self.BASE+220*self.STEP+1), "100", "102", "98", "100", "10"]]
+        with patch.object(market, "_get", return_value=misaligned) as getter:
+            with patch.object(market.time, "time", return_value=(self.BASE+230*self.STEP)/1000):
+                with self.assertRaisesRegex(ValueError, "시각 정렬"):
+                    market.fastest_candles("BTCUSDT", "15m", exchanges=["bitget"])
+        self.assertEqual(getter.call_count, 1)
+
     def test_two_unfinished_bars_cannot_reach_legacy_analysis(self):
         rows = self.rows() + [[str((self.BASE+230*self.STEP)), "100", "102", "98", "100", "10"],
                               [str((self.BASE+232*self.STEP)), "100", "102", "98", "100", "10"]]
