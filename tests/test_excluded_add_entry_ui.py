@@ -46,7 +46,7 @@ class ExcludedAddEntryUiTests(unittest.TestCase):
     def test_decision_plan_excludes_add_entry_fields_and_models_slippage(self):
         source = (ROOT / "app.py").read_text(encoding="utf-8")
         start = source.index("def build_decision_plan_425(")
-        end = source.index("\\ndef scan_one(", start)
+        end = source.index("def scan_one(", start)
         body = source[start:end]
         self.assertNotIn("'add_entry':", body)
         self.assertNotIn("'add_condition':", body)
