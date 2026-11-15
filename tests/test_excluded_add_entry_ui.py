@@ -53,6 +53,15 @@ class ExcludedAddEntryUiTests(unittest.TestCase):
         self.assertIn("'slippage_assumption_roundtrip_pct':0.10", body)
         self.assertIn("execution_cost=entry*(0.0012+0.0010)", body)
 
+    def test_scan_offset_rejects_malformed_input(self):
+        source = (ROOT / "app.py").read_text(encoding="utf-8")
+        self.assertIn("if not re.fullmatch(r'[0-9]{1,8}', offset_raw):", source)
+        self.assertIn("return jsonify(error='offset은 0 이상의 정수여야 합니다'), 400", source)
+
+    def test_trend_alignment_requires_all_required_frames(self):
+        source = (ROOT / "app.py").read_text(encoding="utf-8")
+        self.assertIn("all(tf in trends and trends[tf] == expected_trend", source)
+
     def test_structure_and_wave_panel_remain(self):
         source = (ROOT / "app.py").read_text(encoding="utf-8")
         self.assertIn("function unifiedPanel427(x)", source)
