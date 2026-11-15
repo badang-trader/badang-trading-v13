@@ -134,6 +134,16 @@ class WaveSafetyTests(unittest.TestCase):
                 self.assertIsNone(bars)
                 self.assertIn("미확정봉", reason)
 
+    def test_disposable_last_row_bad_prices_rejected(self):
+        for column, value in ((1, "NaN"), (2, 90), (3, 110),
+                              (4, 0), (5, -1), (5, "Infinity")):
+            with self.subTest(column=column, value=value):
+                rows = candles()
+                rows[-1][column] = value
+                bars, reason = closed_bars(rows, "15m")
+                self.assertIsNone(bars)
+                self.assertIn("미확정봉 OHLCV", reason)
+
     def test_disposable_last_row_structure_must_be_valid(self):
         for bad in (None, 42, [], ["NaN", 1, 2, 1, 2, 3]):
             with self.subTest(row=bad):
