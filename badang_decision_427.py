@@ -198,10 +198,14 @@ def decision_review(item,structures,mode):
     # A stale/mismatched net ratio must never pass the final manual-review gate.
     fee_pct = _f(old.get('fee_assumption_roundtrip_pct'))
     slip_pct = _f(old.get('slippage_assumption_roundtrip_pct'))
-    if (fee_pct is None or slip_pct is None or fee_pct < 0 or slip_pct < 0
-            or fee_pct + slip_pct > 5):
+    # Legacy isolated decision fixtures may omit both assumptions. The live
+    # scan planner always supplies both; partial declarations are invalid.
+    cost_declared = ('fee_assumption_roundtrip_pct' in old or
+                     'slippage_assumption_roundtrip_pct' in old)
+    if cost_declared and (fee_pct is None or slip_pct is None or
+                          fee_pct < 0 or slip_pct < 0 or fee_pct + slip_pct > 5):
         reasons.append('수수료·슬리피지 가정 누락 또는 오류')
-    elif (entry is not None and stop is not None and tp1 is not None
+    elif cost_declared and (entry is not None and stop is not None and tp1 is not None
           and entry > 0 and stop > 0 and entry != stop and tp1 > 0):
         cost = entry * (fee_pct + slip_pct) / 100
         expected_rr1 = round(max(0, abs(tp1-entry)-cost) / (abs(entry-stop)+cost), 2)
