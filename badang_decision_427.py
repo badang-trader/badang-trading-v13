@@ -83,6 +83,38 @@ def impulse_state(turns, current, atr):
     return {'status':'HYPOTHESIS','label':f"{p['direction']=='UP' and '상승' or '하락'} {p['wave']}파 진행 후보",
             'alternatives':possibilities,'note':'확정 전환점 기반 가설. 파동 완료·승률·주문 신호가 아님'}
 
+def completed_impulse_rules(prices):
+    """Validate a completed conventional five-wave impulse (six endpoints).
+
+    This does not validate diagonals or identify wave degree. Returns reasons
+    rather than converting a historical pattern into a trade recommendation.
+    """
+    if len(prices) != 6:
+        return {'valid': False, 'reasons': ['6개 파동 경계점 필요']}
+    vals = [_f(p) for p in prices]
+    if any(v is None or v <= 0 for v in vals):
+        return {'valid': False, 'reasons': ['파동 경계점 가격 오류']}
+    direction = 1 if vals[1] > vals[0] else -1
+    reasons = []
+    if any((vals[i+1]-vals[i])*direction <= 0 for i in (0, 2, 4)):
+        reasons.append('1·3·5파 진행 방향 오류')
+    if any((vals[i+1]-vals[i])*direction >= 0 for i in (1, 3)):
+        reasons.append('2·4파 조정 방향 오류')
+    if (vals[2]-vals[0])*direction <= 0:
+        reasons.append('2파가 1파 출발점을 침범')
+    if (vals[4]-vals[1])*direction <= 0:
+        reasons.append('일반 추진파의 4파·1파 가격 중첩')
+    lengths = [abs(vals[i+1]-vals[i]) for i in (0, 2, 4)]
+    if lengths[1] < min(lengths[0], lengths[2]):
+        reasons.append('3파가 1·3·5파 중 최단')
+    if (vals[3]-vals[1])*direction <= 0:
+        reasons.append('3파가 1파 종점을 넘지 못함')
+    if (vals[5]-vals[3])*direction <= 0:
+        reasons.append('5파가 3파 종점을 넘지 못함: 절단 5파는 별도 시나리오')
+    return {'valid': not reasons, 'reasons': reasons,
+            'direction': 'UP' if direction > 0 else 'DOWN',
+            'note': '일반 추진파 완성형 규칙 검사. 대각삼각형·절단파는 별도 분석 필요'}
+
 def structure_review(raw,tf,now_ms=None):
     bars,reason=closed_bars(raw,tf,now_ms)
     if bars is None:return {'status':'UNAVAILABLE','reason':reason}
