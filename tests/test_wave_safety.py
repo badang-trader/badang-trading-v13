@@ -16,6 +16,18 @@ class WaveSafetyTests(unittest.TestCase):
         self.assertEqual(reason, "OK")
         self.assertEqual(len(bars), 69)
 
+    def test_unknown_timeframe_rejected(self):
+        bars, reason = closed_bars(candles(), 'unknown')
+        self.assertIsNone(bars)
+        self.assertIn('시간봉', reason)
+
+    def test_duplicate_timestamp_rejected(self):
+        rows = candles()
+        rows[30][0] = rows[29][0]
+        bars, reason = closed_bars(rows, '15m')
+        self.assertIsNone(bars)
+        self.assertIn('간격', reason)
+
     def test_gap_rejected(self):
         rows = candles()
         rows[35][0] += 1
