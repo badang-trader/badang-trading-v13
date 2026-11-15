@@ -20,6 +20,14 @@ def closed_bars(raw, tf, now_ms=None):
     rows=list(raw)
     if len(rows)<65: return None,'완료봉 최소 64개 필요'
     if len(rows)>5000: return None,'OHLCV 데이터 상한 초과'
+    # The trailing row is disposable for legacy callers, but must still be
+    # structurally valid and at the expected next candle boundary.
+    trailing=rows[-1]
+    if not isinstance(trailing,(list,tuple)) or len(trailing)<6:
+        return None,'마지막 미확정봉 형식 오류'
+    trailing_time=_f(trailing[0])
+    if trailing_time is None or trailing_time<0 or not trailing_time.is_integer():
+        return None,'마지막 미확정봉 시각 오류'
     bars=[]
     for r in rows[:-1]:
         if not isinstance(r, (list, tuple)) or len(r)<6:
@@ -37,6 +45,8 @@ def closed_bars(raw, tf, now_ms=None):
     # Contiguous timestamps alone do not prove exchange timeframe alignment.
     if any(bar[0] % step for bar in bars):
         return None,'캔들 시간봉 경계 정렬 오류'
+    if int(trailing_time)!=bars[-1][0]+step:
+        return None,'마지막 미확정봉 시간 간격 오류'
     # Exchange candle timestamps are bar OPEN times. A bar is confirmed only
     # after its full interval has elapsed, not merely after its open time.
     if now_ms is not None:
