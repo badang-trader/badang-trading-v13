@@ -153,11 +153,39 @@ class WaveSafetyTests(unittest.TestCase):
     def test_numeric_string_reward_risk_is_normalized(self):
         valid_structures = {tf: {"status": "OK"} for tf in ("15m", "30m", "1H")}
         item = {"decision_plan_425": {"side": "LONG", "score": "90",
+                "entry": "100", "stop": "98", "tp1": "104",
                 "rr1_net_estimate": "1.7", "rr2_net_estimate": "2.2",
                 "state": "READY_REVIEW"}}
         result = decision_review(item, valid_structures, "scalp")
         self.assertEqual(result["state"], "READY_REVIEW")
         self.assertEqual(result["plan"]["rr1_net_estimate"], 1.7)
+
+    def test_missing_trade_prices_cannot_be_ready(self):
+        structures = {tf: {"status": "OK"} for tf in ("15m", "30m", "1H")}
+        item = {"decision_plan_425": {"side": "LONG", "score": 95,
+                "rr1_net_estimate": 2, "state": "READY_REVIEW"}}
+        result = decision_review(item, structures, "scalp")
+        self.assertEqual(result["state"], "WAIT")
+        self.assertTrue(any("가격" in reason for reason in result["reasons"]))
+
+    def test_inverted_long_and_short_prices_rejected(self):
+        structures = {tf: {"status": "OK"} for tf in ("15m", "30m", "1H")}
+        for side, stop, tp1 in (("LONG", 102, 104), ("SHORT", 98, 96),
+                                ("LONG", 98, 96), ("SHORT", 102, 104)):
+            with self.subTest(side=side, stop=stop, tp1=tp1):
+                item = {"decision_plan_425": {"side": side, "score": 95,
+                        "entry": 100, "stop": stop, "tp1": tp1,
+                        "rr1_net_estimate": 2, "state": "READY_REVIEW"}}
+                result = decision_review(item, structures, "scalp")
+                self.assertEqual(result["state"], "WAIT")
+
+    def test_valid_short_price_geometry(self):
+        structures = {tf: {"status": "OK"} for tf in ("15m", "30m", "1H")}
+        item = {"decision_plan_425": {"side": "SHORT", "score": 95,
+                "entry": 100, "stop": 102, "tp1": 96,
+                "rr1_net_estimate": 2, "state": "READY_REVIEW"}}
+        result = decision_review(item, structures, "scalp")
+        self.assertEqual(result["state"], "READY_REVIEW")
 
     def test_unknown_analysis_mode_never_returns_ready(self):
         item = {"decision_plan_425": {"side": "LONG", "score": 95,
