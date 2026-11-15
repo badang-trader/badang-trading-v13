@@ -215,11 +215,27 @@ def decision_review(item,structures,mode):
     wave=wave if isinstance(wave,dict) else {}
     wave_note=wave.get('label','파동 분석 불가')
     if not isinstance(wave_note,str): wave_note='파동 분석 불가'
+    # Surface Elliott alternatives and invalidation levels as context only.
+    # These hypotheses must not masquerade as independent order signals.
+    wave_scenarios=[]
+    if isinstance(wave.get('alternatives'),list):
+        for candidate in wave['alternatives'][:5]:
+            if not isinstance(candidate,dict): continue
+            level=_f(candidate.get('invalidation'))
+            if level is None or level<=0: continue
+            direction=candidate.get('direction')
+            if direction not in ('UP','DOWN'): continue
+            number=candidate.get('wave')
+            if type(number) is not int or number not in (3,5): continue
+            wave_scenarios.append({'wave':number,'direction':direction,
+                                   'invalidation':level,
+                                   'last_pivot_confirmed_at':candidate.get('last_pivot_confirmed_at')})
     unique=list(dict.fromkeys(reasons))
     ready=not unique
     return {'state':'READY_REVIEW' if ready else 'WAIT',
             'label':'진입 검토 가능 · 주문 전 실시간 확인' if ready else '관망 · 진입 조건 미충족',
             'side':side,'score':score,'reasons':unique,'wave_context':wave_note,
+            'wave_scenarios':wave_scenarios,
             'plan':{'entry':entry,'stop':stop,'tp1':tp1,'tp2':tp2,
                     'rr1_net_estimate':rr1,'rr2_net_estimate':rr2},
             'data_is_live_quote':False,'win_probability':None,
