@@ -103,6 +103,17 @@ def impulse_state(turns, current, atr):
     if any(not _f(t.get('time')).is_integer() or _f(t.get('time'))<0
            for t in turns):
         return fallback
+    # Reject pivot sequences with duplicate/reversed times or an impossible
+    # confirmation time. Missing confirmation remains explicitly unknown.
+    if any(_f(turns[i]['time'])<=_f(turns[i-1]['time'])
+           for i in range(1,len(turns))):
+        return fallback
+    for t in turns:
+        if t.get('confirmed_at') is not None:
+            confirmed=_f(t['confirmed_at'])
+            if (confirmed is None or not confirmed.is_integer()
+                    or confirmed<_f(t['time'])):
+                return fallback
     turns=[dict(t,price=float(t['price']),time=int(float(t['time'])))
            for t in turns]
     current=current_value
