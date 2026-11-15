@@ -23,6 +23,13 @@ class ExcludedAddEntryUiTests(unittest.TestCase):
         self.assertIn("scenarioText", source)
         self.assertIn("무효화", source)
 
+    def test_price_action_targets_do_not_claim_fixed_reward_risk(self):
+        source = (ROOT / "app.py").read_text(encoding="utf-8")
+        self.assertNotIn("1차 목표 · 1.3R", source)
+        self.assertNotIn("2차 목표 · 1.8R", source)
+        self.assertIn("n(a.rr1,2)", source)
+        self.assertIn("n(a.rr2,2)", source)
+
     def test_structure_and_wave_panel_remain(self):
         source = (ROOT / "app.py").read_text(encoding="utf-8")
         self.assertIn("function unifiedPanel427(x)", source)
