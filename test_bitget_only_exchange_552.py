@@ -33,7 +33,7 @@ class BitgetOnlyExchangeTests(unittest.TestCase):
         interval = 3600000
         rows = [[str(i * interval), "100", "101", "99", "100", "10"]
                 for i in range(230)]
-        with patch("exchange_data.time.time", return_value=1000000000):
+        with patch("exchange_data.time.time", return_value=230 * interval / 1000):
             self.assertEqual(len(validate_candles(rows, "1H")), 230)
             missing = rows[:40] + rows[41:]
             with self.assertRaisesRegex(ValueError, "Noncontiguous"):
@@ -48,7 +48,7 @@ class BitgetOnlyExchangeTests(unittest.TestCase):
         rows = [[str(i * interval), "100", "101", "99", "100", "10"]
                 for i in range(230)]
         rows.insert(50, rows[49][:])
-        with patch("exchange_data.time.time", return_value=1000000000):
+        with patch("exchange_data.time.time", return_value=230 * interval / 1000):
             with self.assertRaisesRegex(ValueError, "Duplicate Bitget"):
                 validate_candles(rows, "1H")
 
