@@ -16,6 +16,13 @@ class ExcludedAddEntryUiTests(unittest.TestCase):
             with self.subTest(forbidden=forbidden):
                 self.assertNotIn(forbidden, source)
 
+    def test_decision_wave_scenarios_reach_manual_ui(self):
+        source = (ROOT / "app.py").read_text(encoding="utf-8")
+        self.assertIn("item['decision_427'] = decision_review(", source)
+        self.assertIn("d.wave_scenarios", source)
+        self.assertIn("scenarioText", source)
+        self.assertIn("무효화", source)
+
     def test_structure_and_wave_panel_remain(self):
         source = (ROOT / "app.py").read_text(encoding="utf-8")
         self.assertIn("function unifiedPanel427(x)", source)
