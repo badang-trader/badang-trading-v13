@@ -205,6 +205,8 @@ def decision_review(item,structures,mode):
             if rr2 > gross_rr2 + 1e-6:
                 reasons.append('2차 수수료 반영 손익비가 가격 기준 손익비보다 큼')
     if old.get('state')!='READY_REVIEW':reasons.append('기존 진입 검증 미충족')
+    # A missing/invalid Elliott label is not itself a trading veto, but
+    # must never be represented as a confirmed wave direction.
     # Reconcile current multi-timeframe wave ambiguity as contextual warning, not fake confidence.
     primary='15m' if mode=='scalp' else '4H'
     primary_structure=structures.get(primary)
