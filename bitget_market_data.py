@@ -53,6 +53,7 @@ def _get(path, params):
         if r.status_code in (500, 502, 503, 504):
             if attempt == 2:
                 r.raise_for_status()
+                raise ValueError('Bitget 서버 오류(HTTP '+str(r.status_code)+'): 재시도 3회 실패')
             time.sleep(0.8*(attempt+1))
             continue
         r.raise_for_status()
