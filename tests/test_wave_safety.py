@@ -75,6 +75,24 @@ class WaveSafetyTests(unittest.TestCase):
         turns = confirmed_turns(bars, window=3)
         self.assertTrue(all(t["i"] < len(bars)-3 for t in turns))
 
+    def test_pivot_confirmation_is_later_than_pivot(self):
+        rows = candles()
+        rows[30][2] = 110.0
+        bars, _ = closed_bars(rows, "15m")
+        turns = confirmed_turns(bars, window=3)
+        high = next(t for t in turns if t["kind"] == "H" and t["i"] == 30)
+        self.assertEqual(high["confirmed_at"], bars[33][0])
+        self.assertGreater(high["confirmed_at"], high["time"])
+
+    def test_pivot_not_visible_before_right_hand_bars(self):
+        rows = candles()
+        rows[30][2] = 110.0
+        full_bars, _ = closed_bars(rows, "15m")
+        early = confirmed_turns(full_bars[:33], window=3)
+        later = confirmed_turns(full_bars[:34], window=3)
+        self.assertFalse(any(t["i"] == 30 for t in early))
+        self.assertTrue(any(t["i"] == 30 for t in later))
+
     def test_insufficient_pivots_not_claimed_as_wave(self):
         wave = impulse_state([], 100, 1)
         self.assertEqual(wave["status"], "UNDETERMINED")
