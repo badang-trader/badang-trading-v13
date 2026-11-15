@@ -46,7 +46,28 @@ class WaveSafetyTests(unittest.TestCase):
         rows = candles()
         bars, reason = closed_bars(rows, "15m", now_ms=rows[-3][0])
         self.assertIsNone(bars)
-        self.assertIn("미래", reason)
+        self.assertIn("확정되지", reason)
+
+    def test_bar_open_is_not_a_confirmed_close(self):
+        rows = candles()
+        last_used_open = rows[-2][0]
+        bars, reason = closed_bars(rows, "15m", now_ms=last_used_open + STEP - 1)
+        self.assertIsNone(bars)
+        self.assertIn("확정되지", reason)
+
+    def test_bar_close_boundary_is_accepted(self):
+        rows = candles()
+        last_used_open = rows[-2][0]
+        bars, reason = closed_bars(rows, "15m", now_ms=last_used_open + STEP)
+        self.assertEqual(reason, "OK")
+        self.assertEqual(len(bars), 69)
+
+    def test_stale_candle_is_rejected(self):
+        rows = candles()
+        last_used_open = rows[-2][0]
+        bars, reason = closed_bars(rows, "15m", now_ms=last_used_open + STEP * 5)
+        self.assertIsNone(bars)
+        self.assertIn("오래됨", reason)
 
     def test_pivots_require_right_hand_confirmation(self):
         rows = candles()
