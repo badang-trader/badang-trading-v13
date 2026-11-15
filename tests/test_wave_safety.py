@@ -187,6 +187,25 @@ class WaveSafetyTests(unittest.TestCase):
         result = decision_review(item, structures, "scalp")
         self.assertEqual(result["state"], "READY_REVIEW")
 
+    def test_net_reward_risk_cannot_exceed_gross_price_ratio(self):
+        structures = {tf: {"status": "OK"} for tf in ("15m", "30m", "1H")}
+        for side, stop, tp1 in (("LONG", 98, 104), ("SHORT", 102, 96)):
+            with self.subTest(side=side):
+                item = {"decision_plan_425": {"side": side, "score": 95,
+                        "entry": 100, "stop": stop, "tp1": tp1,
+                        "rr1_net_estimate": 2.5, "state": "READY_REVIEW"}}
+                result = decision_review(item, structures, "scalp")
+                self.assertEqual(result["state"], "WAIT")
+                self.assertTrue(any("손익비" in r for r in result["reasons"]))
+
+    def test_net_reward_risk_below_gross_remains_eligible(self):
+        structures = {tf: {"status": "OK"} for tf in ("15m", "30m", "1H")}
+        item = {"decision_plan_425": {"side": "LONG", "score": 95,
+                "entry": 100, "stop": 98, "tp1": 104,
+                "rr1_net_estimate": 1.8, "state": "READY_REVIEW"}}
+        result = decision_review(item, structures, "scalp")
+        self.assertEqual(result["state"], "READY_REVIEW")
+
     def test_unknown_analysis_mode_never_returns_ready(self):
         item = {"decision_plan_425": {"side": "LONG", "score": 95,
                 "rr1_net_estimate": 3.0, "state": "READY_REVIEW"}}
