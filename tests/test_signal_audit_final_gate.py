@@ -14,6 +14,23 @@ class FinalAuditGateTests(unittest.TestCase):
             "futures_data_available": {"oi_history": False},
         }
 
+    def test_malformed_quality_and_derivatives_fail_closed(self):
+        item=self.base()
+        item["data_quality"]=["bad"]
+        item["futures_data_available"]="untrusted"
+        item["signal_precision_418"]="invalid"
+        item["data_caveats"]="not a list"
+        item["decision_427"]={"state": "READY_REVIEW"}
+        result=reconcile(item)
+        self.assertEqual(result["status"], "WAIT")
+        self.assertEqual(result["caveats"], [])
+        self.assertFalse(result["order_authorized"])
+
+    def test_missing_item_fails_closed(self):
+        result=reconcile(None)
+        self.assertEqual(result["status"], "WAIT")
+        self.assertFalse(result["order_authorized"])
+
     def test_final_wait_cannot_be_review_only(self):
         item=self.base()
         item["decision_427"]={"state": "WAIT"}
