@@ -32,7 +32,8 @@ class WaveLiveResearchTests(unittest.TestCase):
             result = evaluate_wave_target("BTCUSDT", "15m",
                                           replay=fake_replay)
         self.assertEqual(result["candidate_observation_counts_by_direction"]["down"], 2)
-        self.assertIsNone(result["invalidation_events"])\n        self.assertFalse(result["invalidation_rules_verified"])
+        self.assertIsNone(result["invalidation_events"])
+        self.assertFalse(result["invalidation_rules_verified"])
         self.assertTrue(result["counts_are_repeated_observations_not_independent_trades"])
         self.assertFalse(result["prediction_accuracy_verified"])
 
