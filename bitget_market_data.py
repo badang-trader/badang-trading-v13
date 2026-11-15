@@ -106,7 +106,10 @@ def fastest_candles(symbol,timeframe,exchanges=None):
             if not isinstance(item,(list,tuple)) or len(item)<6:
                 raise ValueError('Bitget 잘못된 캔들 구조 감지')
             try:
-                stamp=int(item[0]); stamp=stamp*1000 if stamp<100000000000 else stamp
+                raw_stamp=float(item[0])
+                if not math.isfinite(raw_stamp) or raw_stamp < 0 or not raw_stamp.is_integer():
+                    raise ValueError('invalid timestamp')
+                stamp=int(raw_stamp); stamp=stamp*1000 if stamp<100000000000 else stamp
             except (TypeError,ValueError,OverflowError):
                 raise ValueError('Bitget 잘못된 캔들 시각 감지')
             # The same candle may be represented with equivalent numeric
@@ -190,7 +193,10 @@ def fastest_candles(symbol,timeframe,exchanges=None):
         if not isinstance(r,(list,tuple)) or len(r)<6:
             raise ValueError('Bitget 잘못된 캔들 구조 감지')
         try:
-            t=int(r[0]); t=t*1000 if t<100000000000 else t
+            raw_t=float(r[0])
+            if not math.isfinite(raw_t) or raw_t < 0 or not raw_t.is_integer():
+                raise ValueError('Bitget 잘못된 캔들 시각 감지')
+            t=int(raw_t); t=t*1000 if t<100000000000 else t
             o,h,l,c,v=map(float,r[1:6])
             if not (all(math.isfinite(z) for z in (o,h,l,c,v)) and min(o,h,l,c)>0
                     and h>=max(o,l,c) and l<=min(o,c) and v>=0):
