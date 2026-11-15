@@ -77,6 +77,7 @@ def impulse_state(turns, current, atr):
         strength=progress/max(atr,1e-12)
         possibilities.append({'wave':wave,'direction':'UP' if direction>0 else 'DOWN',
                               'invalidation':round(invalid,8),'last_pivot_time':p[-1]['time'],
+                              'last_pivot_confirmed_at':p[-1].get('confirmed_at'),
                               'atr_progress':round(strength,2),'pivot_prices':[round(v,8) for v in vals]})
     if not possibilities:return {'status':'UNDETERMINED','label':'현재 3파·5파 판별 불가','alternatives':[],
                                  'note':'최근 확정 전환점이 일반 추진파 규칙을 충족하지 않음'}
