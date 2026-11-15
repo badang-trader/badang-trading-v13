@@ -196,7 +196,10 @@ def fastest_candles(symbol,timeframe,exchanges=None):
     for _repair_round in range(2):
         stamps=sorted(seen)
         if len(stamps)<2: break
-        gaps=[(left,right) for left,right in zip(stamps[-262:-1],stamps[-261:])
+        # Slice once before pairing neighbors: independent negative slices
+        # become misaligned when fewer than 261 timestamps are available.
+        recent_stamps=stamps[-262:]
+        gaps=[(left,right) for left,right in zip(recent_stamps,recent_stamps[1:])
               if right-left>step and (right-left)%step==0]
         if not gaps: break
         added=0
