@@ -62,6 +62,17 @@ class ExcludedAddEntryUiTests(unittest.TestCase):
         source = (ROOT / "app.py").read_text(encoding="utf-8")
         self.assertIn("all(tf in trends and trends[tf] == expected_trend", source)
 
+    def test_decision_panel_respects_final_gate_and_hides_add_entry(self):
+        source = (ROOT / "app.py").read_text(encoding="utf-8")
+        start = source.index("function decisionPanel425(x)")
+        end = source.index("function unifiedPanel427(x)", start)
+        panel = source[start:end]
+        self.assertNotIn("추가 진입:", panel)
+        self.assertNotIn("p.add_condition", panel)
+        self.assertIn("최종 보류 · 진입 검토 불가", panel)
+        self.assertIn("x.integrated_audit_439?.status", panel)
+        self.assertIn("슬리피지 가정", panel)
+
     def test_structure_and_wave_panel_remain(self):
         source = (ROOT / "app.py").read_text(encoding="utf-8")
         self.assertIn("function unifiedPanel427(x)", source)
