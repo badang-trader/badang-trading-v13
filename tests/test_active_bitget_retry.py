@@ -178,6 +178,30 @@ class ActiveBitgetTimestampTests(unittest.TestCase):
                         market.fastest_candles("BTCUSDT", "15m", exchanges=["bitget"])
                 self.assertEqual(getter.call_count, 1)
 
+class ActiveBitgetOHLCVTests(unittest.TestCase):
+    STEP = 900_000
+    BASE = 1_800_000_000_000
+
+    def test_malformed_ohlcv_rejected_before_history_requests(self):
+        invalid_rows = (
+            ["100", "NaN", "98", "100", "10"],
+            ["100", "102", "98", "100", "-1"],
+            ["100", "99", "98", "100", "10"],
+            ["100", "102", "101", "100", "10"],
+            ["100", "Infinity", "98", "100", "10"],
+            ["100", "102", "98", "100", "not-a-number"],
+        )
+        for values in invalid_rows:
+            with self.subTest(values=values):
+                page = [[str(self.BASE+220*self.STEP), *values]]
+                with patch.object(market, "_get", return_value=page) as getter:
+                    with patch.object(market.time, "time",
+                                      return_value=(self.BASE+230*self.STEP)/1000):
+                        with self.assertRaisesRegex(ValueError, "OHLCV"):
+                            market.fastest_candles("BTCUSDT", "15m", exchanges=["bitget"])
+                self.assertEqual(getter.call_count, 1)
+
+
 class ActiveBitgetContinuityTests(unittest.TestCase):
     STEP = 900_000
     BASE = 1_800_000_000_000  # realistic epoch-ms, aligned to 15m
