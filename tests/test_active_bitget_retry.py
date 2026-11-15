@@ -171,6 +171,30 @@ class ActiveBitgetContinuityTests(unittest.TestCase):
         self.assertEqual(first["candles"], second["candles"])
         self.assertIsNot(first["candles"], second["candles"])
 
+    def test_duplicate_identical_timestamp_is_safe(self):
+        rows = self.rows()
+        rows.append(list(rows[-1]))
+        with patch.object(market, "_get", return_value=rows):
+            with patch.object(market.time, "time", return_value=230*self.STEP/1000):
+                result = market.fastest_candles("BTCUSDT", "15m", exchanges=["bitget"])
+        self.assertEqual(len(result["candles"][:-1]), 220)
+
+    def test_bad_price_cannot_become_trade_signal(self):
+        for bad in ("NaN", "Infinity", "-1", "0"):
+            with self.subTest(value=bad):
+                rows = self.rows()
+                rows[-1][4] = bad
+                with patch.object(market, "_get", return_value=rows):
+                    with patch.object(market.time, "time", return_value=230*self.STEP/1000):
+                        with self.assertRaisesRegex(ValueError, "OHLCV"):
+                            market.fastest_candles("BTCUSDT", "15m", exchanges=["bitget"])
+
+    def test_unsupported_exchange_rejected_before_network(self):
+        with patch.object(market, "_get") as getter:
+            with self.assertRaisesRegex(ValueError, "Bitget-only"):
+                market.fastest_candles("BTCUSDT", "15m", exchanges=["okx"])
+        getter.assert_not_called()
+
     def test_stale_history_rejected_even_when_contiguous(self):
         rows = self.rows()
         with patch.object(market, "_get", return_value=rows):
