@@ -32,6 +32,9 @@ def reconcile(item):
     precision_status = precision.get('status', 'UNVERIFIED')
     if precision_status != 'CANDIDATE':
         reasons.append('기존 확정봉 진입 검증 미통과 또는 미확인')
+    decision=item.get('decision_427')
+    if not isinstance(decision,dict) or decision.get('state')!='READY_REVIEW':
+        reasons.append('최종 진입 판단 미통과 또는 미확인')
     return {
         'status': 'REVIEW_ONLY' if not reasons else 'WAIT',
         'direction': direction or 'NONE',
