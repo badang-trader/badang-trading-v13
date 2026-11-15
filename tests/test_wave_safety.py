@@ -273,6 +273,31 @@ class WaveSafetyTests(unittest.TestCase):
         result = decision_review(item, structures, "scalp")
         self.assertEqual(result["state"], "READY_REVIEW")
 
+    def test_malformed_decision_payload_cannot_be_ready(self):
+        for item in (None, [], {"decision_plan_425": "bad"},
+                     {"decision_plan_425": {"reasons": {"bad": "shape"}}}):
+            with self.subTest(item=item):
+                result=decision_review(item, {}, "scalp")
+                self.assertEqual(result["state"], "WAIT")
+
+    def test_malformed_structure_payload_cannot_be_ready(self):
+        item={"decision_plan_425": {"side": "LONG", "score": 95,
+             "rr1_net_estimate": 1.8, "entry": 100, "stop": 95,
+             "tp1": 110, "state": "READY_REVIEW"}}
+        for structures in (None, [], {"15m": "bad", "30m": None, "1H": []}):
+            with self.subTest(structures=structures):
+                result=decision_review(item, structures, "scalp")
+                self.assertEqual(result["state"], "WAIT")
+
+    def test_malformed_wave_label_cannot_crash_ready_review(self):
+        item={"decision_plan_425": {"side": "LONG", "score": 95,
+             "rr1_net_estimate": 1.8, "entry": 100, "stop": 95,
+             "tp1": 110, "state": "READY_REVIEW"}}
+        structures={tf: {"status": "OK"} for tf in ("15m", "30m", "1H")}
+        structures["15m"]["wave"] = ["malformed"]
+        result=decision_review(item, structures, "scalp")
+        self.assertEqual(result["wave_context"], "파동 분석 불가")
+
     def test_unknown_analysis_mode_never_returns_ready(self):
         item = {"decision_plan_425": {"side": "LONG", "score": 95,
                 "rr1_net_estimate": 3.0, "state": "READY_REVIEW"}}
