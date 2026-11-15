@@ -182,6 +182,15 @@ class ActiveBitgetOHLCVTests(unittest.TestCase):
     STEP = 900_000
     BASE = 1_800_000_000_000
 
+    def test_valid_initial_ohlcv_proceeds_to_history_lookup(self):
+        page = [[str(self.BASE+220*self.STEP), "100", "102", "98", "100", "10"]]
+        with patch.object(market, "_get", side_effect=[page, []]) as getter:
+            with patch.object(market.time, "time",
+                              return_value=(self.BASE+230*self.STEP)/1000):
+                with self.assertRaisesRegex(ValueError, "연속 확정봉 부족"):
+                    market.fastest_candles("BTCUSDT", "15m", exchanges=["bitget"])
+        self.assertEqual(getter.call_count, 2)
+
     def test_malformed_ohlcv_rejected_before_history_requests(self):
         invalid_rows = (
             ["100", "NaN", "98", "100", "10"],
