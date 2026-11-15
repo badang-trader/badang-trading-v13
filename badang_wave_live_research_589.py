@@ -48,7 +48,7 @@ def evaluate_wave_target(symbol, frame, *, fetch=None, replay=None):
                 bool(o["candidate_count"]) for o in observations),
             "candidate_observation_counts_by_direction": by_direction,
             "candidate_observation_counts_by_pattern": patterns,
-            "already_crossed_invalidation_observations": invalidated,
+            "invalidation_rules_verified": False,\n            "invalidation_events": None,
             "counts_are_repeated_observations_not_independent_trades": True,
             "prediction_accuracy_verified": False,
             "profitability_verified": False,
