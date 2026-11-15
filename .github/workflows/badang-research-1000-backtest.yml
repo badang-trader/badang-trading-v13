@@ -1,10 +1,6 @@
 name: BADANG 1000-bar research backtest (read-only one-shot)
 on:
   workflow_dispatch:
-  push:
-    branches: [badang-514-validation]
-    paths:
-      - '.github/workflows/badang-research-1000-backtest.yml'
 permissions:
   contents: read
 concurrency:
