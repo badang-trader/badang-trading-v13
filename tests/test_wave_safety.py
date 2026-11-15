@@ -93,6 +93,25 @@ class WaveSafetyTests(unittest.TestCase):
         self.assertFalse(any(t["i"] == 30 for t in early))
         self.assertTrue(any(t["i"] == 30 for t in later))
 
+    def test_wave_hypothesis_exposes_pivot_confirmation(self):
+        turns = [
+            {"price": 100, "time": 1, "confirmed_at": 4},
+            {"price": 110, "time": 2, "confirmed_at": 5},
+            {"price": 105, "time": 3, "confirmed_at": 6},
+        ]
+        result = impulse_state(turns, 115, 2)
+        self.assertEqual(result["status"], "HYPOTHESIS")
+        self.assertEqual(result["alternatives"][0]["last_pivot_confirmed_at"], 6)
+        self.assertGreater(result["alternatives"][0]["last_pivot_confirmed_at"],
+                           result["alternatives"][0]["last_pivot_time"])
+
+    def test_wave_confirmation_missing_is_not_fabricated(self):
+        turns = [{"price": 100, "time": 1},
+                 {"price": 110, "time": 2},
+                 {"price": 105, "time": 3}]
+        result = impulse_state(turns, 115, 2)
+        self.assertIsNone(result["alternatives"][0]["last_pivot_confirmed_at"])
+
     def test_insufficient_pivots_not_claimed_as_wave(self):
         wave = impulse_state([], 100, 1)
         self.assertEqual(wave["status"], "UNDETERMINED")
