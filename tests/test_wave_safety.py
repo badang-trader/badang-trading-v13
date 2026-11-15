@@ -196,6 +196,24 @@ class WaveSafetyTests(unittest.TestCase):
         self.assertEqual(result["state"], "READY_REVIEW")
         self.assertEqual(result["plan"]["rr1_net_estimate"], 1.7)
 
+    def test_declared_costs_must_match_both_net_targets(self):
+        structures = {tf: {"status": "OK"} for tf in ("15m", "30m", "1H")}
+        base = {"side": "LONG", "score": 95, "entry": 100, "stop": 98,
+                "tp1": 104, "tp2": 106, "state": "READY_REVIEW",
+                "fee_assumption_roundtrip_pct": 0.12,
+                "slippage_assumption_roundtrip_pct": 0.10,
+                "rr1_net_estimate": 1.76, "rr2_net_estimate": 2.86}
+        result = decision_review({"decision_plan_425": base}, structures, "scalp")
+        self.assertEqual(result["state"], "WAIT")
+        correct = dict(base, rr1_net_estimate=1.70, rr2_net_estimate=2.60)
+        # 3.78 / 2.22 = 1.70; 5.78 / 2.22 = 2.60
+        result = decision_review({"decision_plan_425": correct}, structures, "scalp")
+        self.assertEqual(result["state"], "READY_REVIEW")
+        bad = dict(correct, rr2_net_estimate=2.85)
+        result = decision_review({"decision_plan_425": bad}, structures, "scalp")
+        self.assertEqual(result["state"], "WAIT")
+        self.assertTrue(any("2차 순손익비" in reason for reason in result["reasons"]))
+
     def test_missing_trade_prices_cannot_be_ready(self):
         structures = {tf: {"status": "OK"} for tf in ("15m", "30m", "1H")}
         item = {"decision_plan_425": {"side": "LONG", "score": 95,
