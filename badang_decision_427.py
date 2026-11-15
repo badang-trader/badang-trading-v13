@@ -115,7 +115,7 @@ def impulse_state(turns, current, atr, as_of_open=None):
         if (any(k not in ('H','L') for k in kinds)
                 or any(kinds[i]==kinds[i-1] for i in range(1,len(kinds)))):
             return fallback
-        if any((turns[i]['price']>turns[i-1]['price']) != (kinds[i]=='H')
+        if any((_f(turns[i]['price'])>_f(turns[i-1]['price'])) != (kinds[i]=='H')
                for i in range(1,len(turns))):
             return fallback
     for t in turns:
