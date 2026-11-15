@@ -254,7 +254,14 @@ def fastest_candles(symbol,timeframe,exchanges=None):
                              '; history_stop='+history_stop_reason+
                              '; total_timestamps='+str(len(seen)))
         # Keep only the contiguous history and an existing unfinished candle.
-        rows=list(reversed(contiguous)) + [r for r in rows if int(r[0])>int(complete[-1][0])]
+        # Legacy consumers exclude only the last row. Never pass multiple
+        # unfinished/future candles, or a future bar may be analysed as closed.
+        forming=[r for r in rows if int(r[0])>int(complete[-1][0])]
+        if any(int(r[0])>now for r in forming):
+            raise ValueError('Bitget 미래 시각 캔들 감지')
+        if len(forming)>1:
+            raise ValueError('Bitget 미확정 캔들 다중 반환 감지')
+        rows=list(reversed(contiguous)) + forming
     else:
         raise ValueError('Bitget 확정봉 자료 없음')
     # Do not fabricate missing historical bars. A placeholder is only used to
