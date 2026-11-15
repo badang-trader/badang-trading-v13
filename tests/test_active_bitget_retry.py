@@ -216,7 +216,7 @@ class ActiveBitgetContinuityTests(unittest.TestCase):
     def test_stale_history_rejected_even_when_contiguous(self):
         rows = self.rows()
         with patch.object(market, "_get", return_value=rows):
-            with patch.object(market.time, "time", return_value=234*self.STEP/1000):
+            with patch.object(market.time, "time", return_value=(self.BASE+234*self.STEP)/1000):
                 with self.assertRaisesRegex(ValueError, "최근 확정봉 지연"):
                     market.fastest_candles("BTCUSDT", "15m", exchanges=["bitget"])
 
