@@ -50,6 +50,11 @@ def _get(path, params):
                 delay=0.8*(attempt+1)
             time.sleep(delay)
             continue
+        if r.status_code in (500, 502, 503, 504):
+            if attempt == 2:
+                r.raise_for_status()
+            time.sleep(0.8*(attempt+1))
+            continue
         r.raise_for_status()
         try:
             j=r.json()
