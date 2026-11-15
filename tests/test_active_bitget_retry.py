@@ -95,6 +95,22 @@ class ActiveBitgetContinuityTests(unittest.TestCase):
         return [[str(i*self.STEP), "100", "102", "98", "100", "10"]
                 for i in range(10, 230)]
 
+    def test_future_bitget_bar_cannot_reach_closed_candle_analysis(self):
+        rows = self.rows() + [[str(232*self.STEP), "100", "102", "98", "100", "10"]]
+        with patch.object(market, "_get", return_value=rows):
+            with patch.object(market.time, "time", return_value=230*self.STEP/1000):
+                with self.assertRaisesRegex(ValueError, "미래 시각"):
+                    market.fastest_candles("BTCUSDT", "15m", exchanges=["bitget"])
+
+    def test_two_unfinished_bars_cannot_reach_legacy_analysis(self):
+        rows = self.rows() + [[str(230*self.STEP), "100", "102", "98", "100", "10"],
+                              [str(231*self.STEP), "100", "102", "98", "100", "10"]]
+        with patch.object(market, "_get", return_value=rows):
+            with patch.object(market.time, "time", return_value=231*self.STEP/1000):
+                # 230 is now closed; 231 is a future bar and must be rejected.
+                with self.assertRaisesRegex(ValueError, "미래 시각"):
+                    market.fastest_candles("BTCUSDT", "15m", exchanges=["bitget"])
+
     def test_220_recent_contiguous_bars_return_with_disposable_marker(self):
         with patch.object(market, "_get", return_value=self.rows()) as getter:
             with patch.object(market.time, "time", return_value=230*self.STEP/1000):
