@@ -2652,7 +2652,8 @@ def v13_scan():
                     'trade_coverage': 'CONFIRMED' if (research.get('trade_window') or {}).get('coverage_confirmed') else 'UNVERIFIED',
                     'derivatives_exchange': research.get('source_exchange'),
                     'candle_exchange': item.get('exchange'),
-                    'cross_exchange': item.get('exchange') != research.get('source_exchange'),
+                    'cross_exchange': (item.get('exchange') != research.get('source_exchange')
+                                       if research.get('source_exchange') else None),
                 }
                 caveats = []
                 if item['data_quality']['trade_coverage'] != 'CONFIRMED':
