@@ -213,6 +213,35 @@ class WaveSafetyTests(unittest.TestCase):
         result = impulse_state(turns, 115, 2)
         self.assertIsNone(result["alternatives"][0]["last_pivot_confirmed_at"])
 
+    def test_invalid_wave_volatility_and_current_price_fail_closed(self):
+        turns = [{"price": 100, "time": 1}, {"price": 110, "time": 2},
+                 {"price": 105, "time": 3}]
+        for current, atr in ((float("nan"), 2), (115, 0),
+                             (115, -1), (115, float("inf")),
+                             ("bad", 2), (115, None)):
+            with self.subTest(current=current, atr=atr):
+                result = impulse_state(turns, current, atr)
+                self.assertEqual(result["status"], "UNDETERMINED")
+                self.assertEqual(result["alternatives"], [])
+
+    def test_invalid_wave_pivot_payloads_fail_closed(self):
+        valid = [{"price": 100, "time": 1}, {"price": 110, "time": 2},
+                 {"price": 105, "time": 3}]
+        for turns in (None, "bad", [None], [dict(valid[0], price="NaN")],
+                      [dict(valid[0], time="bad")],
+                      [dict(valid[0], time=-1)]):
+            with self.subTest(turns=turns):
+                result = impulse_state(turns, 115, 2)
+                self.assertEqual(result["status"], "UNDETERMINED")
+
+    def test_numeric_string_wave_pivots_normalized(self):
+        turns = [{"price": "100", "time": "1"},
+                 {"price": "110", "time": "2"},
+                 {"price": "105", "time": "3"}]
+        result = impulse_state(turns, 115, 2)
+        self.assertEqual(result["status"], "HYPOTHESIS")
+        self.assertEqual(result["alternatives"][0]["last_pivot_time"], 3)
+
     def test_insufficient_pivots_not_claimed_as_wave(self):
         wave = impulse_state([], 100, 1)
         self.assertEqual(wave["status"], "UNDETERMINED")
