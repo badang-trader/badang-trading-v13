@@ -281,8 +281,11 @@ class ActiveBitgetContinuityTests(unittest.TestCase):
         conflict[4] = "101"
         rows.append(conflict)
         with patch.object(market, "_get", return_value=rows) as getter:
-            with self.assertRaisesRegex(ValueError, "Conflicting"):
-                market.fastest_candles("BTCUSDT", "15m", exchanges=["bitget"])
+            # Keep the synthetic candles in the past so duplicate validation,
+            # rather than the independent future-candle guard, is exercised.
+            with patch.object(market.time, "time", return_value=(self.BASE+230*self.STEP)/1000):
+                with self.assertRaisesRegex(ValueError, "Conflicting"):
+                    market.fastest_candles("BTCUSDT", "15m", exchanges=["bitget"])
         self.assertEqual(getter.call_count, 1)
 
     def test_repeated_scans_do_not_retain_candle_cache(self):
