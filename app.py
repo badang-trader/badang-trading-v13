@@ -888,7 +888,7 @@ def scenario(setup, direction, mode):
 
 
 def build_decision_plan_425(item, action, precision, mode):
-    """Decision support, never an order instruction. No averaging down by default."""
+    """Read-only decision support; no additional-entry or automatic orders."""
     side = action.get('side')
     score = finite_number(item.get('long_score' if side == 'LONG' else 'short_score'))
     opposite = finite_number(item.get('short_score' if side == 'LONG' else 'long_score'))
@@ -896,8 +896,8 @@ def build_decision_plan_425(item, action, precision, mode):
               'score':score,'score_is_probability':False,'entry':None,'stop':None,
               'tp1':None,'tp2':None,'rr1_gross':None,'rr2_gross':None,
               'rr1_net_estimate':None,'rr2_net_estimate':None,
-              'add_entry':None,'add_condition':'가격 하락만으로 추가 진입하지 않음',
               'max_account_risk_pct':0.5,'fee_assumption_roundtrip_pct':0.12,
+              'slippage_assumption_roundtrip_pct':0.10,
               'reasons':[],'note':'분석용 조건부 시나리오. 자동 주문·수익 보장 아님'}
     if side not in ('LONG','SHORT'):
         result['reasons'].append('최근 확정봉에서 가격 행동 트리거 없음')
@@ -916,11 +916,12 @@ def build_decision_plan_425(item, action, precision, mode):
         return result
     result.update(entry=entry,stop=stop,tp1=tp1,tp2=tp2,
                   rr1_gross=round(abs(tp1-entry)/risk,2),rr2_gross=round(abs(tp2-entry)/risk,2))
-    # Conservative illustrative 0.12% notional round-trip fee; slippage not included.
-    fee=entry*0.0012
-    net_risk=risk+fee
-    result['rr1_net_estimate']=round(max(0,abs(tp1-entry)-fee)/net_risk,2)
-    result['rr2_net_estimate']=round(max(0,abs(tp2-entry)-fee)/net_risk,2)
+    # Illustrative 0.12% round-trip fee plus 0.10% round-trip slippage.
+    # Both are explicit assumptions, not live execution-cost estimates.
+    execution_cost=entry*(0.0012+0.0010)
+    net_risk=risk+execution_cost
+    result['rr1_net_estimate']=round(max(0,abs(tp1-entry)-execution_cost)/net_risk,2)
+    result['rr2_net_estimate']=round(max(0,abs(tp2-entry)-execution_cost)/net_risk,2)
     if score is None or score < 80: result['reasons'].append('해당 방향 점수 80점 미만')
     if opposite is not None and score is not None and opposite >= score:
         result['reasons'].append('반대 방향 점수가 같거나 더 높음')
@@ -930,15 +931,13 @@ def build_decision_plan_425(item, action, precision, mode):
     if precision.get('status') != 'CANDIDATE':
         result['reasons'].append('가격 행동·위험 검증 미충족')
     if result['rr1_net_estimate'] < 1.5:
-        result['reasons'].append('수수료 가정 반영 1차 목표 손익비 1.5 미만')
+        result['reasons'].append('수수료·슬리피지 가정 반영 1차 목표 손익비 1.5 미만')
     if result['reasons']:
         result['state']='WAIT' if score is None or score < 80 or item.get('data_quality_warning_411') else 'CONDITIONAL'
         result['label']='관망' if result['state']=='WAIT' else '조건부 진입 대기'
     else:
         result['state']='READY_REVIEW'
         result['label']='진입 조건 충족 · 주문 전 재확인'
-    # Do not propose blind averaging-down. Re-entry requires fresh confirmation.
-    result['add_condition']='추가 진입 가격 자동 제시 안 함: 새로운 확정봉의 지지·저항 재시험과 신호 재검증 후, 총 계좌 위험 0.5% 이내에서만 별도 검토'
     return result
 
 def scan_one(sym, mode):
