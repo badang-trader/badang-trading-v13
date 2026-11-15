@@ -16,6 +16,17 @@ class WaveSafetyTests(unittest.TestCase):
         self.assertEqual(reason, "OK")
         self.assertEqual(len(bars), 69)
 
+    def test_oversized_structure_history_rejected(self):
+        bars, reason = closed_bars(candles(5001), "15m")
+        self.assertIsNone(bars)
+        self.assertIn("상한", reason)
+
+    def test_elliott_rules_reject_invalid_container_types(self):
+        for invalid in (None, 123, "123456", {"a": 1}):
+            with self.subTest(prices=invalid):
+                result = completed_impulse_rules(invalid)
+                self.assertFalse(result["valid"])
+
     def test_unknown_timeframe_rejected(self):
         bars, reason = closed_bars(candles(), 'unknown')
         self.assertIsNone(bars)
