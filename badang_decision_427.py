@@ -32,7 +32,11 @@ def closed_bars(raw, tf, now_ms=None):
             return None,'OHLCV 값 이상'
         bars.append((int(t),o,h,l,c,v))
     step=FRAME_MS.get(tf)
-    if step and any(bars[i][0]-bars[i-1][0]!=step for i in range(1,len(bars))):
+    # Contiguous timestamps alone do not prove that exchange bars align to
+    # the actual timeframe boundaries. Misaligned bars must not drive pivots.
+    if any(bar[0] % step for bar in bars):
+        return None,'캔들 시간봉 경계 정렬 오류'
+    if any(bars[i][0]-bars[i-1][0]!=step for i in range(1,len(bars))):
         return None,'캔들 시간 간격 오류'
     # Exchange candle timestamps are bar OPEN times. A bar is confirmed only
     # after its full interval has elapsed, not merely after its open time.
