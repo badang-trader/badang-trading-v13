@@ -19,6 +19,24 @@ class ActiveBitgetRetryTests(unittest.TestCase):
                 self.assertEqual(getter.call_count, 2)
                 self.assertIn(0.8, [call.args[0] for call in sleep.call_args_list])
 
+    def test_network_io_does_not_hold_global_request_pacing_lock(self):
+        observed = []
+        ok = Mock(status_code=200, headers={})
+        ok.json.return_value = {"code": "00000", "data": ["ok"]}
+
+        def get_without_global_lock(*args, **kwargs):
+            acquired = market._REQUEST_LOCK.acquire(blocking=False)
+            observed.append(acquired)
+            if acquired:
+                market._REQUEST_LOCK.release()
+            return ok
+
+        with patch.object(market.SESSION, "get", side_effect=get_without_global_lock):
+            with patch.object(market.time, "monotonic", return_value=100.0):
+                with patch.object(market, "_LAST_REQUEST", [0.0]):
+                    self.assertEqual(market._get("/test", {}), ["ok"])
+        self.assertEqual(observed, [True])
+
     def test_transient_503_recovers(self):
         busy = Mock(status_code=503, headers={})
         ok = Mock(status_code=200, headers={})
