@@ -273,6 +273,26 @@ class WaveSafetyTests(unittest.TestCase):
         result = decision_review(item, structures, "scalp")
         self.assertEqual(result["state"], "READY_REVIEW")
 
+    def test_scanner_wait_cannot_be_resurrected_by_decision_plan(self):
+        item={"recommendation": "WAIT",
+              "decision_plan_425": {"side": "LONG", "score": 95,
+                  "entry": 100, "stop": 98, "tp1": 104,
+                  "rr1_net_estimate": 1.8, "state": "READY_REVIEW"}}
+        structures={tf: {"status": "OK"} for tf in ("15m", "30m", "1H")}
+        result=decision_review(item, structures, "scalp")
+        self.assertEqual(result["state"], "WAIT")
+        self.assertTrue(any("스캔 최종 추천" in r for r in result["reasons"]))
+
+    def test_entry_blockers_override_stale_ready_plan(self):
+        item={"recommendation": "LONG", "entry_blockers": ["확정봉 누락"],
+              "decision_plan_425": {"side": "LONG", "score": 95,
+                  "entry": 100, "stop": 98, "tp1": 104,
+                  "rr1_net_estimate": 1.8, "state": "READY_REVIEW"}}
+        structures={tf: {"status": "OK"} for tf in ("15m", "30m", "1H")}
+        result=decision_review(item, structures, "scalp")
+        self.assertEqual(result["state"], "WAIT")
+        self.assertTrue(any("차단 사유" in r for r in result["reasons"]))
+
     def test_malformed_decision_payload_cannot_be_ready(self):
         for item in (None, [], {"decision_plan_425": "bad"},
                      {"decision_plan_425": {"reasons": {"bad": "shape"}}}):
