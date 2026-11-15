@@ -41,7 +41,8 @@ class ActiveBitgetRetryTests(unittest.TestCase):
                         with self.assertRaisesRegex(RuntimeError, "503"):
                             market._get("/test", {})
         self.assertEqual(getter.call_count, 3)
-        self.assertEqual(sleep.call_count, 2)
+        self.assertIn(0.8, [call.args[0] for call in sleep.call_args_list])
+        self.assertIn(1.6, [call.args[0] for call in sleep.call_args_list])
 
     def test_http_429_exhaustion_does_not_return_stale_data(self):
         limited = Mock(status_code=429, headers={"Retry-After": "0"})
@@ -90,45 +91,46 @@ class ActiveBitgetTimestampTests(unittest.TestCase):
 
 class ActiveBitgetContinuityTests(unittest.TestCase):
     STEP = 900_000
+    BASE = 1_800_000_000_000  # realistic epoch-ms, aligned to 15m
 
     def rows(self):
-        return [[str(i*self.STEP), "100", "102", "98", "100", "10"]
+        return [[str((self.BASE+i*self.STEP)), "100", "102", "98", "100", "10"]
                 for i in range(10, 230)]
 
     def test_future_bitget_bar_cannot_reach_closed_candle_analysis(self):
-        rows = self.rows() + [[str(232*self.STEP), "100", "102", "98", "100", "10"]]
+        rows = self.rows() + [[str((self.BASE+232*self.STEP)), "100", "102", "98", "100", "10"]]
         with patch.object(market, "_get", return_value=rows):
-            with patch.object(market.time, "time", return_value=230*self.STEP/1000):
+            with patch.object(market.time, "time", return_value=(self.BASE+230*self.STEP)/1000):
                 with self.assertRaisesRegex(ValueError, "미래 시각"):
                     market.fastest_candles("BTCUSDT", "15m", exchanges=["bitget"])
 
     def test_two_unfinished_bars_cannot_reach_legacy_analysis(self):
-        rows = self.rows() + [[str(230*self.STEP), "100", "102", "98", "100", "10"],
-                              [str(231*self.STEP), "100", "102", "98", "100", "10"]]
+        rows = self.rows() + [[str((self.BASE+230*self.STEP)), "100", "102", "98", "100", "10"],
+                              [str((self.BASE+231*self.STEP)), "100", "102", "98", "100", "10"]]
         with patch.object(market, "_get", return_value=rows):
-            with patch.object(market.time, "time", return_value=231*self.STEP/1000):
+            with patch.object(market.time, "time", return_value=(self.BASE+231*self.STEP)/1000):
                 # 230 is now closed; 231 is a future bar and must be rejected.
                 with self.assertRaisesRegex(ValueError, "미래 시각"):
                     market.fastest_candles("BTCUSDT", "15m", exchanges=["bitget"])
 
     def test_220_recent_contiguous_bars_return_with_disposable_marker(self):
         with patch.object(market, "_get", return_value=self.rows()) as getter:
-            with patch.object(market.time, "time", return_value=230*self.STEP/1000):
+            with patch.object(market.time, "time", return_value=(self.BASE+230*self.STEP)/1000):
                 result = market.fastest_candles("BTCUSDT", "15m", exchanges=["bitget"])
         self.assertEqual(getter.call_count, 1)
         self.assertEqual(len(result["candles"][:-1]), 220)
-        self.assertEqual(int(result["candles"][-1][0]), 230*self.STEP)
+        self.assertEqual(int(result["candles"][-1][0]), (self.BASE+230*self.STEP))
 
     def test_missing_recent_bar_cannot_be_fabricated(self):
-        rows = [r for r in self.rows() if int(r[0]) != 220*self.STEP]
+        rows = [r for r in self.rows() if int(r[0]) != (self.BASE+220*self.STEP)]
         with patch.object(market, "_get", side_effect=[rows, [], []]) as getter:
-            with patch.object(market.time, "time", return_value=230*self.STEP/1000):
+            with patch.object(market.time, "time", return_value=(self.BASE+230*self.STEP)/1000):
                 with self.assertRaisesRegex(ValueError, "연속 확정봉 부족"):
                     market.fastest_candles("BTCUSDT", "15m", exchanges=["bitget"])
         self.assertGreaterEqual(getter.call_count, 2)
 
     def test_oversized_exchange_page_is_rejected_before_pagination(self):
-        oversized = [[str(i*self.STEP), "100", "102", "98", "100", "10"]
+        oversized = [[str((self.BASE+i*self.STEP)), "100", "102", "98", "100", "10"]
                      for i in range(1001)]
         with patch.object(market, "_get", return_value=oversized) as getter:
             with self.assertRaisesRegex(ValueError, "페이지 크기 비정상"):
@@ -139,32 +141,32 @@ class ActiveBitgetContinuityTests(unittest.TestCase):
         rows = self.rows()
         rows[0][4] = "not-a-price"
         with patch.object(market, "_get", return_value=rows):
-            with patch.object(market.time, "time", return_value=230*self.STEP/1000):
+            with patch.object(market.time, "time", return_value=(self.BASE+230*self.STEP)/1000):
                 with self.assertRaisesRegex(ValueError, "OHLCV"):
                     market.fastest_candles("BTCUSDT", "15m", exchanges=["bitget"])
 
     def test_non_list_gap_repair_response_is_rejected(self):
-        rows = [r for r in self.rows() if int(r[0]) != 220*self.STEP]
+        rows = [r for r in self.rows() if int(r[0]) != (self.BASE+220*self.STEP)]
         with patch.object(market, "_get", side_effect=[rows, [], {"bad": "shape"}]):
-            with patch.object(market.time, "time", return_value=230*self.STEP/1000):
+            with patch.object(market.time, "time", return_value=(self.BASE+230*self.STEP)/1000):
                 with self.assertRaisesRegex(ValueError, "gap repair response"):
                     market.fastest_candles("BTCUSDT", "15m", exchanges=["bitget"])
 
     def test_oversized_history_page_rejected(self):
         initial = self.rows()[:100]
-        oversized = [[str(i*self.STEP), "100", "102", "98", "100", "10"]
+        oversized = [[str((self.BASE+i*self.STEP)), "100", "102", "98", "100", "10"]
                      for i in range(1001)]
         with patch.object(market, "_get", side_effect=[initial, oversized]) as getter:
-            with patch.object(market.time, "time", return_value=230*self.STEP/1000):
+            with patch.object(market.time, "time", return_value=(self.BASE+230*self.STEP)/1000):
                 with self.assertRaisesRegex(ValueError, "페이지 크기 비정상"):
                     market.fastest_candles("BTCUSDT", "15m", exchanges=["bitget"])
         self.assertEqual(getter.call_count, 2)
 
     def test_future_candle_is_rejected(self):
         rows = self.rows()
-        rows.append([str(232*self.STEP), "100", "102", "98", "100", "10"])
+        rows.append([str((self.BASE+232*self.STEP)), "100", "102", "98", "100", "10"])
         with patch.object(market, "_get", return_value=rows):
-            with patch.object(market.time, "time", return_value=230*self.STEP/1000):
+            with patch.object(market.time, "time", return_value=(self.BASE+230*self.STEP)/1000):
                 with self.assertRaisesRegex(ValueError, "미래 시각"):
                     market.fastest_candles("BTCUSDT", "15m", exchanges=["bitget"])
 
@@ -180,7 +182,7 @@ class ActiveBitgetContinuityTests(unittest.TestCase):
 
     def test_repeated_scans_do_not_retain_candle_cache(self):
         with patch.object(market, "_get", return_value=self.rows()) as getter:
-            with patch.object(market.time, "time", return_value=230*self.STEP/1000):
+            with patch.object(market.time, "time", return_value=(self.BASE+230*self.STEP)/1000):
                 first = market.fastest_candles("BTCUSDT", "15m", exchanges=["bitget"])
                 second = market.fastest_candles("BTCUSDT", "15m", exchanges=["bitget"])
         self.assertEqual(getter.call_count, 2)
@@ -191,7 +193,7 @@ class ActiveBitgetContinuityTests(unittest.TestCase):
         rows = self.rows()
         rows.append(list(rows[-1]))
         with patch.object(market, "_get", return_value=rows):
-            with patch.object(market.time, "time", return_value=230*self.STEP/1000):
+            with patch.object(market.time, "time", return_value=(self.BASE+230*self.STEP)/1000):
                 result = market.fastest_candles("BTCUSDT", "15m", exchanges=["bitget"])
         self.assertEqual(len(result["candles"][:-1]), 220)
 
@@ -201,7 +203,7 @@ class ActiveBitgetContinuityTests(unittest.TestCase):
                 rows = self.rows()
                 rows[-1][4] = bad
                 with patch.object(market, "_get", return_value=rows):
-                    with patch.object(market.time, "time", return_value=230*self.STEP/1000):
+                    with patch.object(market.time, "time", return_value=(self.BASE+230*self.STEP)/1000):
                         with self.assertRaisesRegex(ValueError, "OHLCV"):
                             market.fastest_candles("BTCUSDT", "15m", exchanges=["bitget"])
 
@@ -219,14 +221,14 @@ class ActiveBitgetContinuityTests(unittest.TestCase):
                     market.fastest_candles("BTCUSDT", "15m", exchanges=["bitget"])
 
     def test_real_history_page_repairs_missing_bar(self):
-        rows = [r for r in self.rows() if int(r[0]) != 220*self.STEP]
-        repaired = [r for r in self.rows() if int(r[0]) == 220*self.STEP]
+        rows = [r for r in self.rows() if int(r[0]) != (self.BASE+220*self.STEP)]
+        repaired = [r for r in self.rows() if int(r[0]) == (self.BASE+220*self.STEP)]
         with patch.object(market, "_get", side_effect=[rows, [], repaired]) as getter:
-            with patch.object(market.time, "time", return_value=230*self.STEP/1000):
+            with patch.object(market.time, "time", return_value=(self.BASE+230*self.STEP)/1000):
                 result = market.fastest_candles("BTCUSDT", "15m", exchanges=["bitget"])
         self.assertEqual(getter.call_count, 3)
         self.assertEqual(len(result["candles"][:-1]), 220)
-        self.assertIn(str(220*self.STEP), [r[0] for r in result["candles"][:-1]])
+        self.assertIn(str((self.BASE+220*self.STEP)), [r[0] for r in result["candles"][:-1]])
 
 if __name__ == "__main__":
     unittest.main()
