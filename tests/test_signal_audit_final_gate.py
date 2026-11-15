@@ -31,6 +31,23 @@ class FinalAuditGateTests(unittest.TestCase):
         self.assertEqual(result["status"], "WAIT")
         self.assertFalse(result["order_authorized"])
 
+    def test_unknown_derivatives_source_warns_without_veto(self):
+        item=self.base()
+        item["data_quality"]={"cross_exchange": None}
+        item["decision_427"]={"state": "READY_REVIEW"}
+        result=reconcile(item)
+        self.assertEqual(result["status"], "REVIEW_ONLY")
+        self.assertTrue(any("출처 미확인" in c for c in result["caveats"]))
+        self.assertFalse(result["order_authorized"])
+
+    def test_confirmed_cross_venue_mismatch_blocks(self):
+        item=self.base()
+        item["data_quality"]={"cross_exchange": True}
+        item["decision_427"]={"state": "READY_REVIEW"}
+        result=reconcile(item)
+        self.assertEqual(result["status"], "WAIT")
+        self.assertTrue(any("거래소" in r for r in result["reasons"]))
+
     def test_final_wait_cannot_be_review_only(self):
         item=self.base()
         item["decision_427"]={"state": "WAIT"}
