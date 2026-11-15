@@ -37,7 +37,8 @@ class WaveChoiceResponseTests(unittest.TestCase):
                    return_value=candidate):
             scenario = wave_choice_response(bars())["scenarios"][0]
         self.assertEqual(scenario["invalidation_status"], "not_evaluated")
-        self.assertFalse(scenario["invalidation_rule_verified"])\n
+        self.assertFalse(scenario["invalidation_rule_verified"])
+
     def test_invalid_candle_is_not_silently_dropped(self):
         rows = bars()
         rows[15]["high"] = 1.0
