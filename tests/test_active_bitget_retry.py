@@ -43,6 +43,29 @@ class ActiveBitgetRetryTests(unittest.TestCase):
         self.assertEqual(getter.call_count, 3)
         self.assertEqual(sleep.call_count, 2)
 
+    def test_http_429_exhaustion_does_not_return_stale_data(self):
+        limited = Mock(status_code=429, headers={"Retry-After": "0"})
+        with patch.object(market.SESSION, "get", return_value=limited) as getter:
+            with patch.object(market.time, "sleep"):
+                with patch.object(market.time, "monotonic", return_value=100.0):
+                    with patch.object(market, "_LAST_REQUEST", [0.0]):
+                        with self.assertRaisesRegex(ValueError, "HTTP 429"):
+                            market._get("/test", {})
+        self.assertEqual(getter.call_count, 3)
+
+    def test_bitget_body_rate_limit_retries_then_recovers(self):
+        limited = Mock(status_code=200, headers={})
+        limited.json.return_value = {"code": "40015", "msg": "rate limit"}
+        ok = Mock(status_code=200, headers={})
+        ok.json.return_value = {"code": "00000", "data": ["fresh"]}
+        with patch.object(market.SESSION, "get", side_effect=[limited, ok]) as getter:
+            with patch.object(market.time, "sleep") as sleep:
+                with patch.object(market.time, "monotonic", return_value=100.0):
+                    with patch.object(market, "_LAST_REQUEST", [0.0]):
+                        self.assertEqual(market._get("/test", {}), ["fresh"])
+        self.assertEqual(getter.call_count, 2)
+        self.assertIn(0.8, [call.args[0] for call in sleep.call_args_list])
+
     def test_valid_retry_after_is_capped(self):
         limited = Mock(status_code=429, headers={"Retry-After": "100"})
         ok = Mock(status_code=200, headers={})
