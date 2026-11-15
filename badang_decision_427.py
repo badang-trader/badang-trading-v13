@@ -226,6 +226,13 @@ def decision_review(item,structures,mode):
             gross_rr2 = abs(tp2 - entry) / abs(entry - stop)
             if rr2 > gross_rr2 + 1e-6:
                 reasons.append('2차 수수료·슬리피지 반영 손익비가 가격 기준 손익비보다 큼')
+            if cost_declared and fee_pct is not None and slip_pct is not None and (
+                    fee_pct >= 0 and slip_pct >= 0 and fee_pct + slip_pct <= 5):
+                cost2 = entry * (fee_pct + slip_pct) / 100
+                expected_rr2 = round(max(0, abs(tp2-entry)-cost2) /
+                                     (abs(entry-stop)+cost2), 2)
+                if abs(rr2-expected_rr2) > 0.011:
+                    reasons.append('2차 순손익비가 수수료·슬리피지 재계산 결과와 불일치')
     if old.get('state')!='READY_REVIEW':reasons.append('기존 진입 검증 미충족')
     # A missing/invalid Elliott label is not itself a trading veto, but
     # must never be represented as a confirmed wave direction.
