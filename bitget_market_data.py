@@ -20,12 +20,15 @@ _LAST_REQUEST=[0.0]
 def _get(path, params):
     """Bounded retries for rate limits; never substitute stale candles."""
     for attempt in range(3):
+        # Reserve a non-overlapping request slot under the lock. The actual
+        # sleep and network I/O happen outside it, avoiding global scan stalls.
         with _REQUEST_LOCK:
-            wait=max(0.0, 0.16-(time.monotonic()-_LAST_REQUEST[0]))
-            if wait: time.sleep(wait)
-            _LAST_REQUEST[0]=time.monotonic()
-        # Reserve the request slot under the lock, but never hold the lock
-        # across network I/O (up to 12s timeout per attempt).
+            now_tick=time.monotonic()
+            reserved=max(now_tick, _LAST_REQUEST[0]+0.16)
+            _LAST_REQUEST[0]=reserved
+            wait=max(0.0, reserved-now_tick)
+        if wait:
+            time.sleep(wait)
         try:
             r=SESSION.get(API+path,params=params,timeout=12)
         except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
