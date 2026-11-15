@@ -242,6 +242,23 @@ class WaveSafetyTests(unittest.TestCase):
         self.assertEqual(result["status"], "HYPOTHESIS")
         self.assertEqual(result["alternatives"][0]["last_pivot_time"], 3)
 
+    def test_reversed_or_duplicate_pivot_times_not_claimed_as_wave(self):
+        for times in ((3, 2, 1), (1, 1, 3), (1, 3, 2)):
+            with self.subTest(times=times):
+                turns = [{"price": price, "time": time}
+                         for price, time in zip((100, 110, 105), times)]
+                result = impulse_state(turns, 115, 2)
+                self.assertEqual(result["status"], "UNDETERMINED")
+
+    def test_invalid_pivot_confirmation_times_not_claimed_as_wave(self):
+        for bad in ("NaN", "bad", -1, 0, 1.5):
+            with self.subTest(confirmed_at=bad):
+                turns = [{"price": 100, "time": 1},
+                         {"price": 110, "time": 2},
+                         {"price": 105, "time": 3, "confirmed_at": bad}]
+                result = impulse_state(turns, 115, 2)
+                self.assertEqual(result["status"], "UNDETERMINED")
+
     def test_insufficient_pivots_not_claimed_as_wave(self):
         wave = impulse_state([], 100, 1)
         self.assertEqual(wave["status"], "UNDETERMINED")
