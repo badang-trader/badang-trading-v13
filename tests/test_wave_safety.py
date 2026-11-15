@@ -3,7 +3,7 @@
 No network access, database, or live orders required.
 """
 import unittest
-from badang_decision_427 import closed_bars, confirmed_turns, impulse_state, decision_review
+from badang_decision_427 import closed_bars, confirmed_turns, impulse_state, decision_review, completed_impulse_rules
 
 STEP = 900_000
 
@@ -57,6 +57,30 @@ class WaveSafetyTests(unittest.TestCase):
     def test_insufficient_pivots_not_claimed_as_wave(self):
         wave = impulse_state([], 100, 1)
         self.assertEqual(wave["status"], "UNDETERMINED")
+
+    def test_completed_impulse_valid(self):
+        result = completed_impulse_rules([100, 110, 105, 125, 118, 132])
+        self.assertTrue(result["valid"], result["reasons"])
+
+    def test_wave_three_cannot_be_shortest(self):
+        result = completed_impulse_rules([100, 120, 110, 125, 121, 150])
+        self.assertFalse(result["valid"])
+        self.assertTrue(any("최단" in r for r in result["reasons"]))
+
+    def test_wave_two_cannot_cross_origin(self):
+        result = completed_impulse_rules([100, 110, 99, 130, 120, 140])
+        self.assertFalse(result["valid"])
+        self.assertTrue(any("출발점" in r for r in result["reasons"]))
+
+    def test_wave_four_overlap_rejected(self):
+        result = completed_impulse_rules([100, 120, 110, 140, 118, 155])
+        self.assertFalse(result["valid"])
+        self.assertTrue(any("중첩" in r for r in result["reasons"]))
+
+    def test_wave_three_shortest_bearish(self):
+        result = completed_impulse_rules([150, 130, 140, 125, 129, 100])
+        self.assertFalse(result["valid"])
+        self.assertTrue(any("최단" in r for r in result["reasons"]))
 
     def test_missing_timeframe_prevents_ready_state(self):
         item = {"decision_plan_425": {"side": "LONG", "score": 90,
