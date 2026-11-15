@@ -15,7 +15,9 @@ def closed_bars(raw, tf, now_ms=None):
     """Exclude last possibly-forming bar, verify time ordering and age."""
     if tf not in FRAME_MS:
         return None,'지원하지 않는 시간봉'
-    rows=list(raw or [])
+    if not isinstance(raw, (list, tuple)):
+        return None,'OHLCV 데이터 묶음 형식 오류'
+    rows=list(raw)
     if len(rows)<65: return None,'완료봉 최소 64개 필요'
     bars=[]
     for r in rows[:-1]:
