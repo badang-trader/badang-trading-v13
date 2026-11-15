@@ -1,10 +1,6 @@
 name: BADANG research history pilot (manual read-only)
 on:
   workflow_dispatch:
-  push:
-    branches: [badang-514-validation]
-    paths:
-      - '.github/workflows/badang-research-history-pilot.yml'
 permissions:
   contents: read
 concurrency:
