@@ -128,9 +128,12 @@ def impulse_state(turns, current, atr, as_of_open=None):
         as_of=_f(as_of_open)
         if as_of is None or not as_of.is_integer() or as_of<0:
             return fallback
-        if any(_f(t['time'])>as_of or
-               (t.get('confirmed_at') is not None and
-                _f(t['confirmed_at'])>as_of) for t in turns):
+        # An as-of analysis cannot claim that a pivot was known unless its
+        # right-hand confirmation timestamp is explicitly supplied.
+        if any(t.get('confirmed_at') is None for t in turns):
+            return fallback
+        if any(_f(t['time'])>as_of or _f(t['confirmed_at'])>as_of
+               for t in turns):
             return fallback
     turns=[dict(t,price=float(t['price']),time=int(float(t['time'])))
            for t in turns]
