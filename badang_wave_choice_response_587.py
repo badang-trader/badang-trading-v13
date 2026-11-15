@@ -24,18 +24,17 @@ def wave_choice_response(candles):
         direction = candidate.get("direction")
         if direction not in ("up", "down"):
             continue
-        # Existing levels are structural reference pivots, not verified\n        # directional invalidation or automatic stop-loss thresholds.
+        # Existing levels are structural reference pivots, not verified
+        # directional invalidation or automatic stop-loss thresholds.
         scenarios.append({
             "pattern": candidate["pattern"],
             "direction": direction,
             "confidence": candidate.get("confidence", "low"),
             "invalidation_price": invalidation,
             "current_close": close,
-            "invalidation_status": (
-                "crossed_or_at_level"
-                if (close <= invalidation if direction == "up"
-                    else close >= invalidation)
-                else "not_crossed"),
+            "invalidation_status": "not_evaluated",
+            "level_semantics": "structural_reference_only",
+            "invalidation_rule_verified": False,
             "response_if_invalidated": "recount_wave_and_reassess; do_not_auto_reverse",
             "response_if_supported": "await_independent_confirmation_before_entry",
             "source": "existing_elliott_wave_candidate_engine",
