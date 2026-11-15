@@ -27,8 +27,14 @@ def closed_bars(raw, tf, now_ms=None):
     step=FRAME_MS.get(tf)
     if step and any(bars[i][0]-bars[i-1][0]!=step for i in range(1,len(bars))):
         return None,'캔들 시간 간격 오류'
-    if now_ms is not None and step and (now_ms-bars[-1][0]>step*3 or now_ms-bars[-1][0]<0):
-        return None,'확정봉 시각이 오래되었거나 미래임'
+    # Exchange candle timestamps are bar OPEN times. A bar is confirmed only
+    # after its full interval has elapsed, not merely after its open time.
+    if now_ms is not None:
+        now = _f(now_ms)
+        if now is None or now < bars[-1][0] + step:
+            return None,'마지막 분석봉이 아직 확정되지 않았거나 현재 시각 오류'
+        if now - (bars[-1][0] + step) > step * 3:
+            return None,'확정봉 시각이 오래됨'
     return bars,'OK'
 
 def confirmed_turns(bars,window=3):
