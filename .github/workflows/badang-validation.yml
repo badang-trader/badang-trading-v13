@@ -19,4 +19,16 @@ jobs:
       - name: Check Python syntax
         run: python -m compileall -q .
       - name: Run discovered unittest suite
-        run: python -m unittest discover -s tests -p 'test_*.py' -v
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p validation-results
+          python -m unittest discover -s tests -p 'test_*.py' -v 2>&1 | tee validation-results/unittest.log
+      - name: Upload validation logs (even on failure)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: badang-validation-logs
+          path: validation-results/
+          if-no-files-found: warn
+          retention-days: 14
