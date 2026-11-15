@@ -42,6 +42,13 @@ class WaveSafetyTests(unittest.TestCase):
         self.assertIsNone(bars)
         self.assertIn("이상", reason)
 
+    def test_invalid_top_level_candle_payload_fails_safely(self):
+        for bad in (None, 123, "not-candles", {"data": candles()}):
+            with self.subTest(payload_type=type(bad).__name__):
+                bars, reason = closed_bars(bad, "15m")
+                self.assertIsNone(bars)
+                self.assertIn("형식", reason)
+
     def test_malformed_candle_rows_fail_without_crashing(self):
         for bad in (None, 7, "bad", {"timestamp": 1}, []):
             with self.subTest(row=bad):
