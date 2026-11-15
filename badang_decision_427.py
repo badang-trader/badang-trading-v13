@@ -149,7 +149,8 @@ def decision_review(item,structures,mode):
         if structures.get(tf,{}).get('status')!='OK':reasons.append(tf+' 확정봉·구조 검증 불가')
     if side not in ('LONG','SHORT'):reasons.append('가격 행동 진입 방향 미확정')
     if score is None or score<80:reasons.append('진입 검토 기준 80점 미달')
-    if old.get('rr1_net_estimate') is None or old.get('rr1_net_estimate')<1.5:
+    rr1 = _f(old.get('rr1_net_estimate'))
+    if rr1 is None or rr1 < 1.5:
         reasons.append('수수료 반영 손익비 1.5 미달 또는 산정 불가')
     if old.get('state')!='READY_REVIEW':reasons.append('기존 진입 검증 미충족')
     # Reconcile current multi-timeframe wave ambiguity as contextual warning, not fake confidence.
@@ -162,6 +163,6 @@ def decision_review(item,structures,mode):
             'label':'진입 검토 가능 · 주문 전 실시간 확인' if ready else '관망 · 진입 조건 미충족',
             'side':side,'score':score,'reasons':unique,'wave_context':wave_note,
             'plan':{'entry':old.get('entry'),'stop':old.get('stop'),'tp1':old.get('tp1'),'tp2':old.get('tp2'),
-                    'rr1_net_estimate':old.get('rr1_net_estimate'),'rr2_net_estimate':old.get('rr2_net_estimate')},
+                    'rr1_net_estimate':rr1,'rr2_net_estimate':_f(old.get('rr2_net_estimate'))},
             'data_is_live_quote':False,'win_probability':None,
             'note':'확정봉 스냅샷 기반. 주문호가/청산가/체결·슬리피지 미반영'}
