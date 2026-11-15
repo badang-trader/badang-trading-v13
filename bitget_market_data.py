@@ -125,6 +125,13 @@ def fastest_candles(symbol,timeframe,exchanges=None):
                 stamp=int(raw_stamp); stamp=stamp*1000 if stamp<100000000000 else stamp
             except (TypeError,ValueError,OverflowError):
                 raise ValueError('Bitget 잘못된 캔들 시각 감지')
+            # Reject future/misaligned rows before pagination or gap repair.
+            # This avoids needless network requests on corrupt exchange data.
+            current_open=(int(time.time()*1000)//step)*step
+            if stamp>current_open:
+                raise ValueError('Bitget 미래 시각 캔들 감지: 시계 또는 거래소 데이터 오류')
+            if stamp%step:
+                raise ValueError('Bitget 캔들 시각 정렬 오류: 봉 간격 경계와 불일치')
             # The same candle may be represented with equivalent numeric
             # strings across current and historical endpoints.
             if stamp in seen:
