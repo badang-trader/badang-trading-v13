@@ -259,6 +259,27 @@ class WaveSafetyTests(unittest.TestCase):
                 result = impulse_state(turns, 115, 2)
                 self.assertEqual(result["status"], "UNDETERMINED")
 
+    def test_wave_pivot_confirmation_after_as_of_is_rejected(self):
+        turns = [{"price": 100, "time": 1, "confirmed_at": 4},
+                 {"price": 110, "time": 2, "confirmed_at": 5},
+                 {"price": 105, "time": 3, "confirmed_at": 6}]
+        result = impulse_state(turns, 115, 2, as_of_open=5)
+        self.assertEqual(result["status"], "UNDETERMINED")
+        self.assertEqual(result["alternatives"], [])
+
+    def test_wave_pivot_confirmation_at_as_of_is_allowed(self):
+        turns = [{"price": 100, "time": 1, "confirmed_at": 4},
+                 {"price": 110, "time": 2, "confirmed_at": 5},
+                 {"price": 105, "time": 3, "confirmed_at": 6}]
+        result = impulse_state(turns, 115, 2, as_of_open=6)
+        self.assertEqual(result["status"], "HYPOTHESIS")
+
+    def test_wave_pivot_after_as_of_is_rejected(self):
+        turns = [{"price": 100, "time": 1}, {"price": 110, "time": 2},
+                 {"price": 105, "time": 3}]
+        result = impulse_state(turns, 115, 2, as_of_open=2)
+        self.assertEqual(result["status"], "UNDETERMINED")
+
     def test_insufficient_pivots_not_claimed_as_wave(self):
         wave = impulse_state([], 100, 1)
         self.assertEqual(wave["status"], "UNDETERMINED")
