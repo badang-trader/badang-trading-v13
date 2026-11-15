@@ -65,8 +65,7 @@ def main():
                             "trading_ready": False})
     report = {"read_only": True, "trading_ready": False, "results": results}
     Path("badang-wave-live-research.json").write_text(
-        json.dumps(report, indent=2, ensure_ascii=False, allow_nan=False) + "
-",
+        json.dumps(report, indent=2, ensure_ascii=False, allow_nan=False) + "\\n",
         encoding="utf-8")
     print("BADANG_WAVE_RESEARCH " + json.dumps(
         [{"symbol": r["symbol"], "frame": r["frame"], "status": r["status"]}
