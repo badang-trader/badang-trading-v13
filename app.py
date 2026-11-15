@@ -2564,13 +2564,13 @@ def v13_scan():
 
                 side = item.get('candidate_side')
 
-                aligned = all(
-                    t == (
-                        'UP'
-                        if side == 'LONG'
-                        else 'DOWN'
-                    )
-                    for tf, t in trends.items() if tf in frames
+                # Never let all([]) promote a missing timeframe trend to alignment.
+                expected_trend = ('UP' if side == 'LONG' else
+                                  'DOWN' if side == 'SHORT' else None)
+                aligned = (
+                    expected_trend is not None
+                    and all(tf in trends and trends[tf] == expected_trend
+                            for tf in frames)
                 )
 
                 item['trend_aligned'] = aligned
