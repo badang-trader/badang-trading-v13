@@ -104,6 +104,23 @@ class WaveSafetyTests(unittest.TestCase):
         self.assertIsNone(bars)
         self.assertIn("확정되지", reason)
 
+    def test_disposable_future_slot_rejected_with_clock(self):
+        rows = candles()
+        # The preceding candle has closed, but a future-dated placeholder
+        # must not be silently interpreted as the current slot.
+        now_ms = rows[-2][0] + STEP
+        rows[-1][0] += STEP
+        bars, reason = closed_bars(rows, "15m", now_ms=now_ms)
+        self.assertIsNone(bars)
+        self.assertIn("미확정봉", reason)
+
+    def test_disposable_current_slot_allowed_with_clock(self):
+        rows = candles()
+        now_ms = rows[-2][0] + STEP
+        bars, reason = closed_bars(rows, "15m", now_ms=now_ms)
+        self.assertEqual(reason, "OK")
+        self.assertEqual(len(bars), 69)
+
     def test_bar_close_boundary_is_accepted(self):
         rows = candles()
         last_used_open = rows[-2][0]
