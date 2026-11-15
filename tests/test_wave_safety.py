@@ -214,6 +214,19 @@ class WaveSafetyTests(unittest.TestCase):
         self.assertEqual(result["state"], "WAIT")
         self.assertTrue(any("2차 순손익비" in reason for reason in result["reasons"]))
 
+    def test_declared_second_target_requires_net_ratio(self):
+        structures = {tf: {"status": "OK"} for tf in ("15m", "30m", "1H")}
+        item = {"decision_plan_425": {
+            "side": "LONG", "score": 95, "entry": 100, "stop": 98,
+            "tp1": 104, "tp2": 106, "state": "READY_REVIEW",
+            "fee_assumption_roundtrip_pct": 0.12,
+            "slippage_assumption_roundtrip_pct": 0.10,
+            "rr1_net_estimate": 1.70}}
+        result = decision_review(item, structures, "scalp")
+        self.assertEqual(result["state"], "WAIT")
+        self.assertTrue(any("2차 순손익비 누락" in reason
+                            for reason in result["reasons"]))
+
     def test_missing_trade_prices_cannot_be_ready(self):
         structures = {tf: {"status": "OK"} for tf in ("15m", "30m", "1H")}
         item = {"decision_plan_425": {"side": "LONG", "score": 95,
