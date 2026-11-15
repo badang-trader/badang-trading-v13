@@ -186,7 +186,7 @@ class ActiveBitgetOHLCVTests(unittest.TestCase):
         page = [[str(self.BASE+220*self.STEP), "100", "102", "98", "100", "10"]]
         with patch.object(market, "_get", side_effect=[page, []]) as getter:
             with patch.object(market.time, "time",
-                              return_value=(self.BASE+230*self.STEP)/1000):
+                              return_value=(self.BASE+222*self.STEP)/1000):
                 with self.assertRaisesRegex(ValueError, "연속 확정봉 부족"):
                     market.fastest_candles("BTCUSDT", "15m", exchanges=["bitget"])
         self.assertEqual(getter.call_count, 2)
