@@ -1,5 +1,6 @@
 import requests
 import time
+import math
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -394,7 +395,10 @@ def validate_candles(
 
     for row in rows:
         try:
-            ts = int(row[0])
+            raw_ts = float(row[0])
+            if not math.isfinite(raw_ts) or not raw_ts.is_integer() or raw_ts < 0:
+                continue
+            ts = int(raw_ts)
 
             op, hi, lo, cl = map(
                 float,
@@ -402,6 +406,8 @@ def validate_candles(
             )
 
             volume = float(row[5])
+            if not all(math.isfinite(v) for v in (op, hi, lo, cl, volume)):
+                continue
 
             if ts + interval_ms > now_ms:
                 continue
