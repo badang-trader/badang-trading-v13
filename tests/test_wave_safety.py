@@ -159,6 +159,16 @@ class WaveSafetyTests(unittest.TestCase):
         self.assertEqual(result["state"], "READY_REVIEW")
         self.assertEqual(result["plan"]["rr1_net_estimate"], 1.7)
 
+    def test_unknown_analysis_mode_never_returns_ready(self):
+        item = {"decision_plan_425": {"side": "LONG", "score": 95,
+                "rr1_net_estimate": 3.0, "state": "READY_REVIEW"}}
+        structures = {tf: {"status": "OK"} for tf in ("15m", "30m", "1H", "4H", "1D")}
+        for mode in ("", "SCALP", "unknown", None):
+            with self.subTest(mode=mode):
+                result = decision_review(item, structures, mode)
+                self.assertEqual(result["state"], "WAIT")
+                self.assertIn("지원하지 않는 분석 모드", result["reasons"])
+
     def test_missing_timeframe_prevents_ready_state(self):
         item = {"decision_plan_425": {"side": "LONG", "score": 90,
                 "rr1_net_estimate": 2.0, "state": "READY_REVIEW"}}
