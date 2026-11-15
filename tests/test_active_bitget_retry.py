@@ -144,6 +144,33 @@ class ActiveBitgetContinuityTests(unittest.TestCase):
                     market.fastest_candles("BTCUSDT", "15m", exchanges=["bitget"])
         self.assertEqual(getter.call_count, 2)
 
+    def test_future_candle_is_rejected(self):
+        rows = self.rows()
+        rows.append([str(232*self.STEP), "100", "102", "98", "100", "10"])
+        with patch.object(market, "_get", return_value=rows):
+            with patch.object(market.time, "time", return_value=230*self.STEP/1000):
+                with self.assertRaisesRegex(ValueError, "미래 시각"):
+                    market.fastest_candles("BTCUSDT", "15m", exchanges=["bitget"])
+
+    def test_conflicting_duplicate_candle_is_rejected(self):
+        rows = self.rows()
+        conflict = list(rows[-1])
+        conflict[4] = "101"
+        rows.append(conflict)
+        with patch.object(market, "_get", return_value=rows) as getter:
+            with self.assertRaisesRegex(ValueError, "Conflicting"):
+                market.fastest_candles("BTCUSDT", "15m", exchanges=["bitget"])
+        self.assertEqual(getter.call_count, 1)
+
+    def test_repeated_scans_do_not_retain_candle_cache(self):
+        with patch.object(market, "_get", return_value=self.rows()) as getter:
+            with patch.object(market.time, "time", return_value=230*self.STEP/1000):
+                first = market.fastest_candles("BTCUSDT", "15m", exchanges=["bitget"])
+                second = market.fastest_candles("BTCUSDT", "15m", exchanges=["bitget"])
+        self.assertEqual(getter.call_count, 2)
+        self.assertEqual(first["candles"], second["candles"])
+        self.assertIsNot(first["candles"], second["candles"])
+
     def test_stale_history_rejected_even_when_contiguous(self):
         rows = self.rows()
         with patch.object(market, "_get", return_value=rows):
