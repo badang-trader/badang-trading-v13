@@ -54,6 +54,22 @@ class ResearchHistoryTests(unittest.TestCase):
             research_history("BTCUSDT", "15m", target_bars=205,
                              max_pages=2, now_ms=NOW, fetch=fetch)
 
+    def test_1000_realistic_consecutive_bars_need_five_pages(self):
+        requests = []
+        def fetch(path, params):
+            requests.append(params)
+            end = int(params["endTime"]) // STEP
+            return [candle(i) for i in range(end - 200, end)]
+        r = research_history("BTCUSDT", "15m", target_bars=1000,
+                             max_pages=6, now_ms=NOW, fetch=fetch)
+        self.assertEqual(r["status"], "ok")
+        self.assertEqual(r["confirmed_bars"], 1000)
+        self.assertEqual(r["pages"], 6)
+        self.assertEqual(len({x[0] for x in r["candles"]}), 1000)
+        self.assertTrue(all(int(b[0]) - int(a[0]) == STEP
+                            for a, b in zip(r["candles"], r["candles"][1:])))
+        self.assertEqual(len(requests), 6)
+
     def test_rate_limit_propagates_without_unbounded_retry(self):
         calls = []
         def limited(path, params):
