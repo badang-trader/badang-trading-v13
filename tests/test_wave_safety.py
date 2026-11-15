@@ -280,6 +280,28 @@ class WaveSafetyTests(unittest.TestCase):
         result = impulse_state(turns, 115, 2, as_of_open=2)
         self.assertEqual(result["status"], "UNDETERMINED")
 
+    def test_elliott_pivot_kinds_must_alternate(self):
+        for kinds in (("L", "L", "L"), ("L", "H", "H"),
+                      ("L", "X", "L"), ("L", None, "L")):
+            with self.subTest(kinds=kinds):
+                turns=[{"price":p, "time":i+1, "kind":k}
+                       for i,(p,k) in enumerate(zip((100,110,105),kinds))]
+                self.assertEqual(impulse_state(turns,115,2)["status"],
+                                 "UNDETERMINED")
+
+    def test_elliott_pivot_kind_must_match_price_direction(self):
+        turns=[{"price":100,"time":1,"kind":"H"},
+               {"price":110,"time":2,"kind":"L"},
+               {"price":105,"time":3,"kind":"H"}]
+        self.assertEqual(impulse_state(turns,115,2)["status"],
+                         "UNDETERMINED")
+
+    def test_numeric_string_pivots_with_valid_kinds_still_work(self):
+        turns=[{"price":"100","time":1,"kind":"L"},
+               {"price":"110","time":2,"kind":"H"},
+               {"price":"105","time":3,"kind":"L"}]
+        self.assertEqual(impulse_state(turns,115,2)["status"],"HYPOTHESIS")
+
     def test_insufficient_pivots_not_claimed_as_wave(self):
         wave = impulse_state([], 100, 1)
         self.assertEqual(wave["status"], "UNDETERMINED")
