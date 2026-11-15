@@ -274,13 +274,20 @@ def bitget_derivatives_snapshot(symbol,candles):
         if isinstance(rows,dict):
             oi=rows.get('openInterest') or rows.get('openInterestList')
             if isinstance(oi,list): oi=oi[0].get('size') if oi and isinstance(oi[0],dict) else None
-            if oi is not None: result['oi_contracts']=float(oi)
+            if oi is not None:
+                value=float(oi)
+                if not math.isfinite(value) or value < 0:
+                    raise ValueError('Invalid Bitget open interest')
+                result['oi_contracts']=value
     except Exception as exc: result['errors']['oi']=type(exc).__name__
     try:
         rows=_get('/api/v2/mix/market/current-fund-rate',
                   {'symbol':symbol,'productType':'USDT-FUTURES'})
         if isinstance(rows,list): rows=rows[0] if rows else {}
         if isinstance(rows,dict) and rows.get('fundingRate') is not None:
-            result['funding_rate']=float(rows['fundingRate'])
+            value=float(rows['fundingRate'])
+            if not math.isfinite(value):
+                raise ValueError('Invalid Bitget funding rate')
+            result['funding_rate']=value
     except Exception as exc: result['errors']['funding']=type(exc).__name__
     return result
