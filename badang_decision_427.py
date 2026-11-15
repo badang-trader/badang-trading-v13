@@ -63,6 +63,10 @@ def closed_bars(raw, tf, now_ms=None):
             return None,'마지막 분석봉이 아직 확정되지 않았거나 현재 시각 오류'
         if now - (bars[-1][0] + step) > step * 3:
             return None,'확정봉 시각이 오래됨'
+        # The disposable row is the next slot, not a forecast. A timestamp
+        # beyond the current candle opening indicates corrupted future data.
+        if int(trailing_time) > (int(now)//step)*step:
+            return None,'마지막 미확정봉 미래 시각 오류'
     return bars,'OK'
 
 def confirmed_turns(bars,window=3):
