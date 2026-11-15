@@ -12,7 +12,13 @@ TIMEOUT = 15
 def get_json(url, params=None):
     """Bounded retries for transient exchange throttling and server failures."""
     for attempt in range(3):
-        response = SESSION.get(url, params=params, timeout=TIMEOUT)
+        try:
+            response = SESSION.get(url, params=params, timeout=TIMEOUT)
+        except (requests.Timeout, requests.ConnectionError):
+            if attempt == 2:
+                raise
+            time.sleep(0.5 * (2 ** attempt))
+            continue
         if response.status_code in (429, 500, 502, 503, 504):
             if attempt < 2:
                 retry_after = response.headers.get("Retry-After", "")
