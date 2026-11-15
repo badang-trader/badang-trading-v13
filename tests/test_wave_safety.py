@@ -118,6 +118,31 @@ class WaveSafetyTests(unittest.TestCase):
         self.assertIsNone(bars)
         self.assertIn("오래됨", reason)
 
+    def test_invalid_pivot_confirmation_windows_rejected(self):
+        bars, _ = closed_bars(candles(), "15m")
+        for invalid in (0, -1, 1.5, None, True):
+            with self.subTest(window=invalid):
+                with self.assertRaisesRegex(ValueError, "window"):
+                    confirmed_turns(bars, window=invalid)
+
+    def test_disposable_last_row_timestamp_must_be_next_bar(self):
+        for shift in (-STEP, 1, STEP):
+            with self.subTest(shift=shift):
+                rows = candles()
+                rows[-1][0] += shift
+                bars, reason = closed_bars(rows, "15m")
+                self.assertIsNone(bars)
+                self.assertIn("미확정봉", reason)
+
+    def test_disposable_last_row_structure_must_be_valid(self):
+        for bad in (None, 42, [], ["NaN", 1, 2, 1, 2, 3]):
+            with self.subTest(row=bad):
+                rows = candles()
+                rows[-1] = bad
+                bars, reason = closed_bars(rows, "15m")
+                self.assertIsNone(bars)
+                self.assertIn("미확정봉", reason)
+
     def test_pivots_require_right_hand_confirmation(self):
         rows = candles()
         bars, _ = closed_bars(rows, "15m")
