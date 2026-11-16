@@ -106,6 +106,32 @@ class ActiveBitgetRetryTests(unittest.TestCase):
         self.assertEqual(getter.call_count, 2)
         self.assertIn(0.8, [call.args[0] for call in sleep.call_args_list])
 
+    def test_http_408_timeout_recovers_on_second_attempt(self):
+        timeout=Mock(status_code=408,headers={})
+        ok=Mock(status_code=200,headers={})
+        ok.json.return_value={"code":"00000","data":["fresh"]}
+        with patch.object(market.SESSION,"get",side_effect=[timeout,ok]) as getter:
+            with patch.object(market.time,"sleep") as sleep:
+                with patch.object(market.time,"monotonic",return_value=100.0):
+                    with patch.object(market,"_LAST_REQUEST",[0.0]):
+                        self.assertEqual(market._get("/test",{}),["fresh"])
+        self.assertEqual(getter.call_count,2)
+        self.assertIn(0.8,[call.args[0] for call in sleep.call_args_list])
+
+    def test_http_408_exhaustion_does_not_return_candles(self):
+        timeout=Mock(status_code=408,headers={})
+        with patch.object(market.SESSION,"get",return_value=timeout) as getter:
+            with patch.object(market.time,"sleep") as sleep:
+                with patch.object(market.time,"monotonic",return_value=100.0):
+                    with patch.object(market,"_LAST_REQUEST",[0.0]):
+                        with self.assertRaisesRegex(ValueError,"HTTP 408"):
+                            market._get("/test",{})
+        self.assertEqual(getter.call_count,3)
+        delays=[call.args[0] for call in sleep.call_args_list]
+        self.assertIn(0.8,delays)
+        self.assertIn(1.6,delays)
+        self.assertNotIn(2.4,delays)
+
     def test_persistent_503_fails_after_three_attempts(self):
         busy = Mock(status_code=503, headers={})
         busy.raise_for_status.side_effect = RuntimeError("HTTP 503")
@@ -170,7 +196,7 @@ class ActiveBitgetRetryTests(unittest.TestCase):
 
 class ActiveBitgetTimestampTests(unittest.TestCase):
     def test_invalid_exchange_timestamp_rejected_before_pagination(self):
-        for stamp in ("NaN", "Infinity", "-1", "900000.5", None):
+        for stamp in ("NaN", "Infinity", "-1", "900000.5", None, True, False):
             with self.subTest(timestamp=stamp):
                 page = [[stamp, "100", "102", "98", "100", "10"]]
                 with patch.object(market, "_get", return_value=page) as getter:
