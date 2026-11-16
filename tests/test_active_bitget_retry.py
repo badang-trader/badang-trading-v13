@@ -177,6 +177,24 @@ class ActiveBitgetRetryTests(unittest.TestCase):
         self.assertEqual(snapshot["funding_rate"],-0.0002)
         self.assertFalse(snapshot["eligible_for_alert"])
 
+    def test_derivative_snapshot_supports_direct_oi_list_response(self):
+        with patch.object(market,"_get",
+                          side_effect=[[{"openInterest":"321.25"}],
+                                       {"fundingRate":"0.0003"}]) as getter:
+            snapshot=market.bitget_derivatives_snapshot("BTCUSDT",[])
+        self.assertEqual(getter.call_count,2)
+        self.assertEqual(snapshot["oi_contracts"],321.25)
+        self.assertEqual(snapshot["funding_rate"],0.0003)
+        self.assertNotIn("oi",snapshot["errors"])
+        self.assertFalse(snapshot["eligible_for_alert"])
+
+    def test_derivative_snapshot_empty_list_is_not_a_zero_oi(self):
+        with patch.object(market,"_get",side_effect=[[],[]]):
+            snapshot=market.bitget_derivatives_snapshot("BTCUSDT",[])
+        self.assertIsNone(snapshot["oi_contracts"])
+        self.assertIsNone(snapshot["funding_rate"])
+        self.assertFalse(snapshot["eligible_for_alert"])
+
     def test_candle_endpoints_reject_object_data(self):
         for path in ("/api/v2/mix/market/candles",
                      "/api/v2/mix/market/history-candles"):
