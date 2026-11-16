@@ -269,6 +269,18 @@ def fastest_candles(symbol,timeframe,exchanges=None):
                 raise ValueError('Bitget 잘못된 OHLCV 값 감지')
             rows.append([str(t),str(o),str(h),str(l),str(c),str(v)])
         except (TypeError,ValueError,OverflowError) as exc:
+            # Keep timestamp failures distinct from price/volume failures.
+            # Ingest normally catches these first; this is a defensive gate.
+            if isinstance(r[0],bool):
+                raise ValueError('Bitget 잘못된 캔들 시각 감지') from exc
+            try:
+                parsed_stamp=float(r[0])
+                valid_stamp=(math.isfinite(parsed_stamp) and parsed_stamp>=0
+                             and parsed_stamp.is_integer())
+            except (TypeError,ValueError,OverflowError):
+                valid_stamp=False
+            if not valid_stamp:
+                raise ValueError('Bitget 잘못된 캔들 시각 감지') from exc
             raise ValueError('Bitget 잘못된 OHLCV 값 감지') from exc
     rows.sort(key=lambda x:int(x[0]))
     # Reject exchange timestamps beyond the current candle's opening slot.
