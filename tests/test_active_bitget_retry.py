@@ -408,6 +408,10 @@ class ActiveBitgetContinuityTests(unittest.TestCase):
             with patch.object(market.time, "time", return_value=(self.BASE+230*self.STEP)/1000):
                 result = market.fastest_candles("BTCUSDT", "15m", exchanges=["bitget"])
         self.assertEqual(getter.call_count, 2)
+        self.assertTrue(getter.call_args_list[1].args[0].endswith("/history-candles"))
+        params=getter.call_args_list[1].args[1]
+        self.assertEqual(int(params["startTime"]),self.BASE+218*self.STEP)
+        self.assertEqual(int(params["endTime"]),self.BASE+222*self.STEP)
         self.assertEqual(len(result["candles"][:-1]), 220)
         self.assertIn(str((self.BASE+220*self.STEP)), [r[0] for r in result["candles"][:-1]])
 
