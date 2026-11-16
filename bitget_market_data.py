@@ -154,6 +154,8 @@ def fastest_candles(symbol,timeframe,exchanges=None):
             # Reject malformed price/volume data before requesting history.
             # Otherwise an unusable first page may cause needless pagination.
             try:
+                if any(isinstance(z,bool) for z in item[1:6]):
+                    raise ValueError('boolean OHLCV')
                 o,h,l,close,volume=(float(z) for z in item[1:6])
                 if (not all(math.isfinite(z) for z in (o,h,l,close,volume))
                         or min(o,h,l,close)<=0 or volume<0
@@ -259,6 +261,8 @@ def fastest_candles(symbol,timeframe,exchanges=None):
             if not math.isfinite(raw_t) or raw_t < 0 or not raw_t.is_integer():
                 raise ValueError('Bitget 잘못된 캔들 시각 감지')
             t=int(raw_t); t=t*1000 if t<100000000000 else t
+            if any(isinstance(z,bool) for z in r[1:6]):
+                raise ValueError('Bitget 잘못된 OHLCV 값 감지')
             o,h,l,c,v=map(float,r[1:6])
             if not (all(math.isfinite(z) for z in (o,h,l,c,v)) and min(o,h,l,c)>0
                     and h>=max(o,l,c) and l<=min(o,c) and v>=0):
