@@ -390,6 +390,29 @@ class ActiveBitgetContinuityTests(unittest.TestCase):
         return [[str((self.BASE+i*self.STEP)), "100", "102", "98", "100", "10"]
                 for i in range(10, 230)]
 
+    def test_boolean_ohlcv_rejected_before_history_requests(self):
+        for field in range(1,6):
+            with self.subTest(field=field):
+                rows=self.rows()
+                rows[-1][field]=True
+                with patch.object(market,"_get",return_value=rows) as getter:
+                    with patch.object(market.time,"time",
+                                      return_value=(self.BASE+230*self.STEP)/1000):
+                        with self.assertRaisesRegex(ValueError,"OHLCV"):
+                            market.fastest_candles("BTCUSDT","15m",exchanges=["bitget"])
+                self.assertEqual(getter.call_count,1)
+
+    def test_boolean_ohlcv_in_gap_repair_is_rejected(self):
+        rows=[r for r in self.rows()
+              if int(r[0])!=self.BASE+220*self.STEP]
+        invalid=[str(self.BASE+220*self.STEP),"100","102","98",False,"10"]
+        with patch.object(market,"_get",side_effect=[rows,[invalid]]) as getter:
+            with patch.object(market.time,"time",
+                              return_value=(self.BASE+230*self.STEP)/1000):
+                with self.assertRaisesRegex(ValueError,"OHLCV"):
+                    market.fastest_candles("BTCUSDT","15m",exchanges=["bitget"])
+        self.assertEqual(getter.call_count,2)
+
     def test_future_bitget_bar_cannot_reach_closed_candle_analysis(self):
         rows = self.rows() + [[str((self.BASE+232*self.STEP)), "100", "102", "98", "100", "10"]]
         with patch.object(market, "_get", return_value=rows):
