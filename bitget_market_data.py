@@ -341,6 +341,8 @@ def bitget_derivatives_snapshot(symbol,candles):
                 oi=rows.get('openInterestList')
             if isinstance(oi,list): oi=oi[0].get('size') if oi and isinstance(oi[0],dict) else None
             if oi is not None:
+                if isinstance(oi,bool):
+                    raise ValueError('Invalid Bitget open interest')
                 value=float(oi)
                 if not math.isfinite(value) or value < 0:
                     raise ValueError('Invalid Bitget open interest')
@@ -351,6 +353,8 @@ def bitget_derivatives_snapshot(symbol,candles):
                   {'symbol':symbol,'productType':'USDT-FUTURES'})
         if isinstance(rows,list): rows=rows[0] if rows else {}
         if isinstance(rows,dict) and rows.get('fundingRate') is not None:
+            if isinstance(rows['fundingRate'],bool):
+                raise ValueError('Invalid Bitget funding rate')
             value=float(rows['fundingRate'])
             if not math.isfinite(value):
                 raise ValueError('Invalid Bitget funding rate')
