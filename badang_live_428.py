@@ -50,6 +50,8 @@ def snapshot(symbol,frames=('5m','15m','30m','1H')):
             raw=get('/api/v2/mix/market/candles',{'symbol':symbol,'productType':'USDT-FUTURES','granularity':'1Dutc' if tf=='1D' else tf,'limit':'3'})
             if not isinstance(raw,list) or not raw:raise ValueError('No candles')
             parsed=sorted((normalize_candle(r,tf,now) for r in raw),key=lambda r:r['start_ms'])
+            if len({r['start_ms'] for r in parsed}) != len(parsed):
+                raise ValueError('Duplicate candle timestamp')
             # Do not pretend that the newest returned candle is forming.
             out['candles'][tf]={'current':parsed[-1],'last_confirmed':next((r for r in reversed(parsed) if not r['forming']),None)}
         except Exception as exc:out['errors'][tf]=str(exc)[:120]
