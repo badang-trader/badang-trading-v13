@@ -33,15 +33,7 @@ jobs:
           if [[ -f validation-results/unittest.log ]]; then
             {
               echo '### BADANG validation'
-              grep -E '^Ran [0-9]+ tests? in |^FAILED |^OK
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: badang-validation-logs
-          path: validation-results/
-          if-no-files-found: warn
-          retention-days: 14
- validation-results/unittest.log | tail -n 3 || true
+              grep -E '^Ran [0-9]+ tests? in |^FAILED |^OK$' validation-results/unittest.log | tail -n 3 || true
               echo ''
               echo 'See the validation log artifact for individual failures.'
             } >> "$GITHUB_STEP_SUMMARY"
