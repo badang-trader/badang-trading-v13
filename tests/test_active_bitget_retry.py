@@ -115,8 +115,34 @@ class ActiveBitgetRetryTests(unittest.TestCase):
                     with patch.object(market.time,"monotonic",return_value=100.0):
                         with patch.object(market,"_LAST_REQUEST",[0.0]):
                             with self.assertRaisesRegex(ValueError,"응답 데이터"):
-                                market._get("/test",{})
+                                market._get("/api/v2/mix/market/candles",{})
                 self.assertEqual(getter.call_count,1)
+
+    def test_derivative_endpoints_accept_valid_object_data(self):
+        for path,data in (
+            ("/api/v2/mix/market/open-interest",{"openInterest":"123.5"}),
+            ("/api/v2/mix/market/current-fund-rate",{"fundingRate":"0.0001"}),
+        ):
+            with self.subTest(path=path):
+                ok=Mock(status_code=200,headers={})
+                ok.json.return_value={"code":"00000","data":data}
+                with patch.object(market.SESSION,"get",return_value=ok) as getter:
+                    with patch.object(market.time,"monotonic",return_value=100.0):
+                        with patch.object(market,"_LAST_REQUEST",[0.0]):
+                            self.assertEqual(market._get(path,{}),data)
+                self.assertEqual(getter.call_count,1)
+
+    def test_candle_endpoints_reject_object_data(self):
+        for path in ("/api/v2/mix/market/candles",
+                     "/api/v2/mix/market/history-candles"):
+            with self.subTest(path=path):
+                ok=Mock(status_code=200,headers={})
+                ok.json.return_value={"code":"00000","data":{"bad":"shape"}}
+                with patch.object(market.SESSION,"get",return_value=ok):
+                    with patch.object(market.time,"monotonic",return_value=100.0):
+                        with patch.object(market,"_LAST_REQUEST",[0.0]):
+                            with self.assertRaisesRegex(ValueError,"캔들 배열"):
+                                market._get(path,{})
 
     def test_transport_timeout_recovers_without_stale_fallback(self):
         timeout=market.requests.exceptions.Timeout("socket timed out")
