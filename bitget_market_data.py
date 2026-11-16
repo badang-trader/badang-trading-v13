@@ -71,8 +71,18 @@ def _get(path, params):
             data=j.get('data')
             if data is None:
                 raise ValueError('Bitget API 응답 데이터 누락')
-            if not isinstance(data,list):
-                raise ValueError('Bitget API 응답 데이터 구조 오류: 캔들 배열 필요')
+            # Candle endpoints return arrays, while Bitget open-interest and
+            # funding endpoints can legitimately return objects.
+            if path in ('/api/v2/mix/market/candles',
+                        '/api/v2/mix/market/history-candles'):
+                if not isinstance(data,list):
+                    raise ValueError('Bitget API 응답 데이터 구조 오류: 캔들 배열 필요')
+            elif path in ('/api/v2/mix/market/open-interest',
+                          '/api/v2/mix/market/current-fund-rate'):
+                if not isinstance(data,(list,dict)):
+                    raise ValueError('Bitget API 응답 데이터 구조 오류')
+            elif not isinstance(data,(list,dict)):
+                raise ValueError('Bitget API 응답 데이터 구조 오류')
             return data
         if str(j.get('code')) in ('429','40015','40017'):
             if attempt==2:
