@@ -335,6 +335,8 @@ def bitget_derivatives_snapshot(symbol,candles):
     try:
         rows=_get('/api/v2/mix/market/open-interest',
                   {'symbol':symbol,'productType':'USDT-FUTURES'})
+        if isinstance(rows,list):
+            rows=rows[0] if rows else {}
         if isinstance(rows,dict):
             oi=rows.get('openInterest')
             if oi is None:
