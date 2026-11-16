@@ -40,6 +40,20 @@ class Live428SafetyTests(unittest.TestCase):
         self.assertNotIn("1H", result["candles"])
         self.assertIn("Duplicate candle timestamp", result["errors"]["1H"])
 
+    def test_snapshot_rejects_stale_candles(self):
+        ticker = [{"lastPr": "100", "bidPr": "99", "askPr": "101"}]
+        stale = [[1_800_000_000_000, "100", "102", "99", "101", "5"]]
+        def fake_get(path, params):
+            if path.endswith("/ticker"):
+                return ticker
+            if path.endswith("/candles"):
+                return stale
+            return []
+        with patch.object(live.time, "time", return_value=1_800_010_800), patch.object(live, "get", side_effect=fake_get):
+            result = live.snapshot("BTCUSDT", frames=("1H",))
+        self.assertNotIn("1H", result["candles"])
+        self.assertIn("Stale candle data", result["errors"]["1H"])
+
     def test_snapshot_rejects_future_candle_without_fabricating_confirmation(self):
         ticker = [{"lastPr": "100", "bidPr": "99", "askPr": "101"}]
         future = [[1_800_000_060_000, "100", "102", "99", "101", "5"]]
