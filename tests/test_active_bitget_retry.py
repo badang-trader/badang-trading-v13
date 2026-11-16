@@ -266,13 +266,10 @@ class ActiveBitgetContinuityTests(unittest.TestCase):
             with patch.object(market.time,"time",
                               return_value=(self.BASE+230*self.STEP)/1000):
                 result=market.fastest_candles("BTCUSDT","15m",exchanges=["bitget"])
-        self.assertEqual(getter.call_count,2)
-        # The adapter seeks up to its 230-bar target; the second response
-        # repeats the same mocked page and must not duplicate closed bars.
+        # Exactly 205 confirmed candles are sufficient: avoid unnecessary
+        # pagination that increases Bitget rate-limit exposure.
+        self.assertEqual(getter.call_count,1)
         self.assertTrue(getter.call_args_list[0].args[0].endswith("/candles"))
-        self.assertTrue(getter.call_args_list[1].args[0].endswith("/history-candles"))
-        self.assertEqual(int(getter.call_args_list[1].args[1]["endTime"]),
-                         int(rows[0][0]))
         self.assertEqual(len(result["candles"][:-1]),205)
         self.assertEqual(int(result["candles"][-1][0]),self.BASE+230*self.STEP)
 
@@ -283,13 +280,10 @@ class ActiveBitgetContinuityTests(unittest.TestCase):
             with patch.object(market.time,"time",
                               return_value=(self.BASE+230*self.STEP)/1000):
                 result=market.fastest_candles("BTCUSDT","15m",exchanges=["bitget"])
-        self.assertEqual(getter.call_count,2)
-        # The adapter seeks up to its 230-bar target; the second response
-        # repeats the same mocked page and must not duplicate closed bars.
+        # Exactly 205 confirmed candles are sufficient: avoid unnecessary
+        # pagination that increases Bitget rate-limit exposure.
+        self.assertEqual(getter.call_count,1)
         self.assertTrue(getter.call_args_list[0].args[0].endswith("/candles"))
-        self.assertTrue(getter.call_args_list[1].args[0].endswith("/history-candles"))
-        self.assertEqual(int(getter.call_args_list[1].args[1]["endTime"]),
-                         int(rows[0][0]))
         self.assertEqual(len(result["candles"][:-1]),205)
         self.assertEqual(result["candles"][-1][4],"101.0")
         self.assertEqual(result["candles"][-2][4],"100.0")
