@@ -155,6 +155,28 @@ class ActiveBitgetRetryTests(unittest.TestCase):
         self.assertEqual(snapshot["errors"]["funding"],"ValueError")
         self.assertFalse(snapshot["eligible_for_alert"])
 
+    def test_derivative_snapshot_rejects_boolean_metrics(self):
+        for bad in (True,False):
+            with self.subTest(value=bad):
+                with patch.object(market,"_get",
+                                  side_effect=[{"openInterest":bad},
+                                               {"fundingRate":bad}]):
+                    snapshot=market.bitget_derivatives_snapshot("BTCUSDT",[])
+                self.assertIsNone(snapshot["oi_contracts"])
+                self.assertIsNone(snapshot["funding_rate"])
+                self.assertEqual(snapshot["errors"]["oi"],"ValueError")
+                self.assertEqual(snapshot["errors"]["funding"],"ValueError")
+                self.assertFalse(snapshot["eligible_for_alert"])
+
+    def test_derivative_snapshot_supports_oi_list_payload(self):
+        with patch.object(market,"_get",
+                          side_effect=[{"openInterestList":[{"size":"250.75"}]},
+                                       [{"fundingRate":"-0.0002"}]]):
+            snapshot=market.bitget_derivatives_snapshot("BTCUSDT",[])
+        self.assertEqual(snapshot["oi_contracts"],250.75)
+        self.assertEqual(snapshot["funding_rate"],-0.0002)
+        self.assertFalse(snapshot["eligible_for_alert"])
+
     def test_candle_endpoints_reject_object_data(self):
         for path in ("/api/v2/mix/market/candles",
                      "/api/v2/mix/market/history-candles"):
