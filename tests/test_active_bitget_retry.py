@@ -106,6 +106,32 @@ class ActiveBitgetRetryTests(unittest.TestCase):
         self.assertEqual(getter.call_count, 2)
         self.assertIn(0.8, [call.args[0] for call in sleep.call_args_list])
 
+    def test_transport_timeout_recovers_without_stale_fallback(self):
+        timeout=market.requests.exceptions.Timeout("socket timed out")
+        ok=Mock(status_code=200,headers={})
+        ok.json.return_value={"code":"00000","data":["fresh"]}
+        with patch.object(market.SESSION,"get",side_effect=[timeout,ok]) as getter:
+            with patch.object(market.time,"sleep") as sleep:
+                with patch.object(market.time,"monotonic",return_value=100.0):
+                    with patch.object(market,"_LAST_REQUEST",[0.0]):
+                        self.assertEqual(market._get("/test",{}),["fresh"])
+        self.assertEqual(getter.call_count,2)
+        self.assertIn(0.8,[call.args[0] for call in sleep.call_args_list])
+
+    def test_transport_timeout_exhaustion_propagates_failure(self):
+        timeout=market.requests.exceptions.Timeout("socket timed out")
+        with patch.object(market.SESSION,"get",side_effect=timeout) as getter:
+            with patch.object(market.time,"sleep") as sleep:
+                with patch.object(market.time,"monotonic",return_value=100.0):
+                    with patch.object(market,"_LAST_REQUEST",[0.0]):
+                        with self.assertRaises(market.requests.exceptions.Timeout):
+                            market._get("/test",{})
+        self.assertEqual(getter.call_count,3)
+        delays=[call.args[0] for call in sleep.call_args_list]
+        self.assertIn(0.8,delays)
+        self.assertIn(1.6,delays)
+        self.assertNotIn(2.4,delays)
+
     def test_http_408_timeout_recovers_on_second_attempt(self):
         timeout=Mock(status_code=408,headers={})
         ok=Mock(status_code=200,headers={})
