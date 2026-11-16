@@ -317,6 +317,21 @@ class WaveSafetyTests(unittest.TestCase):
         self.assertEqual(result["status"],"HYPOTHESIS")
         self.assertIsNone(result["alternatives"][0]["last_pivot_confirmed_at"])
 
+    def test_boolean_values_cannot_masquerade_as_wave_numbers(self):
+        base=[{"price":100,"time":1,"confirmed_at":4},
+              {"price":110,"time":2,"confirmed_at":5},
+              {"price":105,"time":3,"confirmed_at":6}]
+        for field in ("price","time","confirmed_at"):
+            with self.subTest(field=field):
+                turns=[dict(t) for t in base]
+                turns[1][field]=True
+                self.assertEqual(impulse_state(turns,115,2)["status"],
+                                 "UNDETERMINED")
+        for current,atr,as_of in ((True,2,6),(115,True,6),(115,2,True)):
+            with self.subTest(current=current,atr=atr,as_of=as_of):
+                self.assertEqual(impulse_state(base,current,atr,as_of_open=as_of)["status"],
+                                 "UNDETERMINED")
+
     def test_insufficient_pivots_not_claimed_as_wave(self):
         wave = impulse_state([], 100, 1)
         self.assertEqual(wave["status"], "UNDETERMINED")
