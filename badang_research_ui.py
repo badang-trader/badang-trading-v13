@@ -39,7 +39,7 @@ def research_514():
             "confirmed_bars":len(bars),"last_closed_bar_open_ms":int(bars[-1][0]),
             "last_close":float(bars[-1][4]),"trend_20bar":trend,
             "analysis":{k:analysis.get(k) for k in selected},
-            "support":decision["observation_zones"],"volume_profile_poc":profile.get("poc"),
+            "support":decision["observation_zones"],"volume_profile_poc":(profile["poc"]["center"] if profile.get("status") == "ok" and profile.get("poc") else None),
             "volume_profile_method":profile.get("method"),"warnings":decision["warnings"]+
             ["Trend is trailing 20-bar regime, not forecast",
              "Wave candidates and divergence are unconfirmed, not guaranteed",
