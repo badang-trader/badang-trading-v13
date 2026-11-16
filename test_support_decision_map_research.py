@@ -55,5 +55,3 @@ class DecisionMapTests(unittest.TestCase):
         self.assertEqual(result['status'],'unconfirmed')
         self.assertEqual(result['observation_zones'],[])
 if __name__=='__main__':unittest.main()
-
-[executed on device: DESKTOP-P1HHLJC (f621e81e-b344-4287-b962-f72b21cec132)]
