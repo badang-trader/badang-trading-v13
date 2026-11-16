@@ -352,6 +352,20 @@ class ActiveBitgetContinuityTests(unittest.TestCase):
         self.assertEqual(result["candles"][-1][4],"101.0")
         self.assertEqual(result["candles"][-2][4],"100.0")
 
+    def test_exactly_205_closed_bars_with_one_gap_are_repaired(self):
+        # Total count alone is insufficient: all 205 bars must be consecutive.
+        full=self.rows()[-205:]
+        missing_ts=self.BASE+220*self.STEP
+        broken=[r for r in full if int(r[0])!=missing_ts]
+        replacement=[r for r in full if int(r[0])==missing_ts]
+        with patch.object(market,"_get",side_effect=[broken,[],replacement]) as getter:
+            with patch.object(market.time,"time",
+                              return_value=(self.BASE+230*self.STEP)/1000):
+                result=market.fastest_candles("BTCUSDT","15m",exchanges=["bitget"])
+        self.assertEqual(getter.call_count,3)
+        self.assertEqual(len(result["candles"][:-1]),205)
+        self.assertIn(str(missing_ts),[r[0] for r in result["candles"][:-1]])
+
     def test_204_closed_candles_fail_without_invented_history(self):
         rows=self.rows()[-204:]
         with patch.object(market,"_get",side_effect=[rows,[]]) as getter:
