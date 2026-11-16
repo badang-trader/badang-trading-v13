@@ -1,9 +1,12 @@
 """Bitget REST snapshots. Current forming candle is provisional; no fabricated CVD."""
 import math, re, time, requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 from datetime import datetime, timezone
 BASE='https://api.bitget.com'
 FRAMES={'5m':300000,'15m':900000,'30m':1800000,'1H':3600000,'4H':14400000,'1D':86400000}
 SESSION=requests.Session()
+SESSION.mount('https://', HTTPAdapter(max_retries=Retry(total=3, connect=2, read=2, status=3, backoff_factor=0.5, status_forcelist=(429, 500, 502, 503, 504), allowed_methods=frozenset({'GET'}), respect_retry_after_header=True)))
 
 def number(x):
     try:
@@ -19,6 +22,7 @@ def get(path,params):
 def normalize_candle(row,frame,now_ms):
     if not isinstance(row,(list,tuple)) or len(row)<6: raise ValueError('Invalid candle')
     ts=int(row[0]);ts=ts*1000 if ts<100000000000 else ts
+    if ts < 0 or ts > now_ms: raise ValueError('Future or invalid candle timestamp')
     o,h,l,c,v=[number(z) for z in row[1:6]]
     if any(z is None for z in (o,h,l,c,v)) or min(o,h,l,c)<=0 or v<0 or h<max(o,c,l) or l>min(o,c): raise ValueError('Invalid OHLCV')
     return {'start_ms':ts,'open':o,'high':h,'low':l,'close':c,'volume':v,'forming':ts+FRAMES[frame]>now_ms,'age_seconds':max(0,(now_ms-ts)//1000)}
