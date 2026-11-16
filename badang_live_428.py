@@ -52,6 +52,9 @@ def snapshot(symbol,frames=('5m','15m','30m','1H')):
             parsed=sorted((normalize_candle(r,tf,now) for r in raw),key=lambda r:r['start_ms'])
             if len({r['start_ms'] for r in parsed}) != len(parsed):
                 raise ValueError('Duplicate candle timestamp')
+            # Reject stale market snapshots instead of presenting old prices as current.
+            if now - parsed[-1]['start_ms'] > 2 * FRAMES[tf]:
+                raise ValueError('Stale candle data')
             # Do not pretend that the newest returned candle is forming.
             out['candles'][tf]={'current':parsed[-1],'last_confirmed':next((r for r in reversed(parsed) if not r['forming']),None)}
         except Exception as exc:out['errors'][tf]=str(exc)[:120]
