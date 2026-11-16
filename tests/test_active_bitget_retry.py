@@ -266,7 +266,12 @@ class ActiveBitgetContinuityTests(unittest.TestCase):
             with patch.object(market.time,"time",
                               return_value=(self.BASE+230*self.STEP)/1000):
                 result=market.fastest_candles("BTCUSDT","15m",exchanges=["bitget"])
-        self.assertEqual(getter.call_count,1)
+        self.assertEqual(getter.call_count,2)
+        # The adapter seeks up to its 230-bar target; the second response
+        # repeats the same mocked page and must not duplicate closed bars.
+        first_cursor = int(getter.call_args_list[0].args[1]["endTime"])
+        second_cursor = int(getter.call_args_list[1].args[1]["endTime"])
+        self.assertLess(second_cursor, first_cursor)
         self.assertEqual(len(result["candles"][:-1]),205)
         self.assertEqual(int(result["candles"][-1][0]),self.BASE+230*self.STEP)
 
@@ -277,7 +282,12 @@ class ActiveBitgetContinuityTests(unittest.TestCase):
             with patch.object(market.time,"time",
                               return_value=(self.BASE+230*self.STEP)/1000):
                 result=market.fastest_candles("BTCUSDT","15m",exchanges=["bitget"])
-        self.assertEqual(getter.call_count,1)
+        self.assertEqual(getter.call_count,2)
+        # The adapter seeks up to its 230-bar target; the second response
+        # repeats the same mocked page and must not duplicate closed bars.
+        first_cursor = int(getter.call_args_list[0].args[1]["endTime"])
+        second_cursor = int(getter.call_args_list[1].args[1]["endTime"])
+        self.assertLess(second_cursor, first_cursor)
         self.assertEqual(len(result["candles"][:-1]),205)
         self.assertEqual(result["candles"][-1][4],"101.0")
         self.assertEqual(result["candles"][-2][4],"100.0")
