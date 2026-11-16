@@ -7,7 +7,7 @@ import math
 
 def net_round_trip(entry,exit_price,direction,fee_per_side=0.0006,slippage_per_side=0.0005):
     values=(entry,exit_price,fee_per_side,slippage_per_side)
-    if any(not isinstance(x,(int,float)) or not math.isfinite(x) for x in values):
+    if any(isinstance(x,bool) or not isinstance(x,(int,float)) or not math.isfinite(x) for x in values):
         raise ValueError("Nonfinite price or cost")
     if entry<=0 or exit_price<=0 or not (0<=fee_per_side<1) or not (0<=slippage_per_side<1):
         raise ValueError("Invalid price or cost")
