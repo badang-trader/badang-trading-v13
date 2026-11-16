@@ -28,6 +28,13 @@ class CostModelTests(unittest.TestCase):
         # A positive subnormal input can round to zero after adverse slippage.
         with self.assertRaisesRegex(ValueError, "Unrepresentable executed price"):
             calc(5e-324, 100, "short", 0, 0.9)
+    def test_huge_integer_inputs_fail_closed(self):
+        # int-to-float conversion must not leak OverflowError to research runners.
+        for args in ((10**400,100,0,0),(100,10**400,0,0),
+                     (100,101,10**400,0),(100,101,0,10**400)):
+            with self.subTest(field=args.index(10**400)):
+                with self.assertRaisesRegex(ValueError, "Nonfinite price or cost"):
+                    calc(args[0],args[1],"long",args[2],args[3])
     def test_invalid_inputs_fail_closed(self):
         for entry,exit_price,fee,slip in ((0,100,0,0),(100,float("nan"),0,0),
                                           (100,101,-0.1,0),(100,101,0,1)):
