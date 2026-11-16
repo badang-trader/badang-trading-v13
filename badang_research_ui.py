@@ -1,3 +1,5 @@
+[Reading 101 lines from start (total: 101 lines, 0 remaining)]
+
 """BADANG read-only research screen; separate validation WSGI entrypoint."""
 from flask import jsonify, request, render_template_string
 from app import app
@@ -79,3 +81,23 @@ out.innerHTML='<section><h2>'+esc(d.symbol)+' / '+esc(d.frame)+'</h2><p>마지�
 @app.get("/research")
 def research_page():
     return render_template_string(PAGE)
+
+# First-stage integration: preserve the original BADANG scanner and append
+# the validated research panel, rather than replacing the existing UI.
+_original_home = app.view_functions["home"]
+def integrated_home():
+    response = _original_home()
+    html = response.get_data(as_text=True) if hasattr(response, "get_data") else str(response)
+    panel = """<section id="badang514" style="max-width:1050px;margin:22px auto;padding:18px;background:#182c40;color:#f0f5ff;border:1px solid #52677d;border-radius:12px;font-family:system-ui">
+    <details><summary style="cursor:pointer;font-size:19px;font-weight:700">BADANG 5.14 검증 분석 · 지지구간 / 파동 / 매물대 (열기)</summary>
+    <p>기존 스캐너를 유지하면서 BTC·ETH 확정봉 연구를 추가했습니다. 자동주문 기능은 없습니다.</p>
+    <iframe title="BADANG 5.14 검증 분석" src="/research" loading="lazy" style="width:100%;height:1250px;border:0;background:#101b2c;border-radius:8px"></iframe>
+    </details></section>"""
+    marker = "</body>"
+    if marker in html.lower():
+        idx = html.lower().rfind(marker)
+        html = html[:idx] + panel + html[idx:]
+    else:
+        html += panel
+    return html
+app.view_functions["home"] = integrated_home
