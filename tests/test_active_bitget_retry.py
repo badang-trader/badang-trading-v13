@@ -366,6 +366,21 @@ class ActiveBitgetContinuityTests(unittest.TestCase):
         self.assertEqual(len(result["candles"][:-1]),205)
         self.assertIn(str(missing_ts),[r[0] for r in result["candles"][:-1]])
 
+    def test_205_count_with_recent_gap_cannot_pass_without_repair(self):
+        # 205 total closed bars is not equivalent to 205 contiguous bars.
+        full=self.rows()[-206:]
+        missing_ts=self.BASE+220*self.STEP
+        broken=[r for r in full if int(r[0])!=missing_ts]
+        self.assertEqual(len(broken),205)
+        with patch.object(market,"_get",side_effect=[broken,[]]) as getter:
+            with patch.object(market.time,"time",
+                              return_value=(self.BASE+230*self.STEP)/1000):
+                with self.assertRaisesRegex(ValueError,"연속 확정봉 부족"):
+                    market.fastest_candles("BTCUSDT","15m",exchanges=["bitget"])
+        self.assertEqual(getter.call_count,2)
+        self.assertTrue(getter.call_args_list[1].args[0].endswith("/history-candles"))
+        self.assertIn("startTime",getter.call_args_list[1].args[1])
+
     def test_204_closed_candles_fail_without_invented_history(self):
         rows=self.rows()[-204:]
         with patch.object(market,"_get",side_effect=[rows,[]]) as getter:
