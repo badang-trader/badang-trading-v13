@@ -259,6 +259,26 @@ class ActiveBitgetContinuityTests(unittest.TestCase):
         self.assertEqual(len(result["candles"][:-1]), 220)
         self.assertEqual(int(result["candles"][-1][0]), (self.BASE+230*self.STEP))
 
+    def test_exactly_205_closed_candles_are_accepted(self):
+        # The engine's minimum must be inclusive; no interpolation is allowed.
+        rows=self.rows()[-205:]
+        with patch.object(market,"_get",return_value=rows) as getter:
+            with patch.object(market.time,"time",
+                              return_value=(self.BASE+230*self.STEP)/1000):
+                result=market.fastest_candles("BTCUSDT","15m",exchanges=["bitget"])
+        self.assertEqual(getter.call_count,1)
+        self.assertEqual(len(result["candles"][:-1]),205)
+        self.assertEqual(int(result["candles"][-1][0]),self.BASE+230*self.STEP)
+
+    def test_204_closed_candles_fail_without_invented_history(self):
+        rows=self.rows()[-204:]
+        with patch.object(market,"_get",side_effect=[rows,[]]) as getter:
+            with patch.object(market.time,"time",
+                              return_value=(self.BASE+230*self.STEP)/1000):
+                with self.assertRaisesRegex(ValueError,"연속 확정봉 부족"):
+                    market.fastest_candles("BTCUSDT","15m",exchanges=["bitget"])
+        self.assertEqual(getter.call_count,2)
+
     def test_missing_recent_bar_cannot_be_fabricated(self):
         rows = [r for r in self.rows() if int(r[0]) != (self.BASE+220*self.STEP)]
         with patch.object(market, "_get", side_effect=[rows, [], []]) as getter:
