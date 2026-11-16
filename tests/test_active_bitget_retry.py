@@ -416,6 +416,29 @@ class ActiveBitgetContinuityTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "OHLCV"):
                     market.fastest_candles("BTCUSDT", "15m", exchanges=["bitget"])
 
+    def test_gap_repair_invalid_timestamp_is_rejected(self):
+        rows=[r for r in self.rows()
+              if int(r[0])!=(self.BASE+220*self.STEP)]
+        invalid=[[True,"100","102","98","100","10"]]
+        with patch.object(market,"_get",side_effect=[rows,invalid]) as getter:
+            with patch.object(market.time,"time",
+                              return_value=(self.BASE+230*self.STEP)/1000):
+                with self.assertRaisesRegex(ValueError,"캔들 시각"):
+                    market.fastest_candles("BTCUSDT","15m",exchanges=["bitget"])
+        self.assertEqual(getter.call_count,2)
+
+    def test_gap_repair_conflicting_duplicate_is_rejected(self):
+        rows=[r for r in self.rows()
+              if int(r[0])!=(self.BASE+220*self.STEP)]
+        conflicting=list(rows[-1])
+        conflicting[4]="101"
+        with patch.object(market,"_get",side_effect=[rows,[conflicting]]) as getter:
+            with patch.object(market.time,"time",
+                              return_value=(self.BASE+230*self.STEP)/1000):
+                with self.assertRaisesRegex(ValueError,"Conflicting"):
+                    market.fastest_candles("BTCUSDT","15m",exchanges=["bitget"])
+        self.assertEqual(getter.call_count,2)
+
     def test_gap_repair_rate_limit_error_is_not_hidden(self):
         rows=[r for r in self.rows()
               if int(r[0])!=(self.BASE+220*self.STEP)]
