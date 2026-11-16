@@ -270,6 +270,18 @@ class ActiveBitgetContinuityTests(unittest.TestCase):
         self.assertEqual(len(result["candles"][:-1]),205)
         self.assertEqual(int(result["candles"][-1][0]),self.BASE+230*self.STEP)
 
+    def test_205_closed_plus_live_candle_excludes_live_data(self):
+        rows=self.rows()[-205:]
+        forming=[str(self.BASE+230*self.STEP),"100","102","98","101","11"]
+        with patch.object(market,"_get",return_value=rows+[forming]) as getter:
+            with patch.object(market.time,"time",
+                              return_value=(self.BASE+230*self.STEP)/1000):
+                result=market.fastest_candles("BTCUSDT","15m",exchanges=["bitget"])
+        self.assertEqual(getter.call_count,1)
+        self.assertEqual(len(result["candles"][:-1]),205)
+        self.assertEqual(result["candles"][-1][4],"101.0")
+        self.assertEqual(result["candles"][-2][4],"100.0")
+
     def test_204_closed_candles_fail_without_invented_history(self):
         rows=self.rows()[-204:]
         with patch.object(market,"_get",side_effect=[rows,[]]) as getter:
