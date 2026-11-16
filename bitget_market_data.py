@@ -341,7 +341,12 @@ def bitget_derivatives_snapshot(symbol,candles):
             oi=rows.get('openInterest')
             if oi is None:
                 oi=rows.get('openInterestList')
-            if isinstance(oi,list): oi=oi[0].get('size') if oi and isinstance(oi[0],dict) else None
+            if isinstance(oi,list):
+                oi=oi[0].get('size') if oi and isinstance(oi[0],dict) else None
+            if oi is None:
+                # Some Bitget OI payloads use size directly, including
+                # entries returned inside the open-interest list.
+                oi=rows.get('size')
             if oi is not None:
                 if isinstance(oi,bool):
                     raise ValueError('Invalid Bitget open interest')
