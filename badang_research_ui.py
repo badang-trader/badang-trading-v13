@@ -79,5 +79,3 @@ out.innerHTML='<section><h2>'+esc(d.symbol)+' / '+esc(d.frame)+'</h2><p>마지�
 @app.get("/research")
 def research_page():
     return render_template_string(PAGE)
-
-[executed on device: DESKTOP-P1HHLJC (f621e81e-b344-4287-b962-f72b21cec132)]
