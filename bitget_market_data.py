@@ -243,6 +243,8 @@ def fastest_candles(symbol,timeframe,exchanges=None):
         if not isinstance(r,(list,tuple)) or len(r)<6:
             raise ValueError('Bitget 잘못된 캔들 구조 감지')
         try:
+            if isinstance(r[0], bool):
+                raise ValueError('Bitget 잘못된 캔들 시각 감지')
             raw_t=float(r[0])
             if not math.isfinite(raw_t) or raw_t < 0 or not raw_t.is_integer():
                 raise ValueError('Bitget 잘못된 캔들 시각 감지')
