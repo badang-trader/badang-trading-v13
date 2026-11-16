@@ -416,6 +416,28 @@ class ActiveBitgetContinuityTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "OHLCV"):
                     market.fastest_candles("BTCUSDT", "15m", exchanges=["bitget"])
 
+    def test_gap_repair_rate_limit_error_is_not_hidden(self):
+        rows=[r for r in self.rows()
+              if int(r[0])!=(self.BASE+220*self.STEP)]
+        with patch.object(market,"_get",
+                          side_effect=[rows,ValueError("Bitget 요청 제한(HTTP 429)")]) as getter:
+            with patch.object(market.time,"time",
+                              return_value=(self.BASE+230*self.STEP)/1000):
+                with self.assertRaisesRegex(ValueError,"HTTP 429"):
+                    market.fastest_candles("BTCUSDT","15m",exchanges=["bitget"])
+        self.assertEqual(getter.call_count,2)
+
+    def test_gap_repair_transport_failure_cannot_fabricate_candle(self):
+        rows=[r for r in self.rows()
+              if int(r[0])!=(self.BASE+220*self.STEP)]
+        timeout=market.requests.exceptions.Timeout("network unavailable")
+        with patch.object(market,"_get",side_effect=[rows,timeout]) as getter:
+            with patch.object(market.time,"time",
+                              return_value=(self.BASE+230*self.STEP)/1000):
+                with self.assertRaisesRegex(ValueError,"연속 확정봉 부족"):
+                    market.fastest_candles("BTCUSDT","15m",exchanges=["bitget"])
+        self.assertEqual(getter.call_count,2)
+
     def test_non_list_gap_repair_response_is_rejected(self):
         rows = [r for r in self.rows() if int(r[0]) != (self.BASE+220*self.STEP)]
         with patch.object(market, "_get", side_effect=[rows, {"bad": "shape"}]):
