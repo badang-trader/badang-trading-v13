@@ -93,10 +93,13 @@ def impulse_state(turns, current, atr, as_of_open=None):
               'alternatives':[],'note':'파동 입력값 또는 변동성 검증 불가'}
     current_value=_f(current)
     atr_value=_f(atr)
+    if isinstance(current,bool) or isinstance(atr,bool):
+        return fallback
     if (not isinstance(turns,(list,tuple)) or current_value is None
             or current_value<=0 or atr_value is None or atr_value<=0):
         return fallback
-    if any(not isinstance(t,dict) or _f(t.get('price')) is None
+    if any(not isinstance(t,dict) or isinstance(t.get('price'),bool)
+           or isinstance(t.get('time'),bool) or _f(t.get('price')) is None
            or _f(t.get('price'))<=0 or _f(t.get('time')) is None
            for t in turns):
         return fallback
@@ -119,12 +122,16 @@ def impulse_state(turns, current, atr, as_of_open=None):
                for i in range(1,len(turns))):
             return fallback
     for t in turns:
+        if isinstance(t.get('confirmed_at'),bool):
+            return fallback
         if t.get('confirmed_at') is not None:
             confirmed=_f(t['confirmed_at'])
             if (confirmed is None or not confirmed.is_integer()
                     or confirmed<_f(t['time'])):
                 return fallback
     if as_of_open is not None:
+        if isinstance(as_of_open,bool):
+            return fallback
         as_of=_f(as_of_open)
         if as_of is None or not as_of.is_integer() or as_of<0:
             return fallback
