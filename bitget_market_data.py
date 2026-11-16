@@ -53,7 +53,7 @@ def _get(path, params):
                 delay=0.8*(attempt+1)
             time.sleep(delay)
             continue
-        if r.status_code in (500, 502, 503, 504):
+        if r.status_code in (408, 500, 502, 503, 504):
             if attempt == 2:
                 r.raise_for_status()
                 raise ValueError('Bitget 서버 오류(HTTP '+str(r.status_code)+'): 재시도 3회 실패')
@@ -123,6 +123,8 @@ def fastest_candles(symbol,timeframe,exchanges=None):
             if not isinstance(item,(list,tuple)) or len(item)<6:
                 raise ValueError('Bitget 잘못된 캔들 구조 감지')
             try:
+                if isinstance(item[0], bool):
+                    raise ValueError('boolean timestamp')
                 raw_stamp=float(item[0])
                 if not math.isfinite(raw_stamp) or raw_stamp < 0 or not raw_stamp.is_integer():
                     raise ValueError('invalid timestamp')
