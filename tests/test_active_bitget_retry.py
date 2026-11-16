@@ -188,6 +188,24 @@ class ActiveBitgetRetryTests(unittest.TestCase):
         self.assertNotIn("oi",snapshot["errors"])
         self.assertFalse(snapshot["eligible_for_alert"])
 
+    def test_derivative_snapshot_supports_size_keyed_oi(self):
+        for payload in ({"size":"456.5"},[{"size":"456.5"}]):
+            with self.subTest(payload=payload):
+                with patch.object(market,"_get",
+                                  side_effect=[payload,{"fundingRate":"0"}]):
+                    snapshot=market.bitget_derivatives_snapshot("BTCUSDT",[])
+                self.assertEqual(snapshot["oi_contracts"],456.5)
+                self.assertEqual(snapshot["funding_rate"],0.0)
+                self.assertFalse(snapshot["eligible_for_alert"])
+
+    def test_derivative_snapshot_rejects_negative_size_keyed_oi(self):
+        with patch.object(market,"_get",
+                          side_effect=[[{"size":"-1"}],{"fundingRate":"0"}]):
+            snapshot=market.bitget_derivatives_snapshot("BTCUSDT",[])
+        self.assertIsNone(snapshot["oi_contracts"])
+        self.assertEqual(snapshot["errors"]["oi"],"ValueError")
+        self.assertFalse(snapshot["eligible_for_alert"])
+
     def test_derivative_snapshot_empty_list_is_not_a_zero_oi(self):
         with patch.object(market,"_get",side_effect=[[],[]]):
             snapshot=market.bitget_derivatives_snapshot("BTCUSDT",[])
