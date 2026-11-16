@@ -224,8 +224,12 @@ def fastest_candles(symbol,timeframe,exchanges=None):
                     {'symbol':symbol,'productType':'USDT-FUTURES',
                      'granularity':gran,'startTime':str(max(0,left-step)),
                      'endTime':str(right+step),'limit':'200'})
-            except (ValueError,requests.RequestException):
+            except requests.RequestException:
+                # A transport failure can leave a gap unresolved; the final
+                # contiguous-bar gate must then reject insufficient history.
                 continue
+            # Exchange validation failures (429 exhaustion, invalid JSON,
+            # malformed payloads) must not be disguised as missing candles.
             before=len(seen)
             if not isinstance(patch,list):
                 raise ValueError('Unexpected Bitget gap repair response')
