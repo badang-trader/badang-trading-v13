@@ -84,8 +84,12 @@ def research_page():
 # the validated research panel, rather than replacing the existing UI.
 _original_home = app.view_functions["home"]
 def integrated_home():
-    response = _original_home()
-    html = response.get_data(as_text=True) if hasattr(response, "get_data") else str(response)
+    response = app.make_response(_original_home())
+    # Preserve the original scanner's status, headers, cookies and mimetype.
+    # Do not rewrite redirects, errors, or non-HTML responses.
+    if response.status_code != 200 or not response.is_json and response.mimetype != "text/html":
+        return response
+    html = response.get_data(as_text=True)
     panel = """<section id="badang514" style="max-width:1050px;margin:22px auto;padding:18px;background:#182c40;color:#f0f5ff;border:1px solid #52677d;border-radius:12px;font-family:system-ui">
     <details><summary style="cursor:pointer;font-size:19px;font-weight:700">BADANG 5.14 검증 분석 · 지지구간 / 파동 / 매물대 (열기)</summary>
     <p>기존 스캐너를 유지하면서 BTC·ETH 확정봉 연구를 추가했습니다. 자동주문 기능은 없습니다.</p>
@@ -97,5 +101,6 @@ def integrated_home():
         html = html[:idx] + panel + html[idx:]
     else:
         html += panel
-    return html
+    response.set_data(html)
+    return response
 app.view_functions["home"] = integrated_home
