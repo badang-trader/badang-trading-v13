@@ -303,7 +303,9 @@ class ActiveBitgetContinuityTests(unittest.TestCase):
             with patch.object(market.time, "time", return_value=(self.BASE+230*self.STEP)/1000):
                 with self.assertRaisesRegex(ValueError, "연속 확정봉 부족"):
                     market.fastest_candles("BTCUSDT", "15m", exchanges=["bitget"])
-        self.assertGreaterEqual(getter.call_count, 2)
+        self.assertEqual(getter.call_count, 2)
+        self.assertTrue(getter.call_args_list[1].args[0].endswith("/history-candles"))
+        self.assertIn("startTime", getter.call_args_list[1].args[1])
 
     def test_oversized_exchange_page_is_rejected_before_pagination(self):
         oversized = [[str((self.BASE+i*self.STEP)), "100", "102", "98", "100", "10"]
