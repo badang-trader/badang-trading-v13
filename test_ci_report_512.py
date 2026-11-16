@@ -43,7 +43,15 @@ class CIReportTests(unittest.TestCase):
             target = Path(folder) / 'target'
             target.write_text('secret')
             link = Path(folder) / 'report.json'
-            link.symlink_to(target)
+            try:
+                link.symlink_to(target)
+            except OSError as exc:
+                # Windows may deny symlink creation without Developer Mode or
+                # SeCreateSymbolicLinkPrivilege. Keep the security check active
+                # on platforms where a real symlink can be created.
+                if getattr(exc, 'winerror', None) == 1314:
+                    self.skipTest('Windows symlink creation privilege unavailable')
+                raise
             with patch.object(audit_module, 'audit', return_value={'status': 'ALL_TESTS_PASSED'}):
                 with contextlib.redirect_stdout(io.StringIO()):
                     code = audit_module.main(['--report', str(link)])
