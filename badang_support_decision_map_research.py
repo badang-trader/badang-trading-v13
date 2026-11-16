@@ -50,5 +50,3 @@ def support_decision_map(candles, symbol, timeframe, mode="scalp", *, confirmed=
                 "Volume profile is OHLCV-estimated, not actual order-book depth",
                 "Trend, Elliott wave and divergence need separate confirmation",
             ]}
-
-[executed on device: DESKTOP-P1HHLJC (f621e81e-b344-4287-b962-f72b21cec132)]
