@@ -87,7 +87,7 @@ def integrated_home():
     response = app.make_response(_original_home())
     # Preserve the original scanner's status, headers, cookies and mimetype.
     # Do not rewrite redirects, errors, or non-HTML responses.
-    if response.status_code != 200 or not response.is_json and response.mimetype != "text/html":
+    if response.status_code != 200 or response.is_json or response.mimetype != "text/html":
         return response
     html = response.get_data(as_text=True)
     panel = """<section id="badang514" style="max-width:1050px;margin:22px auto;padding:18px;background:#182c40;color:#f0f5ff;border:1px solid #52677d;border-radius:12px;font-family:system-ui">
