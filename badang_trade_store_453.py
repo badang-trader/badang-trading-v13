@@ -4,6 +4,7 @@ A REST sample does not establish market-wide coverage or continuous CVD.
 No trade data in this module is approved for trading scores.
 """
 import json
+from contextlib import closing
 import sqlite3
 from pathlib import Path
 from badang_trade_sample_450 import parse_fills
@@ -31,7 +32,7 @@ def store_snapshot(path, symbol, payload, fetched_ms):
     parsed = parse_fills(payload, symbol, fetched_ms)
     symbol = parsed['symbol']
     rows = _rows(payload)
-    with _connect(path) as db:
+    with closing(_connect(path)) as db, db:
         db.execute('BEGIN IMMEDIATE')
         previous = db.execute('SELECT fetched_ms,payload FROM trade_samples WHERE symbol=? '
                               'ORDER BY fetched_ms DESC LIMIT 1', (symbol,)).fetchone()
@@ -49,7 +50,7 @@ def collection_status(path, symbol):
     """Operational diagnostics only. Count and gaps are NOT market coverage."""
     from badang_oi_history_441 import _valid_symbol
     symbol = _valid_symbol(symbol)
-    with _connect(path) as db:
+    with closing(_connect(path)) as db, db:
         records = db.execute('SELECT fetched_ms,count FROM trade_samples WHERE symbol=? '
                              'ORDER BY fetched_ms DESC LIMIT 1000', (symbol,)).fetchall()
     gaps = [records[i][0]-records[i+1][0] for i in range(len(records)-1)]
