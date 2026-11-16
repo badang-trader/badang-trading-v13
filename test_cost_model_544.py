@@ -18,6 +18,12 @@ class CostModelTests(unittest.TestCase):
             a=calc(100,exit_price,direction,0.0002,0.0001)["net_return"]
             b=calc(100,exit_price,direction,0.001,0.001)["net_return"]
             self.assertLess(b,a)
+    def test_boolean_prices_and_costs_rejected(self):
+        for args in ((True,100,0,0),(100,False,0,0),
+                     (100,101,True,0),(100,101,0,False)):
+            with self.subTest(args=args):
+                with self.assertRaises(ValueError):
+                    calc(args[0],args[1],"long",args[2],args[3])
     def test_invalid_inputs_fail_closed(self):
         for entry,exit_price,fee,slip in ((0,100,0,0),(100,float("nan"),0,0),
                                           (100,101,-0.1,0),(100,101,0,1)):
