@@ -1,5 +1,3 @@
-[Reading 101 lines from start (total: 101 lines, 0 remaining)]
-
 """BADANG read-only research screen; separate validation WSGI entrypoint."""
 from flask import jsonify, request, render_template_string
 from app import app
