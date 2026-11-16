@@ -17,6 +17,8 @@ def net_round_trip(entry,exit_price,direction,fee_per_side=0.0006,slippage_per_s
     # Execution prices move against the trader on entry and exit.
     actual_entry=entry*(1+side*slippage_per_side)
     actual_exit=exit_price*(1-side*slippage_per_side)
+    if not all(math.isfinite(x) and x > 0 for x in (actual_entry, actual_exit)):
+        raise ValueError("Unrepresentable executed price")
     gross=side*(actual_exit-actual_entry)/actual_entry
     # Both fees charged on executed notionals, expressed per entry notional.
     fees=fee_per_side*(1+actual_exit/actual_entry)
