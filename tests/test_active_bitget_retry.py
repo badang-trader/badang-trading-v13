@@ -299,7 +299,7 @@ class ActiveBitgetContinuityTests(unittest.TestCase):
 
     def test_missing_recent_bar_cannot_be_fabricated(self):
         rows = [r for r in self.rows() if int(r[0]) != (self.BASE+220*self.STEP)]
-        with patch.object(market, "_get", side_effect=[rows, [], []]) as getter:
+        with patch.object(market, "_get", side_effect=[rows, []]) as getter:
             with patch.object(market.time, "time", return_value=(self.BASE+230*self.STEP)/1000):
                 with self.assertRaisesRegex(ValueError, "연속 확정봉 부족"):
                     market.fastest_candles("BTCUSDT", "15m", exchanges=["bitget"])
@@ -323,7 +323,7 @@ class ActiveBitgetContinuityTests(unittest.TestCase):
 
     def test_non_list_gap_repair_response_is_rejected(self):
         rows = [r for r in self.rows() if int(r[0]) != (self.BASE+220*self.STEP)]
-        with patch.object(market, "_get", side_effect=[rows, [], {"bad": "shape"}]):
+        with patch.object(market, "_get", side_effect=[rows, {"bad": "shape"}]):
             with patch.object(market.time, "time", return_value=(self.BASE+230*self.STEP)/1000):
                 with self.assertRaisesRegex(ValueError, "gap repair response"):
                     market.fastest_candles("BTCUSDT", "15m", exchanges=["bitget"])
@@ -402,10 +402,10 @@ class ActiveBitgetContinuityTests(unittest.TestCase):
     def test_real_history_page_repairs_missing_bar(self):
         rows = [r for r in self.rows() if int(r[0]) != (self.BASE+220*self.STEP)]
         repaired = [r for r in self.rows() if int(r[0]) == (self.BASE+220*self.STEP)]
-        with patch.object(market, "_get", side_effect=[rows, [], repaired]) as getter:
+        with patch.object(market, "_get", side_effect=[rows, repaired]) as getter:
             with patch.object(market.time, "time", return_value=(self.BASE+230*self.STEP)/1000):
                 result = market.fastest_candles("BTCUSDT", "15m", exchanges=["bitget"])
-        self.assertEqual(getter.call_count, 3)
+        self.assertEqual(getter.call_count, 2)
         self.assertEqual(len(result["candles"][:-1]), 220)
         self.assertIn(str((self.BASE+220*self.STEP)), [r[0] for r in result["candles"][:-1]])
 
