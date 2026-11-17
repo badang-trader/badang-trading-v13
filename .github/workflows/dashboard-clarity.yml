@@ -52,6 +52,13 @@ jobs:
         id: fetch
         continue-on-error: true
         run: python badang_collect_okx_research.py
+      - name: Audit real OKX candles with existing BADANG indicators
+        if: steps.fetch.outcome == 'success'
+        id: indicators
+        continue-on-error: true
+        run: |
+          pip install -r requirements.txt
+          python badang_research_audit.py
       - name: Upload provenance and failure manifest
         if: always()
         uses: actions/upload-artifact@v4
