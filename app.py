@@ -496,32 +496,29 @@ def pivots(a, low=True, w=3):
 
 
 def divergence(close, rsis):
-    for low in (True, False):
-        ps = pivots(close, low)
+    """Return the most recently *confirmed* regular divergence.
 
+    A pivot needs three candles to its right; ties and same-bar
+    opposite directions are ambiguous, not a bullish default.
+    """
+    if len(close) != len(rsis) or len(close) < 8:
+        return 'none'
+    candidates = []
+    for low, label in ((True, 'bullish'), (False, 'bearish')):
+        ps = pivots(close, low)
         if len(ps) < 2:
             continue
-
         i, j = ps[-2:]
-
         if j - i > 40:
             continue
-
-        if (
-            low
-            and close[j] < close[i]
-            and rsis[j] > rsis[i] + 2
-        ):
-            return 'bullish'
-
-        if (
-            not low
-            and close[j] > close[i]
-            and rsis[j] < rsis[i] - 2
-        ):
-            return 'bearish'
-
-    return 'none'
+        if (low and close[j] < close[i] and rsis[j] > rsis[i] + 2 or
+                not low and close[j] > close[i] and rsis[j] < rsis[i] - 2):
+            candidates.append((j, label))
+    if not candidates:
+        return 'none'
+    newest = max(j for j, _ in candidates)
+    directions = {label for j, label in candidates if j == newest}
+    return next(iter(directions)) if len(directions) == 1 else 'none'
 
 
 def candles(symbol, gran):
