@@ -39,7 +39,11 @@ def audit_trades(candles, signals, *, fee_rate=0.0006, slippage_rate=0.0003):
     last_exit=-1
     for s in sorted(signals,key=lambda x:x['bar']):
         bar=s['bar'];side=s['side'];stop=s['stop'];target=s['target']
-        if not isinstance(bar,int) or bar<0 or bar+1>=len(candles) or bar<=last_exit: continue
+        # A historical signal must be timestamped at the bar where it was
+        # actually available. Reject future/repainted signals when metadata exists.
+        if 'known_at_bar' not in s or s['known_at_bar'] != bar:
+            continue
+        if not isinstance(bar,int) or isinstance(bar,bool) or bar<0 or bar+1>=len(candles) or bar<=last_exit: continue
         band=score_band(s['score'])
         if band is None or side not in ('LONG','SHORT'): continue
         entry=candles[bar+1][1]
@@ -86,7 +90,8 @@ def audit_trades(candles, signals, *, fee_rate=0.0006, slippage_rate=0.0003):
                         'mean_net_return':sum(t['net_return'] for t in items)/len(items),
                         'compounded_net_return':equity-1,'max_drawdown':mdd,
                         'max_consecutive_losses':max_losing})
-    return {'status':'HISTORICAL_SIGNALS_REQUIRED' if not signals else 'EVALUATED',
+    return {'status':'HISTORICAL_SIGNALS_REQUIRED' if not signals else
+                     'EVALUATED' if trades else 'NO_ELIGIBLE_HISTORICAL_SIGNALS',
             'assumptions':{'fee_rate_per_side':fee_rate,'slippage_rate_per_side':slippage_rate,
                            'entry':'next_bar_open','same_bar_collision':'stop_first',
                            'position_limit':1,'leverage':1},
