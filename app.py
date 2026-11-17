@@ -536,6 +536,24 @@ def candles(symbol, gran):
     # Adapter contract: the last candle is always disposable (forming
     # candle or placeholder). Only confirmed bars may drive signals.
     closed = result['candles'][:-1]
+    # Never calculate indicators from duplicated, unsorted or invalid OHLCV.
+    # Reject instead of silently sorting/deduplicating (which hides feed gaps).
+    previous_ts = None
+    for row in closed:
+        if len(row) < 6:
+            raise ValueError('캔들 필드 부족')
+        try:
+            ts = int(row[0])
+            op, hi, lo, cl, vol = [float(v) for v in row[1:6]]
+        except (TypeError, ValueError, OverflowError):
+            raise ValueError('캔들 숫자 데이터 오류')
+        if previous_ts is not None and ts <= previous_ts:
+            raise ValueError('캔들 시간 역순 또는 중복')
+        if not all(math.isfinite(v) for v in (op, hi, lo, cl, vol)):
+            raise ValueError('캔들 비정상 숫자')
+        if lo <= 0 or lo > min(op, cl) or hi < max(op, cl) or vol < 0:
+            raise ValueError('캔들 OHLCV 범위 오류')
+        previous_ts = ts
     if len(closed) < 205:
         raise ValueError('확정봉 부족: ' + str(len(closed)) + '개 / 최소 205개')
     return closed
