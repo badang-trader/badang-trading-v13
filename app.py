@@ -1823,6 +1823,8 @@ def explain_rsi_divergences_46(candles, timeframe):
                         'second_time':int(float(rows[j][0])),
                         'bars_since_second_pivot':age,'recent':age<=12,
                         'pivot_confirmation_bars':width,'pivot_confirmed':True,
+                        'first_observable_time':int(float(rows[j+width][0])),
+                        'first_observable_bar_index':j+width,
                         'confirmed':False,'status':status,
                         'price_delta_pct':round(price_delta,3),
                         'rsi_delta':round(rsi_delta,2),
