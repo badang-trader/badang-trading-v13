@@ -629,7 +629,14 @@ def analyze(symbol, gran):
         else None
     )
 
-    risk = abs(price - stop) if stop is not None else 0
+    # A stop on the profit side of entry is not a valid protective stop.
+    # Absolute distance would silently turn that invalid setup into a 2R target.
+    stop_valid = (
+        stop is not None and
+        ((direction == 'LONG' and stop < price) or
+         (direction == 'SHORT' and stop > price))
+    )
+    risk = abs(price - stop) if stop_valid else 0
 
     target = (
         price + 2 * risk
