@@ -1503,8 +1503,10 @@ def wave_confluence_review(candidate, candle_rows, research=None, candle_exchang
             return result
         if indices != sorted(indices) or len(set(indices)) != len(indices):
             return result
-        if indices[-1] >= len(candle_rows) - 1:
-            result['warnings'].append('마지막 미완료 캔들 포함 가능성')
+        # Pivot points require three completed bars on their right.
+        # A freshly printed high/low is not yet a confirmed Elliott pivot.
+        if indices[0] < 0 or indices[-1] + 3 >= len(candle_rows):
+            result['warnings'].append('3개 후속 확정봉이 없어 파동 전환점 미확정')
             return result
         result['status'] = 'AVAILABLE'
         result['fib'] = {'status': 'NOT_APPLICABLE'}
