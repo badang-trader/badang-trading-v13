@@ -20,6 +20,13 @@ class DashboardClarityTests(unittest.TestCase):
         self.assertEqual(dashboard.status_code, 200)
         self.assertIn('바당의 쉬운 판단'.encode('utf-8'), dashboard.data)
 
+    def test_scan_exposes_separate_technical_candidate_feed(self):
+        main = (ROOT / 'app.py').read_text(encoding='utf-8')
+        self.assertIn('technical_candidates=sorted([', main)
+        self.assertIn("item['technical_score']>=80", main)
+        self.assertIn("'final_state': (item.get('decision_427') or {}).get('state')", main)
+        self.assertIn("const d=technicalCandidate!==", main)
+
     def test_technical_candidates_are_not_hidden_by_final_gate(self):
         main = (ROOT / 'app.py').read_text(encoding='utf-8')
         self.assertIn("const technicalCandidate=scoredValue>=80?scoredSide", main)
