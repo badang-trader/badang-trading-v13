@@ -39,6 +39,10 @@ def audit_trades(candles, signals, *, fee_rate=0.0006, slippage_rate=0.0003):
     last_exit=-1
     for s in sorted(signals,key=lambda x:x['bar']):
         bar=s['bar'];side=s['side'];stop=s['stop'];target=s['target']
+        # Historical signals must carry the closed-bar timestamp used at
+        # calculation time, not merely an index asserted retrospectively.
+        if s.get('signal_timestamp') != candles[bar][0] if isinstance(bar,int) and not isinstance(bar,bool) and 0 <= bar < len(candles) else True:
+            continue
         # A historical signal must be timestamped at the bar where it was
         # actually available. Reject future/repainted signals when metadata exists.
         if 'known_at_bar' not in s or s['known_at_bar'] != bar:
@@ -63,6 +67,8 @@ def audit_trades(candles, signals, *, fee_rate=0.0006, slippage_rate=0.0003):
                 if hit_stop:
                     exit_price=min(stop,op) if side=='LONG' else max(stop,op)
                 else:
+                    # A target crossed by an opening gap is conservatively
+                    # filled at the target, not at a better unverified price.
                     exit_price=target
                 break
         sign=1 if side=='LONG' else -1
