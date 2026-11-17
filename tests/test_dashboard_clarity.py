@@ -10,6 +10,12 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 SOURCE = (ROOT / "badang_dashboard.py").read_text(encoding="utf-8")
 
 class DashboardClarityTests(unittest.TestCase):
+    def test_main_page_links_to_read_only_dashboard(self):
+        main = (ROOT / "app.py").read_text(encoding="utf-8")
+        self.assertIn('href="/dashboard"', main)
+        self.assertIn("읽기 전용 화면입니다", main)
+        self.assertIn("app.register_blueprint(badang_dashboard)", main)
+
     def test_structured_divergence_only(self):
         self.assertIn("Array.isArray(signals)", SOURCE)
         self.assertIn("z.status==='RECENT_UNCONFIRMED_REVERSAL'", SOURCE)
