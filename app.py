@@ -2821,7 +2821,10 @@ def v13_scan():
                  'technical_score': item.get('technical_score'),
                  'long_score': item.get('long_score'), 'short_score': item.get('short_score'),
                  'final_state': (item.get('decision_427') or {}).get('state'),
-                 'data_quality_warning': item.get('data_quality_warning_411')}
+                 'probability_estimate': None, 'probability_status': 'NOT_BACKTEST_VALIDATED',
+                 'score_meaning': 'indicator_agreement_not_win_rate',
+                 'data_quality_warning': item.get('data_quality_warning_411'),
+                 'timeframe_data_audit': item.get('timeframe_data_audit_49')}
                 for item in results
                 if item.get('technical_side') in ('LONG','SHORT')
                 and isinstance(item.get('technical_score'), (int,float))
