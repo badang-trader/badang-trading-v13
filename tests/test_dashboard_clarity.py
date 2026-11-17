@@ -23,6 +23,8 @@ class DashboardClarityTests(unittest.TestCase):
     def test_scan_exposes_separate_technical_candidate_feed(self):
         main = (ROOT / 'app.py').read_text(encoding='utf-8')
         self.assertIn('technical_candidates=sorted([', main)
+        self.assertIn("'probability_status': 'NOT_BACKTEST_VALIDATED'", main)
+        self.assertIn("'timeframe_data_audit': item.get('timeframe_data_audit_49')", main)
         self.assertIn("item['technical_score']>=80", main)
         self.assertIn("'final_state': (item.get('decision_427') or {}).get('state')", main)
         self.assertIn("const d=technicalCandidate!==", main)
