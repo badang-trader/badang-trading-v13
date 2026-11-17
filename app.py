@@ -451,6 +451,8 @@ def api(path, params=None):
 
 
 def ema(a, n):
+    if n <= 0 or not a:
+        raise ValueError('EMA requires nonempty prices and positive period')
     v = a[0]
     out = []
     k = 2 / (n + 1)
@@ -463,6 +465,8 @@ def ema(a, n):
 
 
 def rsi(a, n=14):
+    if n <= 0 or len(a) < n + 1:
+        raise ValueError('RSI requires at least period + 1 prices')
     gains = []
     losses = []
 
