@@ -7,17 +7,24 @@ def candles(tf='15m', count=80):
     out=[]
     for i in range(count):
         close=100 + i*.08 + (i%8-4)*.12
-        out.append([1700000000000+i*step,close-.05,close+.4,close-.4,close,1000+i])
+        out.append([1700000000000//step*step+i*step,close-.05,close+.4,close-.4,close,1000+i])
     return out
 
 class WaveStructureTests(unittest.TestCase):
     def test_last_forming_candle_excluded(self):
         rows=candles()
-        rows[-1][4]=999999
+        rows[-1][4]=rows[-1][1]+.1
         result=structure_review(rows,'15m')
         self.assertEqual(result['status'],'OK')
         self.assertEqual(result['last_closed_time'],rows[-2][0])
-        self.assertNotEqual(result['last_closed_price'],999999)
+        self.assertNotEqual(result['last_closed_price'],rows[-1][4])
+
+    def test_rejects_malformed_unconfirmed_candle(self):
+        rows=candles()
+        rows[-1][4]=999999
+        result=structure_review(rows,'15m')
+        self.assertEqual(result['status'],'UNAVAILABLE')
+        self.assertIn('마지막 미확정봉',result['reason'])
 
     def test_missing_timeframe_and_bad_interval(self):
         rows=candles()
