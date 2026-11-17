@@ -1,7 +1,7 @@
 name: BADANG dashboard clarity checks
 on:
   push:
-    branches: [badang-514-ui-clarity]
+    branches: [badang-514-ui-clarity, badang-514-validation-ui-bridge]
   pull_request:
     paths:
       - badang_dashboard.py
