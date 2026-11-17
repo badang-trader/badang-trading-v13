@@ -20,6 +20,13 @@ class DashboardClarityTests(unittest.TestCase):
         self.assertEqual(dashboard.status_code, 200)
         self.assertIn('바당의 쉬운 판단'.encode('utf-8'), dashboard.data)
 
+    def test_technical_candidates_are_not_hidden_by_final_gate(self):
+        main = (ROOT / 'app.py').read_text(encoding='utf-8')
+        self.assertIn("const technicalCandidate=scoredValue>=80?scoredSide", main)
+        self.assertIn("롱 기술적 후보 · 진입 조건 별도", main)
+        self.assertIn("숏 기술적 후보 · 진입 조건 별도", main)
+        self.assertNotIn("const d=finalReady?candidate:", main)
+
     def test_main_page_plain_language_grouping(self):
         main = (ROOT / "app.py").read_text(encoding="utf-8")
         for phrase in ("현재 판단: 진입 대기", "참고용 계산과 최종 판단의 차이:",
