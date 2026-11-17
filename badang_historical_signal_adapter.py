@@ -31,7 +31,24 @@ def analyze_closed_prefix(rows):
             'atr':atr,'swing_low':min(l[-11:-1]),'swing_high':max(h[-11:-1]),
             'macd':mac,'macd_signal':sig}
 
-def score_historical_prefixes(setup_rows,lower_rows,higher_rows,mode,flow=None):
+def score_historical_prefixes(setup_rows,lower_rows,higher_rows,mode,flow=None,
+                              *, setup_frame=None, lower_frame=None, higher_frame=None):
+    # Fail closed unless each timeframe's last bar had actually CLOSED by
+    # the setup bar close. A higher-frame bar that ends later is lookahead.
+    from badang_historical_integrity import FRAME_MS
+    frames=(setup_frame,lower_frame,higher_frame)
+    if any(frame not in FRAME_MS for frame in frames):
+        return {'status':'TIMEFRAME_PROVENANCE_MISSING','signal':None}
+    inputs=(setup_rows,lower_rows,higher_rows)
+    if any(not rows for rows in inputs):
+        return {'status':'HISTORICAL_BARS_MISSING','signal':None}
+    try:
+        setup_end=int(setup_rows[-1][0])+FRAME_MS[setup_frame]
+        for rows,frame in zip(inputs,frames):
+            if int(rows[-1][0])+FRAME_MS[frame]>setup_end:
+                return {'status':'FUTURE_TIMEFRAME_BAR_REJECTED','signal':None}
+    except (ValueError,TypeError,IndexError):
+        return {'status':'INVALID_TIMEFRAME_TIMESTAMP','signal':None}
     if mode not in ('scalp','swing'):raise ValueError('invalid mode')
     setup=analyze_closed_prefix(setup_rows)
     lower=analyze_closed_prefix(lower_rows)
