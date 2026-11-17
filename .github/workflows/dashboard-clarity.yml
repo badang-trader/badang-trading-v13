@@ -5,6 +5,8 @@ on:
   pull_request:
     paths:
       - badang_dashboard.py
+      - badang_decision_427.py
+      - tests/test_wave_structure.py
       - tests/test_dashboard_clarity.py
       - .github/workflows/dashboard-clarity.yml
   workflow_dispatch:
@@ -20,3 +22,4 @@ jobs:
         with:
           node-version: '22'
       - run: python -m unittest discover -s tests -p 'test_dashboard_clarity.py' -v
+      - run: python -m unittest discover -s tests -p 'test_wave_structure.py' -v
