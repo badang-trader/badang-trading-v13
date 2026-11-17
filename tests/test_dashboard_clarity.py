@@ -40,6 +40,8 @@ assert(waveText({wave_by_timeframe_32:{'1H':{status:'AVAILABLE',candidates:[{str
 assert(riskText({recommendation:'LONG',entry_reference:100,stop_loss:95,take_profit_1:110}).includes('1:2.00'),'rr calculation wrong');
 assert(riskText({recommendation:'LONG',entry_reference:100,stop_loss:105,take_profit_1:110}).includes('재검증'),'invalid stop accepted');
 assert(riskText({recommendation:'WAIT',entry_reference:100,stop_loss:95,take_profit_1:110}).includes('검증 불가'),'WAIT should not show rr');
+assert(riskText({recommendation:'LONG',entry_reference:100,stop_loss:null,take_profit_1:110}).includes('검증 불가'),'null stop must not be zero');
+assert(riskText({recommendation:'SHORT',entry_reference:100,stop_loss:105,take_profit_1:90}).includes('1:2.00'),'short rr calculation wrong');
 """
         with tempfile.TemporaryDirectory() as directory:
             js = pathlib.Path(directory) / "fixtures.js"
