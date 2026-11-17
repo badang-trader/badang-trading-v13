@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from flask import Flask, jsonify, render_template, render_template_string, request
 from badang_decision_427 import structure_review, decision_review
+from badang_position_scenarios import position_scenario
 
 app = Flask(__name__)
 
@@ -2845,6 +2846,23 @@ def v13_scan():
 # ============================================================
 # BADANG 1.4: Signal history API
 # ============================================================
+
+@app.route('/api/position-scenario', methods=['POST'])
+def position_scenario_api():
+    """Read-only, user-supplied hypothetical position calculator."""
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        return jsonify(error='JSON object required'), 400
+    try:
+        result = position_scenario(
+            payload.get('side'), payload.get('existing_quantity'),
+            payload.get('existing_entry'), payload.get('added_quantity'),
+            payload.get('added_entry'), payload.get('exit_price'),
+            payload.get('fee_pct', 0), payload.get('slippage_pct', 0))
+    except ValueError as exc:
+        return jsonify(error=str(exc)), 400
+    return jsonify(result)
+
 
 @app.route('/api/v14-signals')
 def v14_signals():
