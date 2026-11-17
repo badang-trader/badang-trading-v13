@@ -70,7 +70,14 @@ let r=await fetch('/api/research-514?symbol='+encodeURIComponent(s)+'&frame='+en
 if(d.status!=='ok'){out.innerHTML='<section>분석 불가: '+esc(d.status)+' '+esc(d.message||'')+'</section>';return}
 let a=d.analysis;
 let zones=d.support.map(z=>'<div class="zone"><b>'+z.order+'차 지지 관찰: '+fmt(z.zone_lower)+' ~ '+fmt(z.zone_upper)+'</b><p>근거 등급: '+esc(z.evidence_grade)+' / 참고 점수: '+fmt(z.evidence_score_not_probability)+' (확률 아님)</p><small>무효화: '+esc(z.invalidated_if)+' / 다음 지지: '+(z.next_observation_zone?fmt(z.next_observation_zone.lower)+' ~ '+fmt(z.next_observation_zone.upper):'표시 가능한 구간 없음')+'</small></div>').join('');
-out.innerHTML='<section><h2>'+esc(d.symbol)+' / '+esc(d.frame)+'</h2><p>마지막 확정 종가: <b>'+fmt(d.last_close)+'</b></p><p>20봉 추세: '+esc(d.trend_20bar)+' · 확정봉 '+d.confirmed_bars+'개</p><small>데이터: '+esc(d.source)+'</small></section>'+
+let sc=d.scenario_summary||{};
+let scHtml='<section id="scenario-summary"><h2>통합 분석 요약</h2><p>'+esc(sc.headline||'분석 요약을 확인할 수 없습니다.')+'</p>'+
+'<p><b>가장 가까운 지지:</b> '+(sc.nearest_support?fmt(sc.nearest_support.lower)+' ~ '+fmt(sc.nearest_support.upper):'확인된 구간 없음')+'</p>'+
+'<p><b>지지 이탈 시 다음 구간:</b> '+(sc.next_support_if_broken?fmt(sc.next_support_if_broken.lower)+' ~ '+fmt(sc.next_support_if_broken.upper):'확인된 구간 없음')+'</p>'+
+'<h3>상승 근거</h3><ul>'+(sc.long_evidence||[]).map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul>'+
+'<h3>하락 위험</h3><ul>'+(sc.short_evidence||[]).map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul>'+
+'<small>'+esc(sc.warning||'관찰 정보이며 매매 지시가 아닙니다.')+'</small></section>';
+out.innerHTML=scHtml+'<section><h2>'+esc(d.symbol)+' / '+esc(d.frame)+'</h2><p>마지막 확정 종가: <b>'+fmt(d.last_close)+'</b></p><p>20봉 추세: '+esc(d.trend_20bar)+' · 확정봉 '+d.confirmed_bars+'개</p><small>데이터: '+esc(d.source)+'</small></section>'+
 '<section><h2>지지 구간 · 선택과 대응</h2>'+(zones||'검증 가능한 지지 구간 없음. 임의 매수 지점은 만들지 않습니다.')+'</section>'+
 '<section><h2>기술적 분석</h2><p>EMA20 '+fmt(a.ema20)+' · EMA50 '+fmt(a.ema50)+' · EMA200 '+fmt(a.ema200)+'</p><p>RSI '+fmt(a.rsi)+' · MACD 히스토그램 '+fmt(a.macd_histogram)+' · ATR '+fmt(a.atr14)+'</p><p>거래량 비율 '+fmt(a.volume_ratio)+' · 매물대 추정 POC '+fmt(d.volume_profile_poc)+'</p><p>롱 근거 점수 '+fmt(a.long_score)+' · 숏 근거 점수 '+fmt(a.short_score)+' (수익 확률 아님)</p></section>'+
 '<section><h2>엘리엇 파동 후보 · 피보나치 · 다이버전스</h2><pre>'+esc(JSON.stringify({waves:a.wave_candidates,fibonacci:a.fibonacci,divergences:a.divergence_details,trendlines:a.trendlines},null,2))+'</pre></section>'+
