@@ -5,6 +5,7 @@ from badang_research_history_582 import research_history
 from badang_support_decision_map_research import support_decision_map
 from badang_analysis_v13 import analyze
 from badang_scenario_summary_514 import summarize_scenarios
+from badang_exchange_clock_514 import bitget_server_clock_ms
 from badang_volume_profile_542 import approximate_volume_profile
 from badang_support_timestamp_gate_544 import FRAME_MS
 from badang_research_regimes_555 import regime_at
@@ -19,11 +20,12 @@ def research_514():
         return jsonify({"status":"unsupported","message":"BTC/ETH and 15m/30m/1h/4h/1d only"}), 400
     mode = "swing" if frame in ("4h", "1d") else "scalp"
     try:
-        history = research_history(symbol + "USDT", FRAMES[frame], target_bars=600, max_pages=5)
+        exchange_now_ms = bitget_server_clock_ms()
+        history = research_history(symbol + "USDT", FRAMES[frame], target_bars=600, max_pages=5, now_ms=exchange_now_ms)
         if history["status"] != "ok":
             return jsonify({"status":history["status"],"confirmed_bars":history.get("confirmed_bars",0),"trading_ready":False})
         bars = history["candles"]
-        close_clock = int(bars[-1][0]) + FRAME_MS[frame]
+        close_clock = exchange_now_ms
         decision = support_decision_map(bars, symbol, frame, mode, exchange_now_ms=close_clock)
         if decision["status"] != "ok":
             return jsonify({"status":decision["status"],"trading_ready":False})
