@@ -4,6 +4,7 @@ from app import app
 from badang_research_history_582 import research_history
 from badang_support_decision_map_research import support_decision_map
 from badang_analysis_v13 import analyze
+from badang_scenario_summary_514 import summarize_scenarios
 from badang_volume_profile_542 import approximate_volume_profile
 from badang_support_timestamp_gate_544 import FRAME_MS
 from badang_research_regimes_555 import regime_at
@@ -39,6 +40,7 @@ def research_514():
             "confirmed_bars":len(bars),"last_closed_bar_open_ms":int(bars[-1][0]),
             "last_close":float(bars[-1][4]),"trend_20bar":trend,
             "analysis":{k:analysis.get(k) for k in selected},
+            "scenario_summary":summarize_scenarios(decision,analysis),
             "support":decision["observation_zones"],"volume_profile_poc":(profile["poc"]["center"] if profile.get("status") == "ok" and profile.get("poc") else None),
             "volume_profile_method":profile.get("method"),"warnings":decision["warnings"]+
             ["Trend is trailing 20-bar regime, not forecast",
