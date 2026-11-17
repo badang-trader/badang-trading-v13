@@ -41,7 +41,9 @@ def audit_trades(candles, signals, *, fee_rate=0.0006, slippage_rate=0.0003):
         bar=s['bar'];side=s['side'];stop=s['stop'];target=s['target']
         # Historical signals must carry the closed-bar timestamp used at
         # calculation time, not merely an index asserted retrospectively.
-        if s.get('signal_timestamp') != candles[bar][0] if isinstance(bar,int) and not isinstance(bar,bool) and 0 <= bar < len(candles) else True:
+        if not isinstance(bar, int) or isinstance(bar, bool) or not 0 <= bar < len(candles):
+            continue
+        if s.get('signal_timestamp') != candles[bar][0]:
             continue
         # A historical signal must be timestamped at the bar where it was
         # actually available. Reject future/repainted signals when metadata exists.
