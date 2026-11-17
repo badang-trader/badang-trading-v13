@@ -235,7 +235,7 @@ def divergence(points, rsi_series):
     ]
 
 
-def wave_candidates(points):
+def wave_candidates(points, total_bars=None, pivot_radius=3):
     """Elliott wave candidates, not confirmed wave counts."""
     recent = points[-12:]
     patterns = []
@@ -251,7 +251,10 @@ def wave_candidates(points):
             'reasons': reasons,
             'invalidation_price': invalidation,
             'ratios': ratios or {},
-            'pivot_points': [{'bar_index': int(q[0]), 'price': round(float(q[2]), 10)} for q in (pivots_used or [])]
+            'pivot_points': [{'bar_index': int(q[0]), 'price': round(float(q[2]), 10)} for q in (pivots_used or []),
+            'first_observable_bar_index': (max(int(q[0]) for q in pivots_used) + pivot_radius) if pivots_used else None,
+            'pivot_confirmation_bars': pivot_radius,
+            'observable_in_snapshot': (total_bars is not None and bool(pivots_used) and max(int(q[0]) for q in pivots_used) + pivot_radius < total_bars)
         })
 
     if len(recent) >= 4:
@@ -889,7 +892,7 @@ def analyze(
         'trendline_warning':
             opposite_trendline,
         'wave_candidates':
-            wave_candidates(points),
+            wave_candidates(points, total_bars=len(rows)),
         'fibonacci': fib,
         'funding_rate': f,
         'oi_change_pct': oi,
