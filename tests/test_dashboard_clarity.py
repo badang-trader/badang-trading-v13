@@ -20,6 +20,12 @@ class DashboardClarityTests(unittest.TestCase):
         self.assertEqual(dashboard.status_code, 200)
         self.assertIn('바당의 쉬운 판단'.encode('utf-8'), dashboard.data)
 
+    def test_main_page_plain_language_grouping(self):
+        main = (ROOT / "app.py").read_text(encoding="utf-8")
+        for phrase in ("현재 판단: 진입 대기", "참고용 계산과 최종 판단의 차이:",
+                       "상세 보류 사유", "groupedReasons", "지지·저항은 참고할 수 있지만"):
+            self.assertIn(phrase, main)
+
     def test_main_page_links_to_read_only_dashboard(self):
         main = (ROOT / "app.py").read_text(encoding="utf-8")
         self.assertIn('href="/dashboard"', main)
