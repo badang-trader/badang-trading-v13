@@ -10,6 +10,16 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 SOURCE = (ROOT / "badang_dashboard.py").read_text(encoding="utf-8")
 
 class DashboardClarityTests(unittest.TestCase):
+    def test_flask_main_page_and_dashboard_routes(self):
+        from app import app
+        client = app.test_client()
+        home = client.get('/')
+        self.assertEqual(home.status_code, 200)
+        self.assertIn(b'href="/dashboard"', home.data)
+        dashboard = client.get('/dashboard')
+        self.assertEqual(dashboard.status_code, 200)
+        self.assertIn('바당의 쉬운 판단'.encode('utf-8'), dashboard.data)
+
     def test_main_page_links_to_read_only_dashboard(self):
         main = (ROOT / "app.py").read_text(encoding="utf-8")
         self.assertIn('href="/dashboard"', main)
