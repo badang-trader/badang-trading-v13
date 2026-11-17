@@ -38,3 +38,31 @@ jobs:
       - run: python -m unittest discover -s tests -p 'test_historical_replay.py' -v
       - run: python -m unittest discover -s tests -p 'test_historical_signal_adapter.py' -v
       - run: python -m unittest discover -s tests -p 'test_okx_history.py' -v
+
+  collect-okx-research:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install requests
+      - name: Fetch actual OKX candles (failure recorded, not hidden)
+        id: fetch
+        continue-on-error: true
+        run: python badang_collect_okx_research.py
+      - name: Upload provenance and failure manifest
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: okx-historical-research
+          path: research-output/
+          if-no-files-found: warn
+          retention-days: 7
+      - name: Report collection status
+        if: always()
+        run: |
+          if [ "${{ steps.fetch.outcome }}" != "success" ]; then
+            echo "::warning::OKX historical collection failed; see manifest artifact. No real-data backtest can be claimed."
+          fi
