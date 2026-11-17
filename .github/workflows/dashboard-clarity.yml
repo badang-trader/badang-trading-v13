@@ -33,3 +33,4 @@ jobs:
       - run: python -m unittest discover -s tests -p 'test_indicator_reference.py' -v
       - run: python -m unittest discover -s tests -p 'test_closed_feed_integrity.py' -v
       - run: python -m unittest discover -s tests -p 'test_walkforward_audit.py' -v
+      - run: python -m unittest discover -s tests -p 'test_confirmed_wave_pivots.py' -v
