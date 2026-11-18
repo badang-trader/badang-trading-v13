@@ -50,7 +50,7 @@ def stress_summary(cases,histories,*,strategy='early',partition='HOLDOUT',
                 censored+=1;continue
             rows=histories[key]
             i=t['entry_bar'];j=t['exit_bar']
-            entry=float(rows[i][1])
+            entry=float(t['entry'])
             a=adverse_excursion(rows,i,j,entry,t['side'],leverage,margin)
             total+=1;worst=min(worst,a['worst_intrabar_unrealized_pnl'])
     return {'completed_trades_audited':total,'censored_not_audited':censored,
