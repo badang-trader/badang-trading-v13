@@ -51,6 +51,7 @@ jobs:
       - run: python -m unittest discover -s tests -p 'test_reversal_causal_context.py' -v
       - run: python -m unittest discover -s tests -p 'test_reversal_multiframe_alignment.py' -v
       - run: python -m unittest discover -s tests -p 'test_paired_trend_filter.py' -v
+      - run: python -m unittest discover -s tests -p 'test_portfolio_research.py' -v
       - run: python -m unittest discover -s tests -p 'test_elliott_research.py' -v
       - run: python -m unittest discover -s tests -p 'test_wave_divergence_association.py' -v
 
@@ -90,6 +91,7 @@ jobs:
           python badang_reversal_causal_context.py
           python badang_reversal_multiframe_report.py
           python badang_paired_trend_filter.py
+          python badang_portfolio_research.py
       - name: Upload provenance and failure manifest
         if: always()
         uses: actions/upload-artifact@v4
