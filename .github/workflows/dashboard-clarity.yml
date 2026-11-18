@@ -44,6 +44,7 @@ jobs:
       - run: python -m unittest discover -s tests -p 'test_reversal_divergence.py' -v
       - run: python -m unittest discover -s tests -p 'test_reversal_outcomes.py' -v
       - run: python -m unittest discover -s tests -p 'test_reversal_backtest.py' -v
+      - run: python -m unittest discover -s tests -p 'test_reversal_artifact_consistency.py' -v
       - run: python -m unittest discover -s tests -p 'test_elliott_research.py' -v
       - run: python -m unittest discover -s tests -p 'test_wave_divergence_association.py' -v
 
