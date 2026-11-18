@@ -2,6 +2,7 @@
 import json
 from pathlib import Path
 from badang_reversal_research import reversal_candidates
+from badang_reversal_divergence import confirmed_divergences
 from badang_historical_integrity import audit_historical_candles
 
 def main():
@@ -16,21 +17,24 @@ def main():
             rows=payload['candles']
             audit_historical_candles(rows,frame,asof_ms=manifest['collected_at_ms'])
             candidates=reversal_candidates(rows)
+            divergences=confirmed_divergences(rows)
             cases.append({'symbol':symbol,'timeframe':frame,'closed_bars':len(rows),
                 'candidate_count':len(candidates),
                 'confirmed_structure_break_count':sum(x['confirmed_at_bar'] is not None for x in candidates),
-                'candidates':candidates})
+                'candidates':candidates,'divergence_count':len(divergences),
+                'divergences':divergences})
     output={'status':'CAUSAL_REVERSAL_CANDIDATES_ONLY',
         'primary_exchange':'BITGET','elliott_classification':'NOT_VALIDATED',
-        'rsi_macd_divergence':'NOT_EVALUATED','historical_flow':'NOT_AVAILABLE',
+        'rsi_macd_divergence':'CAUSAL_CONFIRMED_PIVOTS','historical_flow':'NOT_AVAILABLE',
         'profitability':'NOT_EVALUATED',
         'limitations':['A pivot is known only after right-side bars close',
             'Structure break is not proof of lasting reversal',
-            'No Elliott counts or RSI/MACD divergence are asserted'],
+            'Divergence does not prove a lasting reversal; Elliott not classified'],
         'cases':cases}
     (folder/'bitget_reversal_candidates.json').write_text(json.dumps(output,ensure_ascii=False,indent=2),encoding='utf-8')
     print(json.dumps({'status':output['status'],'markets':len(cases),
         'total_candidates':sum(x['candidate_count'] for x in cases),
-        'confirmed_structure_breaks':sum(x['confirmed_structure_break_count'] for x in cases)}))
+        'confirmed_structure_breaks':sum(x['confirmed_structure_break_count'] for x in cases),
+        'divergences':sum(x['divergence_count'] for x in cases)}))
 
 if __name__=='__main__':main()
