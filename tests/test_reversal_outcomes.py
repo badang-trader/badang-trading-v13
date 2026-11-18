@@ -26,5 +26,7 @@ class OutcomeTests(unittest.TestCase):
         result=evaluate_reversal_candidates(rows,[self.candidate()])
         self.assertEqual(result['events'][0]['trading_pnl'],'NOT_EVALUATED')
         self.assertFalse(result['events'][0]['horizon_complete'])
+        self.assertEqual(result['events'][0]['status'],'CENSORED_END_OF_DATA')
+        self.assertEqual(result['censored_end_of_data'],1)
 
 if __name__=='__main__':unittest.main()
