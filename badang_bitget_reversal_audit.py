@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 from badang_reversal_research import reversal_candidates
 from badang_reversal_divergence import confirmed_divergences
+from badang_reversal_outcomes import evaluate_reversal_candidates
 from badang_historical_integrity import audit_historical_candles
 
 def main():
@@ -18,15 +19,16 @@ def main():
             audit_historical_candles(rows,frame,asof_ms=manifest['collected_at_ms'])
             candidates=reversal_candidates(rows)
             divergences=confirmed_divergences(rows)
+            outcomes=evaluate_reversal_candidates(rows,candidates,horizon=24)
             cases.append({'symbol':symbol,'timeframe':frame,'closed_bars':len(rows),
                 'candidate_count':len(candidates),
                 'confirmed_structure_break_count':sum(x['confirmed_at_bar'] is not None for x in candidates),
                 'candidates':candidates,'divergence_count':len(divergences),
-                'divergences':divergences})
+                'divergences':divergences,'outcomes':outcomes})
     output={'status':'CAUSAL_REVERSAL_CANDIDATES_ONLY',
         'primary_exchange':'BITGET','elliott_classification':'NOT_VALIDATED',
         'rsi_macd_divergence':'CAUSAL_CONFIRMED_PIVOTS','historical_flow':'NOT_AVAILABLE',
-        'profitability':'NOT_EVALUATED',
+        'profitability':'NOT_EVALUATED','reversal_success_rate':'NOT_ESTABLISHED',
         'limitations':['A pivot is known only after right-side bars close',
             'Structure break is not proof of lasting reversal',
             'Divergence does not prove a lasting reversal; Elliott not classified'],
@@ -35,6 +37,8 @@ def main():
     print(json.dumps({'status':output['status'],'markets':len(cases),
         'total_candidates':sum(x['candidate_count'] for x in cases),
         'confirmed_structure_breaks':sum(x['confirmed_structure_break_count'] for x in cases),
-        'divergences':sum(x['divergence_count'] for x in cases)}))
+        'divergences':sum(x['divergence_count'] for x in cases),
+        'outcomes':{status:sum(x['outcomes']['counts'].get(status,0) for x in cases)
+                    for status in ('INVALIDATED','STRUCTURE_LEVEL_TOUCHED','AMBIGUOUS_SAME_BAR','UNRESOLVED')}}))
 
 if __name__=='__main__':main()
