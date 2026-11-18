@@ -15,6 +15,8 @@ class WaveResearchTests(unittest.TestCase):
         self.assertEqual(len(result),1)
         self.assertEqual(result[0]['available_at_bar'],8)
         self.assertEqual(result[0]['status'],'UNVALIDATED_IMPULSE_GEOMETRY')
+        self.assertFalse(result[0]['live_signal_eligible'])
+        self.assertEqual(result[0]['wave_degree'],'UNVERIFIED')
         self.assertLess(result[0]['retracement_618'],result[0]['retracement_382'])
         self.assertIsNone(result[0]['invalidation_price'])
         self.assertEqual(result[0]['terminal_reference_price'],130)
@@ -33,6 +35,19 @@ class WaveResearchTests(unittest.TestCase):
         self.assertIsNone(abc[0]['invalidation_price'])
         self.assertEqual(abc[0]['terminal_reference_price'],75)
         self.assertEqual(impulse,[])
+    def test_reject_future_pivot_confirmation(self):
+        rows=[(i*1000,100,140,90,100,1) for i in range(10)]
+        pivots=[{'type':'LOW','price':100,'pivot_bar':5,'confirmed_at_bar':10}]
+        with patch('badang_elliott_research.confirmed_pivots',return_value=pivots):
+            with self.assertRaisesRegex(ValueError,'outside available closed bars'):
+                wave_scenarios(rows)
+    def test_reject_out_of_order_confirmations(self):
+        rows=[(i*1000,100,140,90,100,1) for i in range(10)]
+        pivots=[{'type':'LOW','price':100,'pivot_bar':2,'confirmed_at_bar':6},
+                {'type':'HIGH','price':110,'pivot_bar':3,'confirmed_at_bar':5}]
+        with patch('badang_elliott_research.confirmed_pivots',return_value=pivots):
+            with self.assertRaisesRegex(ValueError,'not chronological'):
+                abc_scenarios(rows)
     def test_reject_wave_three_shortest(self):
         prices=[100,110,105,110.5,110.2,130]
         pivots=[{'type':'LOW' if i%2==0 else 'HIGH','price':p,
