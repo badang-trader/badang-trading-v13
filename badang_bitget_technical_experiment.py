@@ -69,8 +69,27 @@ def run_experiment(frames,mode):
                 item['known_at_bar']-=start
                 selected.append(item)
         result=audit_trades(candles[start:end],selected)
-        return {'signals':len(selected),'trades':len(result['trades']),
-                'groups':result['groups'],'assumptions':result['assumptions']}
+        trades=result['trades']
+        equity=1.0
+        peak=1.0
+        drawdown=0.0
+        consecutive=0
+        max_consecutive=0
+        for trade in trades:
+            equity*=max(0.0,1.0+trade['net_return'])
+            peak=max(peak,equity)
+            drawdown=max(drawdown,(peak-equity)/peak)
+            consecutive=consecutive+1 if trade['net_return']<0 else 0
+            max_consecutive=max(max_consecutive,consecutive)
+        return {'signals':len(selected),'trades':len(trades),
+                'wins':sum(t['net_return']>0 for t in trades),
+                'win_rate':sum(t['net_return']>0 for t in trades)/len(trades) if trades else None,
+                'mean_net_return':sum(t['net_return'] for t in trades)/len(trades) if trades else None,
+                'compounded_net_return':equity-1 if trades else None,
+                'max_drawdown':drawdown if trades else None,
+                'max_consecutive_losses':max_consecutive if trades else None,
+                'groups':result['groups'],'trade_details':trades,
+                'assumptions':result['assumptions']}
     return {'setup_bars':len(candles),'split_bar':split,
             'rejected_insufficient_history':rejected_history,
             'train':partition(0,split),'holdout':partition(split,len(candles))}
@@ -85,7 +104,9 @@ def main():
         'score_rubric':'40 trend alignment + 20 RSI + 20 MACD + 10 volume + 10 lower divergence',
         'execution':'next bar open, 0.06% fee and 0.03% slippage each side',
         'limitations':['no OI','no trade CVD','no original BADANG score',
-            'short history','no parameter tuning','holdout sample may be small'],
+            'short history','no parameter tuning','holdout sample may be small',
+            'train trades crossing split are truncated at split close',
+            'returns are unit-notional, not account equity or leveraged PnL'],
         'results':[]}
     for symbol in ('BTC','ETH'):
         frames={}
