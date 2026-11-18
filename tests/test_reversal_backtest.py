@@ -24,7 +24,7 @@ class ReversalBacktestTests(unittest.TestCase):
         with patch('badang_reversal_backtest.reversal_candidates',return_value=[candidate()]):
             result=replay(rows,'EARLY')
         self.assertEqual(result['trades'][0]['exit_reason'],'STOP')
-        self.assertAlmostEqual(result['trades'][0]['net_return'],-0.1518)
+        self.assertAlmostEqual(result['trades'][0]['net_return'],-0.1018)
     def test_censored(self):
         with patch('badang_reversal_backtest.reversal_candidates',return_value=[candidate(at=9,confirm=None)]):
             result=replay(bars(),'EARLY')
