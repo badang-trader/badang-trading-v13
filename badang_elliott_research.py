@@ -39,7 +39,10 @@ def wave_scenarios(rows):
             'available_at_timestamp_ms':rows[p[-1]['confirmed_at_bar']][0],
             'terminal_price':prices[5],
             'alternative':'TREND_EXTENSION_OR_DIFFERENT_WAVE_DEGREE',
-            'invalidation_price':prices[5],
+            'invalidation_price':None,
+            'terminal_reference_price':prices[5],
+            'invalidation_status':'NOT_VALIDATED_FOR_WAVE_DEGREE',
+            'confirmation_lag_bars':p[-1]['confirmed_at_bar']-p[-1]['pivot_bar'],
             'retracement_382':prices[5]-sign*span*.382,
             'retracement_618':prices[5]-sign*span*.618,
             'caveat':'Illustrative 5-leg geometry only; wave degree, extension, ABC and trade outcome unverified'})
