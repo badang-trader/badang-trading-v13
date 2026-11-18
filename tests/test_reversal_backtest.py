@@ -42,7 +42,7 @@ class ReversalBacktestTests(unittest.TestCase):
     def test_train_cross_split_excluded_from_performance(self):
         rows=bars()
         rows[9]=(9000,100.,125.,95.,100.,10.)
-        with patch('badang_reversal_backtest.reversal_candidates',return_value=[candidate(at=7,confirm=None)]):
+        with patch('badang_reversal_backtest.reversal_candidates',return_value=[candidate(at=6,confirm=None)]):
             result=replay(rows,'EARLY')
         group=result['summary']['TRAIN_LONG']
         self.assertEqual(group['cross_split_trades'],0)
