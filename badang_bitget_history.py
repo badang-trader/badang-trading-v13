@@ -24,8 +24,14 @@ def fetch_bitget_closed_history(symbol,timeframe,*,pages=3,session=None,now_ms=N
     for _ in range(pages):
         params={'symbol':SYMBOLS[symbol],'productType':'USDT-FUTURES',
                 'granularity':BARS[timeframe],'limit':'100','endTime':str(cursor)}
-        response=get(URL,params=params,timeout=15)
-        response.raise_for_status()
+        for attempt in range(5):
+            response=get(URL,params=params,timeout=15)
+            if response.status_code not in (429,500,502,503,504):
+                response.raise_for_status()
+                break
+            if attempt==4:
+                response.raise_for_status()
+            time.sleep(min(2**attempt,8))
         payload=response.json()
         if not isinstance(payload,dict) or str(payload.get('code'))!='00000' or not isinstance(payload.get('data'),list):
             raise ValueError('invalid Bitget history response')
