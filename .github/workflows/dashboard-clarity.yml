@@ -53,6 +53,7 @@ jobs:
       - run: python -m unittest discover -s tests -p 'test_paired_trend_filter.py' -v
       - run: python -m unittest discover -s tests -p 'test_portfolio_research.py' -v
       - run: python -m unittest discover -s tests -p 'test_intratrade_stress.py' -v
+      - run: python -m unittest discover -s tests -p 'test_synchronized_equity.py' -v
       - run: python -m unittest discover -s tests -p 'test_elliott_research.py' -v
       - run: python -m unittest discover -s tests -p 'test_wave_divergence_association.py' -v
 
@@ -94,6 +95,7 @@ jobs:
           python badang_paired_trend_filter.py
           python badang_portfolio_research.py
           python badang_intratrade_stress.py
+          python badang_synchronized_equity.py
       - name: Upload provenance and failure manifest
         if: always()
         uses: actions/upload-artifact@v4
@@ -143,6 +145,7 @@ jobs:
           python badang_paired_trend_filter.py
           python badang_portfolio_research.py
           python badang_intratrade_stress.py
+          python badang_synchronized_equity.py
       - name: Preserve eight-page results and failure evidence
         if: always()
         uses: actions/upload-artifact@v4
