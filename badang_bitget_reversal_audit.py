@@ -20,7 +20,7 @@ def main():
         for frame in ('15m','30m','1H','4H','1D'):
             payload=json.loads((folder/f'bitget_{symbol}_{frame}.json').read_text(encoding='utf-8'))
             rows=payload['candles']
-            audit_historical_candles(rows,frame,asof_ms=manifest['collected_at_ms'])
+            integrity=audit_historical_candles(rows,frame,asof_ms=manifest['collected_at_ms'])
             candidates=reversal_candidates(rows)
             divergences=confirmed_divergences(rows)
             outcomes=evaluate_reversal_candidates(rows,candidates,horizon=24)
@@ -41,7 +41,7 @@ def main():
                        and at-24<=d['available_at_bar']<=at for d in divergences):
                     associated+=1
             cases.append({'symbol':symbol,'timeframe':frame,'closed_bars':len(rows),
-                'candidate_count':len(candidates),
+                'candidate_count':len(candidates),'integrity':integrity,
                 'confirmed_structure_break_count':sum(x['confirmed_at_bar'] is not None for x in candidates),
                 'candidates':candidates,'divergence_count':len(divergences),
                 'divergences':divergences,'outcomes':outcomes,
@@ -68,6 +68,25 @@ def main():
             'Divergence does not prove a lasting reversal; Elliott not classified'],
         'cases':cases}
     (folder/'bitget_reversal_candidates.json').write_text(json.dumps(output,ensure_ascii=False,indent=2),encoding='utf-8')
+    compact={'status':'RESEARCH_METRICS_NOT_LIVE_TRADING',
+        'collected_at_ms':manifest['collected_at_ms'],
+        'markets':[], 'score':'RESEARCH_ONLY_NO_ORIGINAL_BADANG_OI_CVD'}
+    for case in cases:
+        item={'market':case['symbol']+'_'+case['timeframe'],
+              'integrity':case['integrity'],
+              'candidates':case['candidate_count'],
+              'confirmed_structure_breaks':case['confirmed_structure_break_count'],
+              'outcomes':case['outcomes']['counts'],
+              'divergence_by_type':case['divergence_by_type'],
+              'elliott_five_wave_geometry':len(case['elliott_research_scenarios']),
+              'elliott_abc_geometry':len(case['abc_research_scenarios']),
+              'wave_prior_divergence':case['wave_prior_divergence_associations'],
+              'abc_prior_divergence':case['abc_prior_divergence_associations'],
+              'backtest':{kind:case['reversal_backtest'][kind]['summary']
+                          for kind in ('early','confirmed')}}
+        compact['markets'].append(item)
+    (folder/'bitget_reversal_summary.json').write_text(
+        json.dumps(compact,ensure_ascii=False,indent=2),encoding='utf-8')
     print(json.dumps({'status':output['status'],'markets':len(cases),
         'total_candidates':sum(x['candidate_count'] for x in cases),
         'confirmed_structure_breaks':sum(x['confirmed_structure_break_count'] for x in cases),
