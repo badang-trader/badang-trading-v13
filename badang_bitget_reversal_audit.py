@@ -7,6 +7,7 @@ from badang_reversal_divergence import confirmed_divergences
 from badang_reversal_outcomes import evaluate_reversal_candidates
 from badang_reversal_backtest import replay
 from badang_elliott_research import wave_scenarios, abc_scenarios
+from badang_wave_divergence_association import associate_prior_divergences
 from badang_historical_integrity import audit_historical_candles
 
 def main():
@@ -47,6 +48,8 @@ def main():
                 'reversal_backtest':{'early':early_replay,'confirmed':confirmed_replay},
                 'elliott_research_scenarios':wave_cases,
                 'abc_research_scenarios':abc_cases,
+                'wave_prior_divergence_associations':associate_prior_divergences(wave_cases,divergences),
+                'abc_prior_divergence_associations':associate_prior_divergences(abc_cases,divergences),
                 'divergence_by_type':dict(divergence_types),
                 'divergence_by_indicator':dict(divergence_indicators),
                 'candidates_by_direction':dict(candidate_directions),
