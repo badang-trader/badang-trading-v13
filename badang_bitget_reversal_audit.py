@@ -5,6 +5,7 @@ from pathlib import Path
 from badang_reversal_research import reversal_candidates
 from badang_reversal_divergence import confirmed_divergences
 from badang_reversal_outcomes import evaluate_reversal_candidates
+from badang_reversal_backtest import replay
 from badang_historical_integrity import audit_historical_candles
 
 def main():
@@ -21,6 +22,8 @@ def main():
             candidates=reversal_candidates(rows)
             divergences=confirmed_divergences(rows)
             outcomes=evaluate_reversal_candidates(rows,candidates,horizon=24)
+            early_replay=replay(rows,'EARLY')
+            confirmed_replay=replay(rows,'CONFIRMED')
             divergence_types=Counter(d['classification'] for d in divergences)
             divergence_indicators=Counter(d['indicator'] for d in divergences)
             candidate_directions=Counter(d['direction'] for d in candidates)
@@ -38,6 +41,7 @@ def main():
                 'confirmed_structure_break_count':sum(x['confirmed_at_bar'] is not None for x in candidates),
                 'candidates':candidates,'divergence_count':len(divergences),
                 'divergences':divergences,'outcomes':outcomes,
+                'reversal_backtest':{'early':early_replay,'confirmed':confirmed_replay},
                 'divergence_by_type':dict(divergence_types),
                 'divergence_by_indicator':dict(divergence_indicators),
                 'candidates_by_direction':dict(candidate_directions),
@@ -50,7 +54,7 @@ def main():
     output={'status':'CAUSAL_REVERSAL_CANDIDATES_ONLY',
         'primary_exchange':'BITGET','elliott_classification':'NOT_VALIDATED',
         'rsi_macd_divergence':'CAUSAL_CONFIRMED_PIVOTS','historical_flow':'NOT_AVAILABLE',
-        'profitability':'NOT_EVALUATED','reversal_success_rate':'NOT_ESTABLISHED',
+        'profitability':'RESEARCH_ONLY_FIXED_RULES','reversal_success_rate':'NOT_ESTABLISHED',
         'limitations':['A pivot is known only after right-side bars close',
             'Structure break is not proof of lasting reversal',
             'Divergence does not prove a lasting reversal; Elliott not classified'],
