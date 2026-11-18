@@ -17,7 +17,7 @@ def main():
         for frame in ('15m','30m','1H','4H','1D'):
             key=f'{symbol}_{frame}'
             try:
-                result=fetch_bitget_closed_history(symbol,frame,pages=3)
+                result=fetch_bitget_closed_history(symbol,frame,pages=8)
                 (out/f'bitget_{key}.json').write_text(json.dumps(result),encoding='utf-8')
                 manifest['markets'].append({'market':key,**result['provenance']})
             except Exception as exc:
