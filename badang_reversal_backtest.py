@@ -15,13 +15,11 @@ def reversal_signals(rows,kind):
         if kind=='EARLY' and c.get('invalidated_at_bar') is not None and c['invalidated_at_bar']<=bar:
             continue
         side='LONG' if c['direction']=='BULLISH' else 'SHORT'
-        entry=float(rows[bar+1][1])
         stop=float(c['invalidation_price'])
-        risk=entry-stop if side=='LONG' else stop-entry
-        if risk<=0 or stop<=0:continue
-        target=entry+2*risk if side=='LONG' else entry-2*risk
-        if target<=0:continue
-        out.append({'bar':bar,'side':side,'stop':stop,'target':target,
+        if stop<=0:continue
+        # Signal construction must not inspect the next bar's open.
+        # Entry viability and the 2R target are execution-time decisions.
+        out.append({'bar':bar,'side':side,'stop':stop,
                     'kind':kind,'known_at_bar':bar,'signal_timestamp':rows[bar][0]})
     return sorted(out,key=lambda s:s['bar'])
 
@@ -34,7 +32,11 @@ def replay(rows,kind,*,fee=0.0006,slippage=0.0003):
         bar=s['bar']
         if bar<=last_exit:continue
         side=s['side'];entry=float(rows[bar+1][1])
-        stop=s['stop'];target=s['target']
+        stop=s['stop']
+        risk=entry-stop if side=='LONG' else stop-entry
+        if risk<=0:continue
+        target=entry+2*risk if side=='LONG' else entry-2*risk
+        if target<=0:continue
         exit_reason='END_OF_DATA';exit_bar=len(rows)-1;exit_price=float(rows[-1][4])
         for k in range(bar+1,len(rows)):
             op=float(rows[k][1]);hi=float(rows[k][2]);lo=float(rows[k][3])
