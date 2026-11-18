@@ -66,8 +66,8 @@ jobs:
           python badang_research_audit.py
           python badang_real_pivot_audit.py
           python badang_historical_signal_readiness.py
-      - name: Collect Bitget primary historical data and compare OKX
-        if: steps.fetch.outcome == 'success'
+      - name: Collect Bitget primary historical data and compare available OKX
+        if: always() && steps.fetch.outcome != 'cancelled'
         id: bitget
         continue-on-error: true
         run: |
@@ -89,5 +89,12 @@ jobs:
             echo "::warning::Bitget primary historical collection failed; see bitget_manifest.json."
           fi
           if [ "${{ steps.fetch.outcome }}" != "success" ]; then
-            echo "::warning::OKX historical collection failed; see manifest artifact. No real-data backtest can be claimed."
+            echo "::warning::OKX comparison incomplete; inspect manifest. Bitget independent result must be checked separately."
+          fi
+      - name: Enforce primary Bitget data validation result
+        if: always()
+        run: |
+          if [ "${{ steps.bitget.outcome }}" != "success" ]; then
+            echo "::error::Primary Bitget research failed or was skipped. CI data validation is NOT successful."
+            exit 1
           fi
