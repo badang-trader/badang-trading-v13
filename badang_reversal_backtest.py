@@ -58,7 +58,9 @@ def replay(rows,kind,*,fee=0.0006,slippage=0.0003):
     for part in ('TRAIN','HOLDOUT'):
         for side in ('LONG','SHORT'):
             subset=[t for t in trades if t['partition']==part and t['side']==side]
-            completed=[t for t in subset if t['exit_reason']!='END_OF_DATA']
+            # Do not score training trades using outcomes from the holdout period.
+            completed=[t for t in subset if t['exit_reason']!='END_OF_DATA'
+                       and not (part=='TRAIN' and t['crosses_split'])]
             equity=peak=1.0;mdd=0.0;streak=max_streak=0
             for t in completed:
                 equity*=max(0,1+t['net_return']);peak=max(peak,equity)
@@ -66,7 +68,9 @@ def replay(rows,kind,*,fee=0.0006,slippage=0.0003):
                 streak=streak+1 if t['net_return']<0 else 0
                 max_streak=max(max_streak,streak)
             result[part+'_'+side]={'signals_traded':len(subset),
-                'completed_trades':len(completed),'censored':len(subset)-len(completed),
+                'completed_trades':len(completed),
+                'censored':sum(t['exit_reason']=='END_OF_DATA' for t in subset),
+                'excluded_train_cross_split':sum(part=='TRAIN' and t['crosses_split'] for t in subset),
                 'cross_split_trades':sum(t['crosses_split'] for t in subset),
                 'win_rate':sum(t['net_return']>0 for t in completed)/len(completed) if completed else None,
                 'mean_net_return':sum(t['net_return'] for t in completed)/len(completed) if completed else None,
