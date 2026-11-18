@@ -79,6 +79,16 @@ def run_experiment(frames,mode):
             drawdown=max(drawdown,(peak-equity)/peak)
             consecutive=consecutive+1 if trade['net_return']<0 else 0
             max_consecutive=max(max_consecutive,consecutive)
+        group_rows=[]
+        for mode_key,side_key,band_key in sorted({(t['mode'],t['side'],t['band']) for t in trades}):
+            subset=[t for t in trades if (t['mode'],t['side'],t['band'])==(mode_key,side_key,band_key)]
+            group_equity=1.0
+            for t in subset:group_equity*=max(0.0,1+t['net_return'])
+            group_rows.append({'mode':mode_key,'side':side_key,'score_band':band_key,
+                'samples':len(subset),'wins':sum(t['net_return']>0 for t in subset),
+                'win_rate':sum(t['net_return']>0 for t in subset)/len(subset),
+                'mean_net_return':sum(t['net_return'] for t in subset)/len(subset),
+                'compounded_net_return':group_equity-1})
         return {'signals':len(selected),'trades':len(trades),
                 'censored_end_of_data':len(censored),
                 'wins':sum(t['net_return']>0 for t in trades),
@@ -87,7 +97,7 @@ def run_experiment(frames,mode):
                 'compounded_net_return':equity-1 if trades else None,
                 'max_drawdown':drawdown if trades else None,
                 'max_consecutive_losses':max_consecutive if trades else None,
-                'trade_details':trades,'censored_trade_details':censored,
+                'groups':group_rows,'trade_details':trades,'censored_trade_details':censored,
                 'assumptions':replay['assumptions']}
     return {'setup_bars':len(candles),'split_bar':split,
             'rejected_insufficient_history':rejected_history,
