@@ -10,6 +10,10 @@ from badang_elliott_research import wave_scenarios, abc_scenarios
 from badang_wave_divergence_association import associate_prior_divergences
 from badang_historical_integrity import audit_historical_candles
 
+def audit_market_payload(payload,frame):
+    return audit_historical_candles(payload['candles'],frame,
+        asof_ms=payload['provenance']['collection_timestamp_ms'])
+
 def main():
     folder=Path('research-output')
     manifest=json.loads((folder/'bitget_manifest.json').read_text(encoding='utf-8'))
@@ -20,7 +24,7 @@ def main():
         for frame in ('15m','30m','1H','4H','1D'):
             payload=json.loads((folder/f'bitget_{symbol}_{frame}.json').read_text(encoding='utf-8'))
             rows=payload['candles']
-            integrity=audit_historical_candles(rows,frame,asof_ms=payload['provenance']['collection_timestamp_ms'])
+            integrity=audit_market_payload(payload,frame)
             candidates=reversal_candidates(rows)
             divergences=confirmed_divergences(rows)
             outcomes=evaluate_reversal_candidates(rows,candidates,horizon=24)
