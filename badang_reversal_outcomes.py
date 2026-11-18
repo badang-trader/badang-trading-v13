@@ -38,6 +38,10 @@ def evaluate_reversal_candidates(rows,candidates,*,horizon=24):
         mfe=max([0.0]+[signed*(float(r[2] if signed>0 else r[3])-entry)/entry for r in path])
         mae=min([0.0]+[signed*(float(r[3] if signed>0 else r[2])-entry)/entry for r in path])
         complete=(end==start+horizon)
+        # A truncated horizon cannot establish that an unresolved event stayed
+        # unresolved for the requested number of bars.
+        if status=='UNRESOLVED' and not complete:
+            status='CENSORED_END_OF_DATA'
         outcomes.append({'direction':side,'available_at_bar':start,'event_bar':event_bar,
             'status':status,'horizon_complete':complete,
             'max_favorable_excursion':mfe,'max_adverse_excursion':mae,
@@ -45,4 +49,6 @@ def evaluate_reversal_candidates(rows,candidates,*,horizon=24):
     counts=Counter(x['status'] for x in outcomes)
     return {'horizon_bars':horizon,'total':len(outcomes),
         'counts':dict(counts),'events':outcomes,
+        'fully_observed':sum(x['horizon_complete'] for x in outcomes),
+        'censored_end_of_data':counts['CENSORED_END_OF_DATA'],
         'caveat':'Price level touches are not executable trades or confirmed closing breaks'}
