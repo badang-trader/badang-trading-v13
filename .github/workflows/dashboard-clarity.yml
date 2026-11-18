@@ -38,6 +38,7 @@ jobs:
       - run: python -m unittest discover -s tests -p 'test_historical_replay.py' -v
       - run: python -m unittest discover -s tests -p 'test_historical_signal_adapter.py' -v
       - run: python -m unittest discover -s tests -p 'test_okx_history.py' -v
+      - run: python -m unittest discover -s tests -p 'test_real_pivot_audit.py' -v
 
   collect-okx-research:
     runs-on: ubuntu-latest
@@ -59,6 +60,7 @@ jobs:
         run: |
           pip install -r requirements.txt
           python badang_research_audit.py
+          python badang_real_pivot_audit.py
       - name: Upload provenance and failure manifest
         if: always()
         uses: actions/upload-artifact@v4
