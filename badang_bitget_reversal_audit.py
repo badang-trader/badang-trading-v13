@@ -6,7 +6,7 @@ from badang_reversal_research import reversal_candidates
 from badang_reversal_divergence import confirmed_divergences
 from badang_reversal_outcomes import evaluate_reversal_candidates
 from badang_reversal_backtest import replay
-from badang_elliott_research import wave_scenarios
+from badang_elliott_research import wave_scenarios, abc_scenarios
 from badang_historical_integrity import audit_historical_candles
 
 def main():
@@ -24,6 +24,7 @@ def main():
             divergences=confirmed_divergences(rows)
             outcomes=evaluate_reversal_candidates(rows,candidates,horizon=24)
             wave_cases=wave_scenarios(rows)
+            abc_cases=abc_scenarios(rows)
             early_replay=replay(rows,'EARLY')
             confirmed_replay=replay(rows,'CONFIRMED')
             divergence_types=Counter(d['classification'] for d in divergences)
@@ -45,6 +46,7 @@ def main():
                 'divergences':divergences,'outcomes':outcomes,
                 'reversal_backtest':{'early':early_replay,'confirmed':confirmed_replay},
                 'elliott_research_scenarios':wave_cases,
+                'abc_research_scenarios':abc_cases,
                 'divergence_by_type':dict(divergence_types),
                 'divergence_by_indicator':dict(divergence_indicators),
                 'candidates_by_direction':dict(candidate_directions),
