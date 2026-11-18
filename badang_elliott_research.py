@@ -75,7 +75,10 @@ def abc_scenarios(rows):
             'terminal_price':prices[3],
             'a_length':a,'b_retracement_ratio':b/a,'c_to_a_ratio':c/a,
             'alternative':'COMPLEX_CORRECTION_OR_TREND_CONTINUATION',
-            'invalidation_price':prices[3],
+            'invalidation_price':None,
+            'terminal_reference_price':prices[3],
+            'invalidation_status':'NOT_VALIDATED_FOR_WAVE_DEGREE',
+            'confirmation_lag_bars':p[-1]['confirmed_at_bar']-p[-1]['pivot_bar'],
             'retracement_382':prices[3]+direction*abs(prices[0]-prices[3])*.382,
             'retracement_618':prices[3]+direction*abs(prices[0]-prices[3])*.618,
             'caveat':'Zigzag-like geometry only; internal 5-3-5 and wave degree unverified'})
