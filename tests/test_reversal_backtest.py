@@ -34,6 +34,22 @@ class ReversalBacktestTests(unittest.TestCase):
             result=replay(rows,'EARLY')
         self.assertEqual(result['trades'][0]['exit_reason'],'STOP')
         self.assertAlmostEqual(result['trades'][0]['net_return'],-0.1018)
+    def test_long_stop_gap_uses_worse_open(self):
+        rows=bars()
+        rows[3]=(3000,85.,95.,80.,90.,10.)
+        with patch('badang_reversal_backtest.reversal_candidates',return_value=[candidate()]):
+            result=replay(rows,'EARLY')
+        t=result['trades'][0]
+        self.assertEqual(t['exit_reason'],'STOP')
+        self.assertAlmostEqual(t['net_return'],-0.1518)
+    def test_short_stop_gap_uses_worse_open(self):
+        rows=bars()
+        rows[3]=(3000,120.,125.,115.,120.,10.)
+        with patch('badang_reversal_backtest.reversal_candidates',return_value=[candidate(side='BEARISH')]):
+            result=replay(rows,'EARLY')
+        t=result['trades'][0]
+        self.assertEqual(t['exit_reason'],'STOP')
+        self.assertAlmostEqual(t['net_return'],-0.2018)
     def test_censored(self):
         with patch('badang_reversal_backtest.reversal_candidates',return_value=[candidate(at=9,confirm=None)]):
             result=replay(bars(),'EARLY')
