@@ -16,6 +16,22 @@ class WalkforwardAuditTests(unittest.TestCase):
         self.assertEqual(trade['exit_bar'],2)
         self.assertAlmostEqual(trade['net_return'],.096)
         self.assertEqual(result['groups'][0]['samples'],1)
+    def test_trade_details_and_end_of_data_reason(self):
+        s=dict(bar=0,known_at_bar=0,signal_timestamp=1,side='LONG',score=90,stop=95,target=120)
+        t=audit_trades(self.rows,[s])['trades'][0]
+        self.assertEqual(t['signal_timestamp'],1)
+        self.assertEqual(t['entry_price'],100)
+        self.assertEqual(t['stop_price'],95)
+        self.assertEqual(t['target_price'],120)
+        self.assertEqual(t['exit_reason'],'END_OF_DATA')
+        self.assertEqual(t['exit_timestamp'],4)
+        self.assertAlmostEqual(t['net_return'],.09-.0018)
+
+    def test_stop_reason(self):
+        rows=[(1,100,101,99,100),(2,100,115,90,100),(3,100,101,99,100)]
+        s=dict(bar=0,known_at_bar=0,signal_timestamp=1,side='LONG',score=90,stop=95,target=110)
+        self.assertEqual(audit_trades(rows,[s])['trades'][0]['exit_reason'],'STOP')
+
     def test_same_bar_stop_wins(self):
         rows=[(1,100,101,99,100),(2,100,115,90,100),(3,100,101,99,100)]
         r=audit_trades(rows,[dict(bar=0,known_at_bar=0,signal_timestamp=1,side='LONG',score=90,stop=95,target=110)])
