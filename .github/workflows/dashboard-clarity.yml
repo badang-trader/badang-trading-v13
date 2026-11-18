@@ -40,6 +40,7 @@ jobs:
       - run: python -m unittest discover -s tests -p 'test_okx_history.py' -v
       - run: python -m unittest discover -s tests -p 'test_real_pivot_audit.py' -v
       - run: python -m unittest discover -s tests -p 'test_bitget_technical_experiment.py' -v
+      - run: python -m unittest discover -s tests -p 'test_reversal_research.py' -v
 
   collect-okx-research:
     runs-on: ubuntu-latest
@@ -70,6 +71,7 @@ jobs:
         run: |
           python badang_collect_bitget_research.py
           python badang_bitget_technical_experiment.py
+          python badang_bitget_reversal_audit.py
       - name: Upload provenance and failure manifest
         if: always()
         uses: actions/upload-artifact@v4
