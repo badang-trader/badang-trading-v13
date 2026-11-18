@@ -9,7 +9,7 @@ from badang_historical_integrity import FRAME_MS,audit_historical_candles
 
 URL='https://api.bitget.com/api/v2/mix/market/history-candles'
 SYMBOLS={'BTC':'BTCUSDT','ETH':'ETHUSDT'}
-BARS={'15m':'15m','30m':'30m','1H':'1H','4H':'4H','1D':'1D'}
+BARS={'15m':'15m','30m':'30m','1H':'1H','4H':'4H','1D':'1Dutc'}
 
 def fetch_bitget_closed_history(symbol,timeframe,*,pages=3,session=None,now_ms=None):
     if symbol not in SYMBOLS or timeframe not in BARS:
@@ -44,7 +44,7 @@ def fetch_bitget_closed_history(symbol,timeframe,*,pages=3,session=None,now_ms=N
             records[ts]=row
         if oldest is None or oldest>=cursor:
             raise ValueError('Bitget pagination failed to move backward')
-        cursor=oldest-1
+        cursor=oldest
     rows=[records[ts] for ts in sorted(records)]
     provenance=audit_historical_candles(rows,timeframe,asof_ms=now_ms)
     provenance.update({'source':'BITGET_PUBLIC_HISTORY_API','instrument':SYMBOLS[symbol],
