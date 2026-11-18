@@ -93,6 +93,7 @@ jobs:
           python badang_reversal_multiframe_report.py
           python badang_paired_trend_filter.py
           python badang_portfolio_research.py
+          python badang_intratrade_stress.py
       - name: Upload provenance and failure manifest
         if: always()
         uses: actions/upload-artifact@v4
@@ -141,6 +142,7 @@ jobs:
           python badang_reversal_multiframe_report.py
           python badang_paired_trend_filter.py
           python badang_portfolio_research.py
+          python badang_intratrade_stress.py
       - name: Preserve eight-page results and failure evidence
         if: always()
         uses: actions/upload-artifact@v4
