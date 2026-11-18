@@ -18,6 +18,15 @@ class ReversalBacktestTests(unittest.TestCase):
         self.assertEqual(early[0]['bar'],2)
         self.assertEqual(confirmed[0]['bar'],4)
         self.assertEqual(confirmed[0]['entry_bar'] if 'entry_bar' in confirmed[0] else confirmed[0]['bar']+1,5)
+    def test_signal_does_not_use_future_entry_open(self):
+        first=bars()
+        changed=bars()
+        changed[3]=(3000,200.,205.,195.,200.,10.)
+        with patch('badang_reversal_backtest.reversal_candidates',return_value=[candidate()]):
+            a=reversal_signals(first,'EARLY')
+            b=reversal_signals(changed,'EARLY')
+        self.assertEqual(a,b)
+        self.assertNotIn('target',a[0])
     def test_stop_first_and_cost(self):
         rows=bars()
         rows[3]=(3000,100.,125.,85.,100.,10.)
