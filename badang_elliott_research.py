@@ -44,3 +44,36 @@ def wave_scenarios(rows):
             'retracement_618':prices[5]-sign*span*.618,
             'caveat':'Illustrative 5-leg geometry only; wave degree, extension, ABC and trade outcome unverified'})
     return scenarios
+
+def abc_scenarios(rows):
+    """Find three alternating legs consistent with a possible zigzag-like ABC.
+
+    Geometry is descriptive, not a validated 5-3-5 subdivision or prediction.
+    """
+    pivots=_alternating(confirmed_pivots(rows))
+    result=[]
+    for k in range(3,len(pivots)):
+        p=pivots[k-3:k+1]
+        prices=[float(x['price']) for x in p]
+        direction=1 if p[0]['type']=='HIGH' else -1
+        a=direction*(prices[0]-prices[1])
+        b=direction*(prices[2]-prices[1])
+        c=direction*(prices[2]-prices[3])
+        if not (a>0 and 0<b<a and c>0):continue
+        if c<0.618*a or c>1.618*a:continue
+        # C beyond A end is a possible zigzag, not a universal ABC rule.
+        if direction*(prices[1]-prices[3])<=0:continue
+        result.append({'status':'UNVALIDATED_ABC_GEOMETRY',
+            'scenario':'POSSIBLE_ABC_ZIGZAG_END',
+            'correction_direction':'DOWN' if direction==1 else 'UP',
+            'pivot_bars':[x['pivot_bar'] for x in p],
+            'available_at_bar':p[-1]['confirmed_at_bar'],
+            'available_at_timestamp_ms':rows[p[-1]['confirmed_at_bar']][0],
+            'terminal_price':prices[3],
+            'a_length':a,'b_retracement_ratio':b/a,'c_to_a_ratio':c/a,
+            'alternative':'COMPLEX_CORRECTION_OR_TREND_CONTINUATION',
+            'invalidation_price':prices[3],
+            'retracement_382':prices[3]+direction*abs(prices[0]-prices[3])*.382,
+            'retracement_618':prices[3]+direction*abs(prices[0]-prices[3])*.618,
+            'caveat':'Zigzag-like geometry only; internal 5-3-5 and wave degree unverified'})
+    return result
