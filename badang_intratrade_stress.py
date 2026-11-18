@@ -57,3 +57,22 @@ def stress_summary(cases,histories,*,strategy='early',partition='HOLDOUT',
             'worst_single_position_intrabar_pnl':worst,
             'portfolio_concurrent_intrabar_drawdown':'NOT_CALCULATED',
             'actual_liquidation':'NOT_VERIFIED','research_only':True}
+
+def main():
+    import json
+    from pathlib import Path
+    folder=Path('research-output')
+    cases=json.loads((folder/'bitget_reversal_candidates.json').read_text(encoding='utf-8'))['cases']
+    histories={(c['symbol'],c['timeframe']):json.loads(
+        (folder/('bitget_'+c['symbol']+'_'+c['timeframe']+'.json')).read_text(encoding='utf-8'))['candles']
+        for c in cases}
+    results=[dict(strategy=s,partition=p,**stress_summary(cases,histories,strategy=s,partition=p))
+             for s in ('early','confirmed') for p in ('TRAIN','HOLDOUT')]
+    (folder/'bitget_intratrade_stress.json').write_text(json.dumps({
+        'status':'ADVERSE_EXTREME_PROXY_NOT_PORTFOLIO_EQUITY',
+        'entry_reference':'RECORDED_NEXT_OPEN',
+        'results':results},indent=2),encoding='utf-8')
+    print('intratrade stress groups:',len(results))
+
+if __name__=='__main__':
+    main()
