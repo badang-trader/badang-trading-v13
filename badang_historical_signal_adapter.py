@@ -62,6 +62,16 @@ def score_historical_prefixes(setup_rows,lower_rows,higher_rows,mode,flow=None,
     scores={side:score_direction(setup,higher['trend'],flow,side,lower)
             for side in ('LONG','SHORT')}
     side=max(scores,key=scores.get)
+    expected='UP' if side=='LONG' else 'DOWN'
+    opposite='bearish' if side=='LONG' else 'bullish'
+    aligned=setup['trend']==expected and higher['trend']==expected
+    flow_ok=flow['state']==('BUY' if side=='LONG' else 'SELL')
+    safe=(not setup['fake_breakout'] and setup['divergence']!=opposite
+          and lower['divergence']!=opposite)
+    if not (scores[side]>=65 and aligned and flow_ok and safe):
+        return {'status':'WAIT_HISTORICAL_CONDITIONS_NOT_MET',
+                'signal':None,'scores':scores,
+                'conditions':{'aligned':aligned,'flow_ok':flow_ok,'safe':safe}}
     plan=scenario(setup,side,mode)
     if not plan:return {'status':'NO_VALID_PLAN','signal':None,'scores':scores}
     return {'status':'EVALUATED_HISTORICAL_PREFIX','signal':{'side':side,
