@@ -1,6 +1,6 @@
 import unittest
 from unittest.mock import patch
-from badang_elliott_research import wave_scenarios
+from badang_elliott_research import wave_scenarios, abc_scenarios
 
 class WaveResearchTests(unittest.TestCase):
     def test_empty(self):
@@ -16,6 +16,18 @@ class WaveResearchTests(unittest.TestCase):
         self.assertEqual(result[0]['available_at_bar'],8)
         self.assertEqual(result[0]['status'],'UNVALIDATED_IMPULSE_GEOMETRY')
         self.assertLess(result[0]['retracement_618'],result[0]['retracement_382'])
+    def test_abc_separate_from_impulse_and_causal(self):
+        prices=[110,90,100,75]
+        pivots=[{'type':'HIGH' if i%2==0 else 'LOW','price':p,
+                 'pivot_bar':i+2,'confirmed_at_bar':i+3} for i,p in enumerate(prices)]
+        rows=[(i*1000,100,140,60,100,1) for i in range(12)]
+        with patch('badang_elliott_research.confirmed_pivots',return_value=pivots):
+            abc=abc_scenarios(rows)
+            impulse=wave_scenarios(rows)
+        self.assertEqual(len(abc),1)
+        self.assertEqual(abc[0]['available_at_bar'],6)
+        self.assertEqual(abc[0]['scenario'],'POSSIBLE_ABC_ZIGZAG_END')
+        self.assertEqual(impulse,[])
     def test_reject_wave_three_shortest(self):
         prices=[100,110,105,110.5,110.2,130]
         pivots=[{'type':'LOW' if i%2==0 else 'HIGH','price':p,
