@@ -30,6 +30,16 @@ class ReversalBacktestTests(unittest.TestCase):
             result=replay(bars(),'EARLY')
         self.assertEqual(result['summary']['HOLDOUT_LONG']['censored'],1)
         self.assertIsNone(result['summary']['HOLDOUT_LONG']['win_rate'])
+    def test_train_cross_split_excluded_from_performance(self):
+        rows=bars()
+        rows[9]=(9000,100.,125.,95.,100.,10.)
+        with patch('badang_reversal_backtest.reversal_candidates',return_value=[candidate(at=7,confirm=None)]):
+            result=replay(rows,'EARLY')
+        group=result['summary']['TRAIN_LONG']
+        self.assertEqual(group['cross_split_trades'],1)
+        self.assertEqual(group['excluded_train_cross_split'],1)
+        self.assertEqual(group['completed_trades'],0)
+        self.assertIsNone(group['win_rate'])
     def test_invalid_kind(self):
         with self.assertRaises(ValueError):reversal_signals(bars(),'UNKNOWN')
 
