@@ -77,7 +77,13 @@ def audit_trades(candles, signals, *, fee_rate=0.0006, slippage_rate=0.0003):
         gross=sign*(exit_price-entry)/entry
         net=gross-2*(fee_rate+slippage_rate)
         trades.append({'mode':s.get('mode','UNSPECIFIED'),'side':side,'band':band,
-                       'signal_bar':bar,'entry_bar':bar+1,'exit_bar':exit_bar,
+                       'signal_bar':bar,'signal_timestamp':candles[bar][0],
+                       'entry_bar':bar+1,'entry_timestamp':candles[bar+1][0],
+                       'entry_price':entry,'stop_price':stop,'target_price':target,
+                       'exit_bar':exit_bar,'exit_timestamp':candles[exit_bar][0],
+                       'exit_price':exit_price,'exit_reason':('END_OF_DATA' if exit_bar==len(candles)-1 and not (candles[exit_bar][2]>=target if side=='LONG' else candles[exit_bar][3]<=target) and not (candles[exit_bar][3]<=stop if side=='LONG' else candles[exit_bar][2]>=stop) else 'PRICE_TRIGGER'),
+                       'entry_fee_rate':fee_rate,'exit_fee_rate':fee_rate,
+                       'entry_slippage_rate':slippage_rate,'exit_slippage_rate':slippage_rate,
                        'gross_return':gross,'net_return':net})
         last_exit=exit_bar
     groups={}
