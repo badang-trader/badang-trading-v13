@@ -13,16 +13,22 @@ def main():
     out.mkdir(parents=True,exist_ok=True)
     manifest={'collected_at_ms':int(time.time()*1000),'markets':[],
               'errors':[],'status':'INCOMPLETE','primary':'BITGET','secondary':'OKX'}
+    pages=int(os.environ.get('BADANG_BITGET_PAGES','3'))
+    if not 1<=pages<=8:raise ValueError('BADANG_BITGET_PAGES must be 1..8')
     for symbol in ('BTC','ETH'):
         for frame in ('15m','30m','1H','4H','1D'):
             key=f'{symbol}_{frame}'
             try:
-                result=fetch_bitget_closed_history(symbol,frame,pages=8)
+                result=fetch_bitget_closed_history(symbol,frame,pages=pages)
                 (out/f'bitget_{key}.json').write_text(json.dumps(result),encoding='utf-8')
                 manifest['markets'].append({'market':key,**result['provenance']})
             except Exception as exc:
                 manifest['errors'].append({'market':key,'type':type(exc).__name__,
                                            'message':str(exc)[:250]})
+            finally:
+                (out/'bitget_manifest.json').write_text(json.dumps(manifest,indent=2),encoding='utf-8')
+                print(json.dumps({'market':key,'completed':any(m['market']==key for m in manifest['markets']),
+                                  'errors':len(manifest['errors'])}),flush=True)
     manifest['status']='COMPLETE' if len(manifest['markets'])==10 else 'INCOMPLETE'
     (out/'bitget_manifest.json').write_text(json.dumps(manifest,indent=2),encoding='utf-8')
     comparisons=[]
