@@ -16,6 +16,9 @@ class WaveResearchTests(unittest.TestCase):
         self.assertEqual(result[0]['available_at_bar'],8)
         self.assertEqual(result[0]['status'],'UNVALIDATED_IMPULSE_GEOMETRY')
         self.assertLess(result[0]['retracement_618'],result[0]['retracement_382'])
+        self.assertIsNone(result[0]['invalidation_price'])
+        self.assertEqual(result[0]['terminal_reference_price'],130)
+        self.assertEqual(result[0]['invalidation_status'],'NOT_VALIDATED_FOR_WAVE_DEGREE')
     def test_abc_separate_from_impulse_and_causal(self):
         prices=[110,90,100,75]
         pivots=[{'type':'HIGH' if i%2==0 else 'LOW','price':p,
@@ -27,6 +30,8 @@ class WaveResearchTests(unittest.TestCase):
         self.assertEqual(len(abc),1)
         self.assertEqual(abc[0]['available_at_bar'],6)
         self.assertEqual(abc[0]['scenario'],'POSSIBLE_ABC_ZIGZAG_END')
+        self.assertIsNone(abc[0]['invalidation_price'])
+        self.assertEqual(abc[0]['terminal_reference_price'],75)
         self.assertEqual(impulse,[])
     def test_reject_wave_three_shortest(self):
         prices=[100,110,105,110.5,110.2,130]
