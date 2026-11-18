@@ -58,6 +58,7 @@ def audit_trades(candles, signals, *, fee_rate=0.0006, slippage_rate=0.0003):
         if side=='SHORT' and not (target<entry<stop): continue
         exit_bar=len(candles)-1
         exit_price=candles[-1][4]
+        exit_reason='END_OF_DATA'
         for k in range(bar+1,len(candles)):
             hi,lo=candles[k][2],candles[k][3]
             hit_stop=lo<=stop if side=='LONG' else hi>=stop
@@ -67,8 +68,10 @@ def audit_trades(candles, signals, *, fee_rate=0.0006, slippage_rate=0.0003):
                 # Opening gaps beyond stop/target must not receive a better stop fill.
                 op=candles[k][1]
                 if hit_stop:
+                    exit_reason='STOP'
                     exit_price=min(stop,op) if side=='LONG' else max(stop,op)
                 else:
+                    exit_reason='TARGET'
                     # A target crossed by an opening gap is conservatively
                     # filled at the target, not at a better unverified price.
                     exit_price=target
@@ -81,7 +84,7 @@ def audit_trades(candles, signals, *, fee_rate=0.0006, slippage_rate=0.0003):
                        'entry_bar':bar+1,'entry_timestamp':candles[bar+1][0],
                        'entry_price':entry,'stop_price':stop,'target_price':target,
                        'exit_bar':exit_bar,'exit_timestamp':candles[exit_bar][0],
-                       'exit_price':exit_price,'exit_reason':('END_OF_DATA' if exit_bar==len(candles)-1 and not (candles[exit_bar][2]>=target if side=='LONG' else candles[exit_bar][3]<=target) and not (candles[exit_bar][3]<=stop if side=='LONG' else candles[exit_bar][2]>=stop) else 'PRICE_TRIGGER'),
+                       'exit_price':exit_price,'exit_reason':exit_reason,
                        'entry_fee_rate':fee_rate,'exit_fee_rate':fee_rate,
                        'entry_slippage_rate':slippage_rate,'exit_slippage_rate':slippage_rate,
                        'gross_return':gross,'net_return':net})
