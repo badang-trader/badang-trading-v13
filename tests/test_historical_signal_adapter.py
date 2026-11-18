@@ -22,6 +22,19 @@ class HistoricalSignalAdapterTests(unittest.TestCase):
         r=score_historical_prefixes(self.rows,self.rows,self.rows,'scalp',
                                     setup_frame='15m',lower_frame='15m',higher_frame='1H')
         self.assertEqual(r['status'],'FUTURE_TIMEFRAME_BAR_REJECTED')
+    def test_neutral_observed_flow_does_not_emit_signal(self):
+        r=score_historical_prefixes(
+            self.rows,self.rows,self.rows,'scalp',
+            {'state':'NEUTRAL','source':'HISTORICAL_OBSERVED'},
+            setup_frame='15m',lower_frame='15m',higher_frame='15m')
+        self.assertEqual(r['status'],'WAIT_HISTORICAL_CONDITIONS_NOT_MET')
+        self.assertIsNone(r['signal'])
+    def test_opposite_flow_does_not_emit_signal(self):
+        r=score_historical_prefixes(
+            self.rows,self.rows,self.rows,'scalp',
+            {'state':'SELL','source':'HISTORICAL_OBSERVED'},
+            setup_frame='15m',lower_frame='15m',higher_frame='15m')
+        self.assertIsNone(r['signal'])
     def test_missing_timeframe_metadata_rejected(self):
         r=score_historical_prefixes(self.rows,self.rows,self.rows,'scalp')
         self.assertEqual(r['status'],'TIMEFRAME_PROVENANCE_MISSING')
