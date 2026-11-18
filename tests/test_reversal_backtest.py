@@ -45,10 +45,21 @@ class ReversalBacktestTests(unittest.TestCase):
         with patch('badang_reversal_backtest.reversal_candidates',return_value=[candidate(at=7,confirm=None)]):
             result=replay(rows,'EARLY')
         group=result['summary']['TRAIN_LONG']
-        self.assertEqual(group['cross_split_trades'],1)
+        self.assertEqual(group['cross_split_trades'],0)
+        self.assertEqual(group['censored'],1)
+        self.assertEqual(result['trades'][0]['exit_reason'],'END_OF_PARTITION')
+        self.assertIsNone(result['trades'][0]['net_return'])
         self.assertEqual(group['excluded_train_cross_split'],1)
         self.assertEqual(group['completed_trades'],0)
         self.assertIsNone(group['win_rate'])
+    def test_holdout_not_suppressed_by_train_censored_position(self):
+        rows=bars(20)
+        candidates=[candidate(at=12,confirm=None),candidate(at=15,confirm=None)]
+        with patch('badang_reversal_backtest.reversal_candidates',return_value=candidates):
+            result=replay(rows,'EARLY')
+        self.assertEqual(result['summary']['TRAIN_LONG']['censored'],1)
+        self.assertEqual(result['summary']['HOLDOUT_LONG']['signals_traded'],1)
+        self.assertEqual(result['trades'][1]['signal_bar'],15)
     def test_invalid_kind(self):
         with self.assertRaises(ValueError):reversal_signals(bars(),'UNKNOWN')
 
