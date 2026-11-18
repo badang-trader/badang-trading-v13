@@ -66,7 +66,9 @@ jobs:
         if: steps.fetch.outcome == 'success'
         id: bitget
         continue-on-error: true
-        run: python badang_collect_bitget_research.py
+        run: |
+          python badang_collect_bitget_research.py
+          python badang_bitget_technical_experiment.py
       - name: Upload provenance and failure manifest
         if: always()
         uses: actions/upload-artifact@v4
