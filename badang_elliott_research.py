@@ -5,6 +5,20 @@ at the final pivot confirmation; no future bars are needed to label it.
 """
 from badang_real_pivot_audit import confirmed_pivots
 
+def _causal_pivots(pivots, rows):
+    """Reject invalid pivot timestamps rather than silently labeling hindsight."""
+    out=[]
+    previous_confirmation=-1
+    for p in pivots:
+        pivot=int(p['pivot_bar']); confirmed=int(p['confirmed_at_bar'])
+        if not (0<=pivot<=confirmed<len(rows)):
+            raise ValueError('pivot confirmation outside available closed bars')
+        if confirmed<previous_confirmation:
+            raise ValueError('pivot confirmations not chronological')
+        previous_confirmation=confirmed
+        out.append(p)
+    return out
+
 def _alternating(pivots):
     out=[]
     for p in pivots:
@@ -16,7 +30,7 @@ def _alternating(pivots):
     return out
 
 def wave_scenarios(rows):
-    pivots=_alternating(confirmed_pivots(rows))
+    pivots=_alternating(_causal_pivots(confirmed_pivots(rows),rows))
     scenarios=[]
     for k in range(5,len(pivots)):
         p=pivots[k-5:k+1]
@@ -43,6 +57,10 @@ def wave_scenarios(rows):
             'terminal_reference_price':prices[5],
             'invalidation_status':'NOT_VALIDATED_FOR_WAVE_DEGREE',
             'confirmation_lag_bars':p[-1]['confirmed_at_bar']-p[-1]['pivot_bar'],
+            'wave_degree':'UNVERIFIED',
+            'internal_subdivision':'UNVERIFIED',
+            'structural_rule_evidence':'GEOMETRY_ONLY',
+            'live_signal_eligible':False,
             'retracement_382':prices[5]-sign*span*.382,
             'retracement_618':prices[5]-sign*span*.618,
             'caveat':'Illustrative 5-leg geometry only; wave degree, extension, ABC and trade outcome unverified'})
