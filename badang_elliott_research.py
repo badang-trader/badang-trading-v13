@@ -71,7 +71,7 @@ def abc_scenarios(rows):
 
     Geometry is descriptive, not a validated 5-3-5 subdivision or prediction.
     """
-    pivots=_alternating(confirmed_pivots(rows))
+    pivots=_alternating(_causal_pivots(confirmed_pivots(rows),rows))
     result=[]
     for k in range(3,len(pivots)):
         p=pivots[k-3:k+1]
