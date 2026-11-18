@@ -58,18 +58,16 @@ def run_experiment(frames,mode):
         if s:
             signals.append({'bar':bar,'known_at_bar':bar,
                 'signal_timestamp':candles[bar][0],**s})
-    # Partition by signal date. Trade outcomes can extend across boundary,
-    # so evaluate train and holdout on their own candle slices.
+    # One continuous chronological replay prevents an artificial liquidation at
+    # the train/holdout boundary. Attribute by signal time, not exit time.
+    # Trades still open at the dataset end are censored, never scored as wins.
+    replay=audit_trades(candles,signals)
     def partition(start,end):
-        selected=[]
-        for s in signals:
-            if start<=s['bar']<end-1:
-                item=dict(s)
-                item['bar']-=start
-                item['known_at_bar']-=start
-                selected.append(item)
-        result=audit_trades(candles[start:end],selected)
-        trades=result['trades']
+        selected=[s for s in signals if start<=s['bar']<end]
+        trades=[t for t in replay['trades']
+                if start<=t['signal_bar']<end and t['exit_reason']!='END_OF_DATA']
+        censored=[t for t in replay['trades']
+                  if start<=t['signal_bar']<end and t['exit_reason']=='END_OF_DATA']
         equity=1.0
         peak=1.0
         drawdown=0.0
@@ -82,14 +80,15 @@ def run_experiment(frames,mode):
             consecutive=consecutive+1 if trade['net_return']<0 else 0
             max_consecutive=max(max_consecutive,consecutive)
         return {'signals':len(selected),'trades':len(trades),
+                'censored_end_of_data':len(censored),
                 'wins':sum(t['net_return']>0 for t in trades),
                 'win_rate':sum(t['net_return']>0 for t in trades)/len(trades) if trades else None,
                 'mean_net_return':sum(t['net_return'] for t in trades)/len(trades) if trades else None,
                 'compounded_net_return':equity-1 if trades else None,
                 'max_drawdown':drawdown if trades else None,
                 'max_consecutive_losses':max_consecutive if trades else None,
-                'groups':result['groups'],'trade_details':trades,
-                'assumptions':result['assumptions']}
+                'trade_details':trades,'censored_trade_details':censored,
+                'assumptions':replay['assumptions']}
     return {'setup_bars':len(candles),'split_bar':split,
             'rejected_insufficient_history':rejected_history,
             'train':partition(0,split),'holdout':partition(split,len(candles))}
@@ -105,7 +104,8 @@ def main():
         'execution':'next bar open, 0.06% fee and 0.03% slippage each side',
         'limitations':['no OI','no trade CVD','no original BADANG score',
             'short history','no parameter tuning','holdout sample may be small',
-            'train trades crossing split are truncated at split close',
+            'trades crossing split remain open; attributed to signal period',
+            'end-of-data exits excluded as censored',
             'returns are unit-notional, not account equity or leveraged PnL'],
         'results':[]}
     for symbol in ('BTC','ETH'):
