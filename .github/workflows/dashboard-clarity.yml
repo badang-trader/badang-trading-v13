@@ -42,6 +42,7 @@ jobs:
       - run: python -m unittest discover -s tests -p 'test_bitget_technical_experiment.py' -v
       - run: python -m unittest discover -s tests -p 'test_reversal_research.py' -v
       - run: python -m unittest discover -s tests -p 'test_reversal_divergence.py' -v
+      - run: python -m unittest discover -s tests -p 'test_reversal_outcomes.py' -v
 
   collect-okx-research:
     runs-on: ubuntu-latest
