@@ -1,5 +1,6 @@
 """Read-only primary Bitget reversal candidate audit; no trading orders."""
 import json
+from collections import Counter
 from pathlib import Path
 from badang_reversal_research import reversal_candidates
 from badang_reversal_divergence import confirmed_divergences
@@ -20,11 +21,32 @@ def main():
             candidates=reversal_candidates(rows)
             divergences=confirmed_divergences(rows)
             outcomes=evaluate_reversal_candidates(rows,candidates,horizon=24)
+            divergence_types=Counter(d['classification'] for d in divergences)
+            divergence_indicators=Counter(d['indicator'] for d in divergences)
+            candidate_directions=Counter(d['direction'] for d in candidates)
+            # Association requires divergence availability at or before the
+            # candidate and within 24 setup bars; no future divergence matching.
+            associated=0
+            for candidate in candidates:
+                direction='BULLISH' if candidate['direction']=='BULLISH' else 'BEARISH'
+                at=candidate['available_at_bar']
+                if any(d['classification'].startswith('REGULAR_'+direction)
+                       and at-24<=d['available_at_bar']<=at for d in divergences):
+                    associated+=1
             cases.append({'symbol':symbol,'timeframe':frame,'closed_bars':len(rows),
                 'candidate_count':len(candidates),
                 'confirmed_structure_break_count':sum(x['confirmed_at_bar'] is not None for x in candidates),
                 'candidates':candidates,'divergence_count':len(divergences),
-                'divergences':divergences,'outcomes':outcomes})
+                'divergences':divergences,'outcomes':outcomes,
+                'divergence_by_type':dict(divergence_types),
+                'divergence_by_indicator':dict(divergence_indicators),
+                'candidates_by_direction':dict(candidate_directions),
+                'candidates_with_prior_regular_divergence':associated,
+                'first_closed_bar_timestamp_ms':rows[0][0],
+                'last_closed_bar_timestamp_ms':rows[-1][0],
+                'observation_split_bar':int(len(rows)*0.7),
+                'train_candidate_count':sum(x['available_at_bar']<int(len(rows)*0.7) for x in candidates),
+                'holdout_candidate_count':sum(x['available_at_bar']>=int(len(rows)*0.7) for x in candidates)})
     output={'status':'CAUSAL_REVERSAL_CANDIDATES_ONLY',
         'primary_exchange':'BITGET','elliott_classification':'NOT_VALIDATED',
         'rsi_macd_divergence':'CAUSAL_CONFIRMED_PIVOTS','historical_flow':'NOT_AVAILABLE',
