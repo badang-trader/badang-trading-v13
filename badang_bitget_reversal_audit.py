@@ -39,6 +39,6 @@ def main():
         'confirmed_structure_breaks':sum(x['confirmed_structure_break_count'] for x in cases),
         'divergences':sum(x['divergence_count'] for x in cases),
         'outcomes':{status:sum(x['outcomes']['counts'].get(status,0) for x in cases)
-                    for status in ('INVALIDATED','STRUCTURE_LEVEL_TOUCHED','AMBIGUOUS_SAME_BAR','UNRESOLVED')}}))
+                    for status in ('INVALIDATED','STRUCTURE_LEVEL_TOUCHED','AMBIGUOUS_SAME_BAR','UNRESOLVED','CENSORED_END_OF_DATA')}}))
 
 if __name__=='__main__':main()
