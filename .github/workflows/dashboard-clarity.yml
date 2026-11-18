@@ -138,6 +138,8 @@ jobs:
           python badang_reversal_loss_diagnostic.py
           python badang_reversal_causal_context.py
           python badang_reversal_multiframe_report.py
+          python badang_paired_trend_filter.py
+          python badang_portfolio_research.py
       - name: Preserve eight-page results and failure evidence
         if: always()
         uses: actions/upload-artifact@v4
