@@ -18,6 +18,9 @@ class ReversalTests(unittest.TestCase):
             self.assertEqual(item['elliott_label'],'NOT_CLASSIFIED')
             if item['confirmed_at_bar'] is not None:
                 self.assertGreater(item['confirmed_at_bar'],item['available_at_bar'])
+            if item['invalidated_at_bar'] is not None:
+                self.assertGreater(item['invalidated_at_bar'],item['available_at_bar'])
+                self.assertIsNone(item['confirmed_at_bar'])
     def test_no_hindsight_from_appended_rows(self):
         rows=[(i*1000,100,hi,lo,100,1) for i,(hi,lo) in enumerate([
             (101,99),(105,98),(104,99),(103,90),(104,99),
