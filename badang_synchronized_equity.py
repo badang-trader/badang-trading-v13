@@ -7,7 +7,7 @@ Censored trades are excluded and explicitly counted.
 import json
 from pathlib import Path
 from badang_reversal_multiframe_alignment import alignment
-from badang_portfolio_research import simulate
+from badang_portfolio_events import allocate,realized_path
 
 FRAME_MS={'15m':900000,'30m':1800000,'1H':3600000,'4H':14400000,'1D':86400000}
 
@@ -37,28 +37,9 @@ def synchronized_marks(cases,histories,*,strategy='early',partition='HOLDOUT',
             trades.append({'key':key,'t':t,'entry_ts':int(rows[i][0]),
                            'exit_ts':int(rows[j][0])+step,
                            'step':step,'rows':rows})
-    trades.sort(key=lambda a:(a['entry_ts'],a['exit_ts'],a['key']))
-    cash=initial_capital;active=[];accepted=[];rejected=0
-    # Strictly earlier exit frees margin; same-timestamp exits are handled
-    # only after the entry batch, never before it.
-    for e in trades:
-        start=e['entry_ts']
-        for a in list(active):
-            if a['exit_ts']<start:
-                cash+=a['pnl'];active.remove(a)
-        locked=sum(a['margin'] for a in active)
-        margin=min(max(0,cash)*margin_fraction,
-                   max(0,cash)*max_total_margin_fraction-locked,
-                   max(0,cash-locked))
-        if margin<=0:
-            rejected+=1;continue
-        t=e['t']
-        e.update(margin=margin,pnl=margin*leverage*float(t['net_return']),
-                 exposure=margin*leverage,entry=float(t['entry']))
-        active.append(e);accepted.append(e)
-    # This allocates margin on entry using prior realized exits, but never
-    # reallocates it based on future mark-to-market. End cash is realized only.
-    final_cash=initial_capital+sum(a['pnl'] for a in accepted)
+    accepted,rejected=allocate(trades,initial_capital,margin_fraction,leverage,
+                               max_total_margin_fraction)
+    final_cash,realized_dd=realized_path(accepted,initial_capital)
     # Exact close-time marks: a position is observed only at candle close,
     # and only before its recorded exit timestamp.
     close_maps={}
@@ -94,6 +75,7 @@ def synchronized_marks(cases,histories,*,strategy='early',partition='HOLDOUT',
             'strategy':strategy,'partition':partition,'filter':filter_name or 'NONE',
             'initial_capital':initial_capital,'ending_realized_cash':final_cash,
             'realized_return':final_cash/initial_capital-1,
+            'realized_event_drawdown':realized_dd,
             'close_observed_drawdown':worst_dd if observations else None,
             'complete_close_observations':len(observations),
             'skipped_incomplete_mark_timestamps':incomplete,
