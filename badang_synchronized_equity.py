@@ -5,6 +5,7 @@ Not an intrabar equity bound, liquidation engine, or exchange mark-price replay.
 Censored trades are excluded and explicitly counted.
 """
 import json
+from collections import Counter
 from pathlib import Path
 from badang_reversal_multiframe_alignment import alignment
 from badang_portfolio_events import allocate,realized_path
@@ -49,6 +50,7 @@ def synchronized_marks(cases,histories,*,strategy='early',partition='HOLDOUT',
     timestamps=sorted({ts for a in accepted for ts in close_maps[a['key']]
                        if a['entry_ts']<ts<a['exit_ts']})
     observations=[];peak=initial_capital;worst_dd=0.;incomplete=0
+    missing_by_frame=Counter();missing_position_marks=0;max_missing_at_timestamp=0
     for ts in timestamps:
         realized=initial_capital+sum(a['pnl'] for a in accepted if a['exit_ts']<ts)
         opened=[a for a in accepted if a['entry_ts']<ts<a['exit_ts']]
@@ -62,6 +64,9 @@ def synchronized_marks(cases,histories,*,strategy='early',partition='HOLDOUT',
             marks.append((a,pnl))
         if missing:
             incomplete+=1
+            missing_position_marks+=len(missing)
+            max_missing_at_timestamp=max(max_missing_at_timestamp,len(missing))
+            missing_by_frame.update(frame for _,frame in missing)
             continue
         equity=realized+sum(p for _,p in marks)
         locked=sum(a['margin'] for a in opened)
@@ -79,6 +84,11 @@ def synchronized_marks(cases,histories,*,strategy='early',partition='HOLDOUT',
             'close_observed_drawdown':worst_dd if observations else None,
             'complete_close_observations':len(observations),
             'skipped_incomplete_mark_timestamps':incomplete,
+            'missing_position_marks':missing_position_marks,
+            'missing_by_timeframe':dict(sorted(missing_by_frame.items())),
+            'max_missing_positions_at_one_timestamp':max_missing_at_timestamp,
+            'complete_timestamp_coverage':(len(observations)/(len(observations)+incomplete)
+                if observations or incomplete else None),
             'accepted':len(accepted),'rejected_insufficient_margin':rejected,
             'excluded_by_filter':excluded,'unknown_filter':unknown,
             'censored_excluded':censored,'observations':observations,
