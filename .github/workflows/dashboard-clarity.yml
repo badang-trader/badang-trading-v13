@@ -149,6 +149,7 @@ jobs:
           python badang_portfolio_research.py
           python badang_intratrade_stress.py
           python badang_synchronized_equity.py
+          python badang_portfolio_parity_audit.py
       - name: Preserve eight-page results and failure evidence
         if: always()
         uses: actions/upload-artifact@v4
