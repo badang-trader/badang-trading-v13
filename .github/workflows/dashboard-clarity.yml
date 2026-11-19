@@ -56,6 +56,7 @@ jobs:
       - run: python -m unittest discover -s tests -p 'test_synchronized_equity.py' -v
       - run: python -m unittest discover -s tests -p 'test_portfolio_equity_parity.py' -v
       - run: python -m unittest discover -s tests -p 'test_portfolio_parity_audit.py' -v
+      - run: python -m unittest discover -s tests -p 'test_prospective_holdout_gate.py' -v
       - run: python -m unittest discover -s tests -p 'test_elliott_research.py' -v
       - run: python -m unittest discover -s tests -p 'test_wave_divergence_association.py' -v
 
