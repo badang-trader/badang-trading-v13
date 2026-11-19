@@ -32,5 +32,9 @@ class SynchronizedEquityTests(unittest.TestCase):
         r=synchronized_marks(cases,{('BTC','15m'):rows,('ETH','30m'):slow})
         self.assertGreater(r['skipped_incomplete_mark_timestamps'],0)
         self.assertEqual(r['risk_warnings'][4],'MISSING_MARK_TIMESTAMPS_SKIPPED')
+        self.assertGreater(r['missing_by_timeframe'].get('30m',0),0)
+        self.assertGreater(r['missing_position_marks'],0)
+        self.assertLess(r['complete_timestamp_coverage'],1.0)
+        self.assertEqual(sum(r['missing_by_timeframe'].values()),r['missing_position_marks'])
 
 if __name__=='__main__':unittest.main()
