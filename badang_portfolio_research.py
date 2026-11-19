@@ -7,6 +7,8 @@ Missing/unfinished exits are excluded and counted, never marked as winners.
 import json
 from pathlib import Path
 from badang_reversal_multiframe_alignment import alignment
+from badang_portfolio_events import allocate,realized_path
+from badang_historical_integrity import FRAME_MS
 
 def simulate(cases,histories,*,strategy='early',partition='HOLDOUT',
              filter_name=None,initial_capital=10000.0,
@@ -33,36 +35,18 @@ def simulate(cases,histories,*,strategy='early',partition='HOLDOUT',
             entry_bar=t['entry_bar'];exit_bar=t['exit_bar']
             if not (0<=entry_bar<=exit_bar<len(candles)):
                 raise ValueError('trade outside candle history')
-            entry_ts=candles[entry_bar][0];exit_ts=candles[exit_bar][0]
-            events.append((entry_ts,exit_ts,key,t))
-    events.sort(key=lambda e:(e[0],e[1],e[2]))
-    capital=initial_capital;peak=capital;max_dd=0.;accepted=0;rejected=0
-    realized=[];active=[];max_margin_used=0.;max_positions=0
-    for start,end,key,t in events:
-        # A same-timestamp exit is not known before a same-timestamp entry:
-        # only exits strictly earlier than entry release margin.
-        still=[]
-        for a in active:
-            if a['exit_ts']<start:
-                capital+=a['pnl'];realized.append(a)
-                peak=max(peak,capital);max_dd=max(max_dd,(peak-capital)/peak)
-            else:still.append(a)
-        active=still
-        locked=sum(a['margin'] for a in active)
-        available=max(0,capital-locked)
-        margin=min(max(0,capital)*margin_fraction,
-                   max(0,capital)*max_total_margin_fraction-locked,
-                   available)
-        if margin<=0 or capital<=0:
-            rejected+=1;continue
-        pnl=margin*leverage*t['net_return']
-        active.append({'exit_ts':end,'margin':margin,'pnl':pnl,'key':key})
-        accepted+=1
-        max_positions=max(max_positions,len(active))
-        max_margin_used=max(max_margin_used,sum(a['margin'] for a in active))
-    for a in sorted(active,key=lambda x:x['exit_ts']):
-        capital+=a['pnl'];realized.append(a)
-        peak=max(peak,capital);max_dd=max(max_dd,(peak-capital)/peak)
+            entry_ts=candles[entry_bar][0];exit_ts=candles[exit_bar][0]+FRAME_MS[key[1]]
+            events.append({'entry_ts':entry_ts,'exit_ts':exit_ts,'key':key,'t':t})
+    accepted_events,rejected=allocate(events,initial_capital,margin_fraction,
+                                      leverage,max_total_margin_fraction)
+    capital,max_dd=realized_path(accepted_events,initial_capital)
+    accepted=len(accepted_events)
+    max_positions=0;max_margin_used=0.
+    for a in accepted_events:
+        simultaneous=[b for b in accepted_events
+                      if b['entry_ts']<=a['entry_ts']<=b['exit_ts']]
+        max_positions=max(max_positions,len(simultaneous))
+        max_margin_used=max(max_margin_used,sum(b['margin'] for b in simultaneous))
     return {'research_only':True,'model':'CLOSED_TRADE_EVENT_REPLAY_NOT_MARK_TO_MARKET',
         'liquidation_risk':'NOT_MODELED','same_timestamp_exit_margin_reuse':False,
         'strategy':strategy,'partition':partition,'filter':filter_name or 'NONE',
