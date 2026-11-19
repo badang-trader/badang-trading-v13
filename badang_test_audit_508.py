@@ -39,6 +39,13 @@ def audit(start_dir='.', pattern='test*.py', loader=None, runner=None):
             outcome = (runner or unittest.TextTestRunner(stream=stream, verbosity=0)).run(suite)
         result.update(tests_run=outcome.testsRun, failures=len(outcome.failures),
                       errors=len(outcome.errors), skipped=len(outcome.skipped))
+        # Diagnostic names only: never print exception traces, candle data or secrets.
+        # This makes failing regressions actionable without exposing credentials.
+        def _safe_test_id(test):
+            name = test.id() if hasattr(test, 'id') else type(test).__name__
+            return name if re.fullmatch(r'[A-Za-z0-9_.]{1,180}', name) else 'REDACTED'
+        result['failed_test_ids'] = [_safe_test_id(test) for test, _ in outcome.failures][:20]
+        result['errored_test_ids'] = [_safe_test_id(test) for test, _ in outcome.errors][:20]
         missing = set()
         dependency_errors = 0
         for _, trace in outcome.errors:

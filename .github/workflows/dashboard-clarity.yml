@@ -1,0 +1,161 @@
+name: BADANG dashboard clarity checks
+on:
+  push:
+    branches: [badang-514-ui-clarity, badang-514-validation-ui-bridge]
+  pull_request:
+    paths:
+      - badang_dashboard.py
+      - badang_decision_427.py
+      - tests/test_wave_structure.py
+      - badang_position_scenarios.py
+      - tests/test_position_scenarios.py
+      - tests/test_divergence_order.py
+      - tests/test_dashboard_clarity.py
+      - .github/workflows/dashboard-clarity.yml
+  workflow_dispatch:
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: pip install -r requirements.txt
+      - run: python -m unittest discover -s tests -p 'test_dashboard_clarity.py' -v
+      - run: python -m unittest discover -s tests -p 'test_wave_structure.py' -v
+      - run: python -m unittest discover -s tests -p 'test_position_scenarios.py' -v
+      - run: python -m unittest discover -s tests -p 'test_divergence_order.py' -v
+      - run: python -m unittest discover -s tests -p 'test_stop_side.py' -v
+      - run: python -m unittest discover -s tests -p 'test_indicator_reference.py' -v
+      - run: python -m unittest discover -s tests -p 'test_closed_feed_integrity.py' -v
+      - run: python -m unittest discover -s tests -p 'test_walkforward_audit.py' -v
+      - run: python -m unittest discover -s tests -p 'test_confirmed_wave_pivots.py' -v
+      - run: python -m unittest discover -s tests -p 'test_historical_integrity.py' -v
+      - run: python -m unittest discover -s tests -p 'test_historical_replay.py' -v
+      - run: python -m unittest discover -s tests -p 'test_historical_signal_adapter.py' -v
+      - run: python -m unittest discover -s tests -p 'test_okx_history.py' -v
+      - run: python -m unittest discover -s tests -p 'test_real_pivot_audit.py' -v
+      - run: python -m unittest discover -s tests -p 'test_bitget_technical_experiment.py' -v
+      - run: python -m unittest discover -s tests -p 'test_reversal_research.py' -v
+      - run: python -m unittest discover -s tests -p 'test_reversal_divergence.py' -v
+      - run: python -m unittest discover -s tests -p 'test_reversal_outcomes.py' -v
+      - run: python -m unittest discover -s tests -p 'test_reversal_backtest.py' -v
+      - run: python -m unittest discover -s tests -p 'test_reversal_artifact_consistency.py' -v
+      - run: python -m unittest discover -s tests -p 'test_timeframe_exposure.py' -v
+      - run: python -m unittest discover -s tests -p 'test_reversal_loss_diagnostic.py' -v
+      - run: python -m unittest discover -s tests -p 'test_reversal_causal_prefix.py' -v
+      - run: python -m unittest discover -s tests -p 'test_reversal_causal_context.py' -v
+      - run: python -m unittest discover -s tests -p 'test_reversal_multiframe_alignment.py' -v
+      - run: python -m unittest discover -s tests -p 'test_paired_trend_filter.py' -v
+      - run: python -m unittest discover -s tests -p 'test_portfolio_research.py' -v
+      - run: python -m unittest discover -s tests -p 'test_intratrade_stress.py' -v
+      - run: python -m unittest discover -s tests -p 'test_synchronized_equity.py' -v
+      - run: python -m unittest discover -s tests -p 'test_portfolio_equity_parity.py' -v
+      - run: python -m unittest discover -s tests -p 'test_portfolio_parity_audit.py' -v
+      - run: python -m unittest discover -s tests -p 'test_prospective_holdout_gate.py' -v
+      - run: python -m unittest discover -s tests -p 'test_elliott_research.py' -v
+      - run: python -m unittest discover -s tests -p 'test_wave_divergence_association.py' -v
+
+  collect-okx-research:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install requests
+      - name: Fetch actual OKX candles (failure recorded, not hidden)
+        id: fetch
+        continue-on-error: true
+        run: python badang_collect_okx_research.py
+      - name: Audit real OKX candles with existing BADANG indicators
+        if: steps.fetch.outcome == 'success'
+        id: indicators
+        continue-on-error: true
+        run: |
+          pip install -r requirements.txt
+          python badang_research_audit.py
+          python badang_real_pivot_audit.py
+          python badang_historical_signal_readiness.py
+      - name: Collect Bitget primary historical data and compare available OKX
+        if: always() && steps.fetch.outcome != 'cancelled'
+        id: bitget
+        continue-on-error: true
+        run: |
+          python badang_collect_bitget_research.py
+          python badang_bitget_technical_experiment.py
+          python badang_bitget_reversal_audit.py
+          python badang_reversal_artifact_consistency.py
+          python badang_timeframe_exposure.py
+          python badang_reversal_loss_diagnostic.py
+          python badang_reversal_causal_context.py
+          python badang_reversal_multiframe_report.py
+          python badang_paired_trend_filter.py
+          python badang_portfolio_research.py
+          python badang_intratrade_stress.py
+          python badang_synchronized_equity.py
+          python badang_portfolio_parity_audit.py
+      - name: Upload provenance and failure manifest
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: okx-historical-research
+          path: research-output/
+          if-no-files-found: warn
+          retention-days: 7
+      - name: Report collection status
+        if: always()
+        run: |
+          if [ "${{ steps.bitget.outcome }}" != "success" ]; then
+            echo "::warning::Bitget primary historical collection failed; see bitget_manifest.json."
+          fi
+          if [ "${{ steps.fetch.outcome }}" != "success" ]; then
+            echo "::warning::OKX comparison incomplete; inspect manifest. Bitget independent result must be checked separately."
+          fi
+      - name: Enforce primary Bitget data validation result
+        if: always()
+        run: |
+          if [ "${{ steps.bitget.outcome }}" != "success" ]; then
+            echo "::error::Primary Bitget research failed or was skipped. CI data validation is NOT successful."
+            exit 1
+          fi
+
+  bitget-eight-page-stage43:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      BADANG_BITGET_PAGES: '8'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r requirements.txt
+      - name: Collect Bitget eight-page historical data
+        run: python badang_collect_bitget_research.py
+      - name: Recalculate current reversal and Elliott research
+        run: |
+          python badang_bitget_reversal_audit.py
+          python badang_reversal_artifact_consistency.py
+          python badang_timeframe_exposure.py
+          python badang_reversal_loss_diagnostic.py
+          python badang_reversal_causal_context.py
+          python badang_reversal_multiframe_report.py
+          python badang_paired_trend_filter.py
+          python badang_portfolio_research.py
+          python badang_intratrade_stress.py
+          python badang_synchronized_equity.py
+          python badang_portfolio_parity_audit.py
+      - name: Preserve eight-page results and failure evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bitget-eight-page-stage43
+          path: research-output/
+          if-no-files-found: warn
+          retention-days: 7
