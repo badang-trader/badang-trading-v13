@@ -58,7 +58,7 @@ def synchronized_marks(cases,histories,*,strategy='early',partition='HOLDOUT',
             if mark is None:
                 missing.append(a['key']);continue
             direction=1 if a['t']['side']=='LONG' else -1
-            pnl=a['exposure']*direction*(mark/a['entry']-1)
+            pnl=a['exposure']*direction*(mark/float(a['t']['entry'])-1)
             marks.append((a,pnl))
         if missing:
             incomplete+=1
