@@ -32,3 +32,48 @@ F. Never claim trading readiness until CI, causal replay, independent sample, an
 
 ## Current verification status
 Existing GitHub Actions on commit `36cd56d1` (2026-11-15 UTC) show **807 tests, 2 failures**. The test audit suppresses failure traceback; root causes remain unverified. This research note is not a code fix or passing test claim. Do not merge into main or deploy to Render.
+
+
+## Follow-up evidence review — 2026-11-20 (research only)
+
+### Source provenance and disagreement
+- R.N. Elliott's *The Wave Principle* (1938) is the historical origin. EWI's history dates publication to 1938-08-31: https://www.elliottwave.com/free/introduction-to-the-wave-principle/ . The original full text was not independently inspected in this review; do not describe modern detailed rules as verbatim Elliott quotations.
+- Frost & Prechter's *Elliott Wave Principle* (first published 1978) is a later interpretive textbook, not the 1938 primary source: https://www.elliottwave.com/books/elliott-wave-principle/
+- EWI's diagonal discussion distinguishes ending diagonals (typically 3-3-3-3-3 internals) from leading diagonals; it acknowledges ambiguous leading-diagonal internals, including 5-3-5-3-5 in some cases: https://www.elliottwave.com/waveopedia/elliott-wave-pattern-diagonals/
+- StockCharts' introduction describes leading diagonals as 5-3-5-3-5; this is a **source-dependent convention**, not an agreed universal classifier: https://chartschool.stockcharts.com/table-of-contents/market-analysis/elliott-wave-analysis-articles/identifying-elliott-wave-patterns
+- D'Angelo & Grimaldi (2017), EUR/USD 2009–2015, report favorable retrospective forecasting: https://doi.org/10.5539/ibr.v10n6p1 . This does not establish out-of-sample BTC/ETH trading profitability.
+- Applied Sciences (2024) on multi-agent Elliott interpretation explicitly discusses subjective labeling and overfitting risk: https://www.mdpi.com/2076-3417/14/24/11897 . No reproduction or independent cryptocurrency validation was completed in this review.
+
+### Pattern taxonomy for a future research-only classifier
+| Pattern | Indicative internals | Rule versus heuristic | Status in current engine |
+| --- | --- | --- | --- |
+| Ordinary impulse | 5-3-5-3-5 | wave 2 origin, wave 3 not shortest, wave 4 non-overlap: structural rules | Six extrema only; lower-degree internals unverified |
+| Ending diagonal (wave 5/C) | 3-3-3-3-3 | wave 1/4 overlap is allowed; wedge, volume, throw-over are contextual | No dedicated classifier |
+| Leading diagonal (wave 1/A) | disputed 3-3-3-3-3 or 5-3-5-3-5 | preserve source-specific alternatives | No dedicated classifier |
+| Zigzag | 5-3-5 | B cannot exceed A origin; ratios are guidelines | Generic ABC swings only |
+| Flat | 3-3-5 | B usually retraces >=90% of A; verify lower-degree structure | No dedicated classifier |
+| Triangle | 3-3-3-3-3 (A-B-C-D-E) | require five legs and converging/other permitted boundaries | No dedicated classifier |
+| W-X-Y / W-X-Y-X-Z | corrective combinations | require independent component classification | No dedicated classifier |
+| Extended wave 3 / truncated 5 | requires nested impulse evidence | extension ratios and divergence are not proof | No confirmed detection |
+
+### Specific hypothesis: downward wave 3 extension vs wave 5 exhaustion
+- **Primary hypothesis A:** current fall is the end of wave 5. Minimum evidence: completed lower-degree fifth wave, non-contradictory higher-degree count, and confirmation after the final pivot is observable. RSI/MACD divergence or decreasing volume can support, but cannot establish completion.
+- **Alternative hypothesis B:** current fall is an extended wave 3, with a later wave 4 and wave 5 still possible. Do not call a bounce a reversal merely because an oscillator diverges.
+- Maintain both hypotheses as `unconfirmed` until enough closed bars and confirmed nested pivots exist. Every observation must record when the last pivot **became knowable**, not merely its historical pivot timestamp.
+- An actual pattern-specific invalidation requires explicit rules per count and the correct pattern subtype. The current `invalidation_price` is a **structural reference** and must not be used as an automatic stop or a verified invalidation threshold.
+- After a rule is contradicted, retire that count, retain alternatives, and recompute from information available at that closed bar. Never automatically reverse position.
+
+### Causal validation protocol before any trading claim
+1. Archive immutable candle batches with exchange, instrument, market type, timeframe, UTC open/close, data source, and ingestion timestamps. Reject duplicates, gaps and unfinished candles; do not infer completeness from 1000 rows alone.
+2. At time `t`, generate pivots and candidates using only candles closed by `t`. Radius-3 pivot at index `i` first becomes observable at `i+3`; account for pivot replacement/repainting on subsequent bars.
+3. Pre-register label definitions and outcome horizons (e.g. 5/10/20 bars), deduplicate correlated observations, and compare wave candidate policy against EMA/RSI baselines and a no-wave benchmark.
+4. Walk-forward train/calibration/test partitions by chronological time; embargo overlapping horizons; hold out independent later market periods and separately BTC versus ETH. Do not tune Fibonacci bands on test sets.
+5. Report by trend/range and high/low volatility regime, including coverage, calibration, false-positive rates, costs (maker/taker fees, spread, slippage, funding where applicable), net expectancy and maximum drawdown. A candidate count is not a trade.
+6. Treat data gaps, API 429 and short history as explicit `unverified`, not `pass`. Maintain `trading_ready=false` until independently demonstrated.
+
+### Current code audit, 2026-11-20
+- `badang_analysis_v13.py::wave_candidates` remains a preliminary six-pivot / three-swing heuristic, not a validated nested Elliott classifier.
+- `badang_wave_choice_response_587.py` preserves alternative candidates and marks structural levels `invalidation_rule_verified=false`, avoiding a false claim of actionable invalidation.
+- `badang_wave_causal_replay_588.py` replays prefixes of closed candles, but it has no out-of-sample forecast evaluation, execution simulation or calibrated accuracy.
+- `badang_wave_live_research_589.py` counts repeated observations, not independent trades. The report output newline was corrected in the validation branch in this review.
+- No new predictive accuracy, net profitability, or independent-sample statistics were computed during this review. No main/Render/order changes.
