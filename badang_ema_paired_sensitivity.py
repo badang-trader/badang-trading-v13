@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 from badang_prospective_ema_eligibility import audit
 from badang_censored_equity_replay import replay
+from badang_synchronized_ohlc_stress import stress_snapshots
 from badang_causal_mark_lookup import FRAME_MS
 
 def run(cases,histories):
@@ -45,11 +46,13 @@ def run(cases,histories):
                     for mode,events in modes.items():
                         out=replay([{**e,"leverage":float(lev)} for e in events],
                                    histories,times,initial_capital=10000.,
-                                   margin_fraction=fraction,max_margin_fraction=cap)
+                                   margin_fraction=fraction,max_margin_fraction=cap,
+                                   include_active_positions=True)
                         snaps={s["ts"]:s for s in out["snapshots"]}
                         arms[mode]={"snapshots":snaps,"rejected":len(out["rejected"]),
                                     "expired_partition_count":len(out["expired_partition_ids"]),
-                                    "unclosed_count":len(out["unclosed_ids"])}
+                                    "unclosed_count":len(out["unclosed_ids"]),
+                                    "stress":stress_snapshots(out["snapshots"],histories)}
                     common=sorted(set(arms["ALL"]["snapshots"])&set(arms["EMA_ALIGNED"]["snapshots"]))
                     exact=[ts for ts in common if all(arms[m]["snapshots"][ts]["strict_observed_equity"] is not None
                                                        for m in arms)]
@@ -68,6 +71,7 @@ def run(cases,histories):
                             exact_mdd=max(exact_mdd,(exact_peak-eq)/exact_peak)
                         last=snaps[exact[-1]] if exact else None
                         return {"realized_mdd":realized_mdd,
+                                "synchronized_ohlc_stress":arm["stress"],
                                 "common_exact_close_mdd_lower_bound":exact_mdd,
                                 "rejected":arm["rejected"],
                                 "expired_partition_count":arm["expired_partition_count"],
@@ -117,7 +121,8 @@ def run(cases,histories):
             "cutoff_ms":report["cutoff_ms"],"scenarios":outputs,
             "warnings":["SAME_TIMEFRAME_EMA_ONLY; HTF_FILTER_NOT_EVALUATED",
                         "COMMON_EXACT_CLOSE_MDD_IS_OBSERVATION_LOWER_BOUND",
-                        "NO_INTRABAR_OR_EXCHANGE_LIQUIDATION_MODEL",
+                        "SYNCHRONIZED_OHLC_STRESS_IS_HYPOTHETICAL_NOT_TRUE_INTRABAR_MDD",
+                        "NO_EXCHANGE_LIQUIDATION_MODEL",
                         "HISTORICAL_SIGNAL_SELECTION_NOT_PROSPECTIVELY_VALIDATED"]}
 def main():
     folder=Path("research-output")
