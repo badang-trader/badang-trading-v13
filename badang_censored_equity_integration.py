@@ -61,7 +61,7 @@ def run_scenario(cases,histories,strategy,partition,*,initial_capital=10000,
     missing_count=sum(bool(row["missing_marks"]) for row in snapshots)
     nonexact_count=sum(bool(row["non_exact_marks"]) for row in snapshots)
     counts=Counter(e["reason"] for e in events)
-    return {"strategy":strategy,"partition":partition,"event_counts":dict(counts),
+    return {"strategy":strategy,"partition":partition,"leverage":leverage,"margin_fraction":margin_fraction,"max_margin_fraction":max_margin_fraction,"event_counts":dict(counts),
             "total_candidates":len(events),"accepted":len(events)-len(out["rejected"]),
             "rejected":len(out["rejected"]),"realized_pnl":snapshots[-1]["realized_pnl"] if snapshots else 0.,
             "final_reserved_margin":snapshots[-1]["reserved_margin"] if snapshots else 0.,
@@ -94,11 +94,23 @@ def main():
         for c in cases}
     results=[run_scenario(cases,histories,strategy,partition)
              for strategy in ("early","confirmed") for partition in ("TRAIN","HOLDOUT")]
+    sensitivity=[run_scenario(cases,histories,strategy,"HOLDOUT",
+                    leverage=lev,margin_fraction=margin,max_margin_fraction=limit)
+                 for strategy in ("early","confirmed")
+                 for lev,margin,limit in ((1,.05,.30),(2,.05,.30),
+                                          (3,.05,.30),(2,.03,.30),
+                                          (2,.05,.20))]
     output={"status":"RESEARCH_ONLY_CENSORED_EQUITY_OBSERVED_CLOSE",
-            "source":"BITGET_PUBLIC_HISTORY_API","results":results}
+            "source":"BITGET_PUBLIC_HISTORY_API","results":results,"sensitivity":sensitivity}
     (folder/"bitget_censored_equity_replay.json").write_text(
         json.dumps(output,indent=2,ensure_ascii=False),encoding="utf-8")
     print("censored equity scenarios:",len(results))
+    print("sensitivity scenarios:",len(sensitivity))
+    for r in sensitivity:
+        print("sensitivity:",json.dumps({k:r[k] for k in
+              ("strategy","leverage","margin_fraction","max_margin_fraction",
+               "accepted","rejected","realized_pnl","realized_drawdown",
+               "max_reserved_margin")}))
     for r in results:
         print(json.dumps({k:v for k,v in r.items() if k not in ("unclosed_ids","expired_partition_ids")}))
 if __name__=="__main__":main()
