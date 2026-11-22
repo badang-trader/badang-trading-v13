@@ -37,7 +37,7 @@ class CensoredOhlcStressTests(unittest.TestCase):
         rows=[[1000,100,95,105,100,1]]
         cases=[{"symbol":"ETH","timeframe":"1H","reversal_backtest":{
             "early":{"trades":[{"entry_bar":0,"exit_bar":0,"entry":100,
-                               "net_return":None,"exit_reason":"END_OF_DATA"}]}}]
+                               "net_return":None,"exit_reason":"END_OF_DATA"}]}}}]
         fake={"cutoff_ms":0,"results":[{"symbol":"ETH","timeframe":"1H",
               "strategy":"early","sample_entries":[{"trade_id":"early:ETH:1H:0",
               "side":"LONG","net_return":None}]}]}
