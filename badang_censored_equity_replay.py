@@ -22,14 +22,16 @@ def replay(events, histories, observation_times, *, initial_capital=10000.0,
         if event["reason"] == "CLOSED" and ("exit_ts" not in event or "net_return" not in event):
             raise ValueError("completed trade missing exit")
         if event["reason"] == "END_OF_PARTITION":
-            # Partition-end trades are not transferable into the next period.
-            # Exclude from this continuous account replay, report separately.
-            continue
+            boundary = event.get("partition_end_ts")
+            if boundary is None or boundary < event["entry_ts"]:
+                raise ValueError("partition boundary required")
+            timeline.setdefault(boundary, []).append(("partition_end", event))
         timeline.setdefault(event["entry_ts"], []).append(("entry", event))
         if event["reason"] == "CLOSED":
             timeline.setdefault(event["exit_ts"], []).append(("exit", event))
     active = {}
     realized = 0.0
+    expired_partition_ids = []
     rejected = []
     snapshots = []
     # Exit and entry at same timestamp: exit margin cannot be reused until
@@ -50,6 +52,9 @@ def replay(events, histories, observation_times, *, initial_capital=10000.0,
             p = active.pop(e["id"], None)
             if p is not None:
                 realized += p["margin"] * e["leverage"] * e["net_return"]
+        for _, e in (a for a in actions if a[0] == "partition_end"):
+            if active.pop(e["id"], None) is not None:
+                expired_partition_ids.append(e["id"])
         if ts not in observation_times:
             continue
         unrealized = 0.0
@@ -58,11 +63,6 @@ def replay(events, histories, observation_times, *, initial_capital=10000.0,
         stale = []
         for id_, p in active.items():
             e = p["event"]
-            if e["reason"] == "END_OF_PARTITION":
-                # Training partition truncation is not a live position.
-                # It is excluded from cross-partition account snapshots.
-                if ts > e.get("partition_end_ts", ts):
-                    continue
             key = (e["symbol"], e["timeframe"])
             mark = observed_mark(histories[key], e["timeframe"], ts, max_age_ms=max_age_ms)
             if mark["price"] is None:
@@ -87,4 +87,5 @@ def replay(events, histories, observation_times, *, initial_capital=10000.0,
                           "active_count": len(active)})
     return {"research_only": True, "not_exchange_mark_price": True,
             "no_liquidation_model": True, "rejected": rejected, "snapshots": snapshots,
-            "unclosed_ids": [id_ for id_, p in active.items() if p["event"]["reason"] != "CLOSED"]}
+            "expired_partition_ids": expired_partition_ids,
+            "unclosed_ids": [id_ for id_, p in active.items() if p["event"]["reason"] == "END_OF_DATA"]}
