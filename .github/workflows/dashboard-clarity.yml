@@ -106,6 +106,7 @@ jobs:
           python badang_censored_position_diagnostic.py
           python badang_censored_equity_integration.py
           python badang_prospective_ema_eligibility.py
+          python badang_paired_ema_equity.py
       - name: Upload provenance and failure manifest
         if: always()
         uses: actions/upload-artifact@v4
@@ -160,6 +161,7 @@ jobs:
           python badang_censored_position_diagnostic.py
           python badang_censored_equity_integration.py
           python badang_prospective_ema_eligibility.py
+          python badang_paired_ema_equity.py
       - name: Preserve eight-page results and failure evidence
         if: always()
         uses: actions/upload-artifact@v4
