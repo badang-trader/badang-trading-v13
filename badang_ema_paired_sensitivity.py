@@ -119,9 +119,67 @@ def run(cases,histories,filter_kind="SAME_FRAME"):
                                 "stress_mdd_per_10000_mean_notional":m["synchronized_ohlc_stress"]["synchronized_ohlc_stress_mdd"]/factor,
                                 "close_mdd_per_10000_mean_notional":m["common_exact_close_mdd_lower_bound"]/factor}
                     normalized_all,normalized_ema=normalized(a),normalized(b)
+                    # True chronological account rerun with equal fixed margin PER
+                    # accepted trade, subject to the same aggregate margin cap.
+                    # This does not force equal aggregate exposure at each timestamp.
+                    fixed_arms={}
+                    for mode,events in modes.items():
+                        fixed_out=replay([{**e,"leverage":float(lev)} for e in events],
+                                         histories,times,initial_capital=10000.,
+                                         margin_fraction=fraction,max_margin_fraction=cap,
+                                         fixed_margin_per_trade=10000.*fraction,
+                                         include_active_positions=True)
+                        fixed_snaps={s["ts"]:s for s in fixed_out["snapshots"]}
+                        fixed_arms[mode]={"snaps":fixed_snaps,
+                                          "rejected":len(fixed_out["rejected"]),
+                                          "unclosed":len(fixed_out["unclosed_ids"]),
+                                          "expired":len(fixed_out["expired_partition_ids"])}
+                    fixed_exact=[ts for ts in exact if all(
+                        fixed_arms[mode]["snaps"][ts]["strict_observed_equity"] is not None
+                        for mode in fixed_arms)]
+                    def fixed_summary(mode):
+                        arm=fixed_arms[mode];snap=arm["snaps"]
+                        peak_realized=peak_close=10000.
+                        realized_mdd=close_mdd=0.
+                        for s in snap.values():
+                            eq=10000.+s["realized_pnl"]
+                            peak_realized=max(peak_realized,eq)
+                            realized_mdd=max(realized_mdd,(peak_realized-eq)/peak_realized)
+                        for ts in fixed_exact:
+                            eq=snap[ts]["strict_observed_equity"]
+                            peak_close=max(peak_close,eq)
+                            close_mdd=max(close_mdd,(peak_close-eq)/peak_close)
+                        obs=[snap[ts] for ts in fixed_exact]
+                        last=obs[-1] if obs else None
+                        stress=stress_snapshots(list(snap.values()),histories,
+                                                observation_times=fixed_exact)
+                        return {"fixed_margin_per_trade":10000.*fraction,
+                                "realized_mdd":realized_mdd,
+                                "common_exact_close_mdd":close_mdd,
+                                "synchronized_ohlc_stress_mdd":stress["synchronized_ohlc_stress_mdd"],
+                                "mean_gross_notional":(sum(sum(p["margin"]*p["leverage"] for p in s["active_positions"]) for s in obs)/len(obs) if obs else None),
+                                "mean_reserved_margin":(sum(s["reserved_margin"] for s in obs)/len(obs) if obs else None),
+                                "rejected":arm["rejected"],"unclosed":arm["unclosed"],
+                                "expired_partition":arm["expired"],
+                                "last_exact":({k:last[k] for k in ("ts","realized_pnl",
+                                   "observed_unrealized_pnl","strict_observed_equity",
+                                   "reserved_margin","active_count")} if last else None)}
+                    fixed_all=fixed_summary("ALL")
+                    fixed_ema=fixed_summary("EMA_ALIGNED")
+                    if not fixed_exact:
+                        raise AssertionError("no exact fixed-budget common observations")
+                    for arm in (fixed_all,fixed_ema):
+                        if arm["last_exact"]["reserved_margin"] > cap*max(0.,10000.+arm["last_exact"]["realized_pnl"])+1e-5:
+                            raise AssertionError("fixed-budget margin cap breached")
+                    fixed_budget={"status":"EQUAL_FIXED_MARGIN_PER_ACCEPTED_TRADE_NOT_EQUAL_TIME_EXPOSURE",
+                                  "common_exact_observations":len(fixed_exact),
+                                  "all":fixed_all,"ema":fixed_ema,
+                                  "mean_notional_gap_ema_minus_all":fixed_ema["mean_gross_notional"]-fixed_all["mean_gross_notional"],
+                                  "independent_signal_quality_proven":False}
                     outputs.append({"strategy":strategy,"leverage":lev,"margin_fraction":fraction,
                                     "max_margin_fraction":cap,"common_exact_observations":len(exact),
                                     "all":a,"ema":b,
+                                    "fixed_per_trade_budget_replay":fixed_budget,
                                     "exposure_normalized_descriptive":{
                                         "all":normalized_all,"ema":normalized_ema,
                                         "causal_signal_quality_established":False,
