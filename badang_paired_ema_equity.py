@@ -45,9 +45,11 @@ def run(cases,histories):
     report=audit(cases,histories)
     by_key={(c["symbol"],c["timeframe"]):c for c in cases}
     results=[]
+    same_time=[]
     for strategy in ("early","confirmed"):
         selected=[t for r in report["results"] if r["strategy"]==strategy
                   for t in r["sample_entries"]]
+        mode_snapshots={}
         for mode in ("ALL","EMA_ALIGNED"):
             events=[]
             for t in selected:
@@ -78,13 +80,36 @@ def run(cases,histories):
                           for r in histories[k] if int(r[0])>cutoff})
             result=replay(events,histories,times,initial_capital=10000.,
                           margin_fraction=.05,max_margin_fraction=.30)
+            mode_snapshots[mode]={r["ts"]:r for r in result["snapshots"]}
             summary=summarize(result)
             summary["accepted"]=len(events)-summary["rejected"]
             results.append({"strategy":strategy,"mode":mode,"candidates":len(events),
                             "candidate_censored":sum(e["reason"]!="CLOSED" for e in events),
                             **summary})
+        all_rows=mode_snapshots["ALL"]
+        ema_rows=mode_snapshots["EMA_ALIGNED"]
+        common=sorted(set(all_rows)&set(ema_rows))
+        exact=[ts for ts in common if all_rows[ts]["strict_observed_equity"] is not None
+               and ema_rows[ts]["strict_observed_equity"] is not None]
+        last=exact[-1] if exact else None
+        def at(ts,rows):
+            if ts is None:return None
+            row=rows[ts]
+            return {k:row[k] for k in ("ts","realized_pnl","observed_unrealized_pnl",
+                    "strict_observed_equity","reserved_margin",
+                    "available_capital_realized_basis","active_count")}
+        same_time.append({"strategy":strategy,"common_observations":len(common),
+                          "both_exact_observations":len(exact),
+                          "last_both_exact_ts":last,
+                          "all_at_same_time":at(last,all_rows),
+                          "ema_at_same_time":at(last,ema_rows),
+                          "equity_difference_ema_minus_all":(
+                              ema_rows[last]["strict_observed_equity"]-
+                              all_rows[last]["strict_observed_equity"] if last is not None else None),
+                          "warning":"STRICT_EXACT_CLOSE_ONLY; NOT_EXCHANGE_MARK"})
     return {"status":"RESEARCH_ONLY_PAIRED_EMA_EQUITY_DIAGNOSTIC",
             "cutoff_ms":report["cutoff_ms"],"results":results,
+            "same_timestamp_comparison":same_time,
             "warnings":["NOT_PROSPECTIVE_OUTCOME_VALIDATED",
                         "HTF_FILTER_NOT_EVALUATED",
                         "CLOSED_CANDLE_NOT_EXCHANGE_MARK",
@@ -102,6 +127,8 @@ def main():
         json.dumps(report,ensure_ascii=False,indent=2),encoding="utf-8")
     for row in report["results"]:
         print("paired EMA equity:",json.dumps(row))
+    for row in report["same_timestamp_comparison"]:
+        print("paired EMA same-time:",json.dumps(row))
     print("prospective EMA performance: NOT_ESTABLISHED")
 if __name__=="__main__":
     main()
