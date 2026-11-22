@@ -6,7 +6,7 @@ adverse-extremes scenario, NOT proof that extremes happened simultaneously.
 """
 from badang_causal_mark_lookup import FRAME_MS
 
-def stress_snapshots(snapshots,histories,initial_capital=10000.):
+def stress_snapshots(snapshots,histories,initial_capital=10000.,observation_times=None):
     candles={}
     for key,rows in histories.items():
         for row in rows:
@@ -16,7 +16,11 @@ def stress_snapshots(snapshots,histories,initial_capital=10000.):
     exact_count=0
     skipped=0
     worst=None
+    allowed=set(observation_times) if observation_times is not None else None
     for snap in snapshots:
+        if allowed is not None and snap["ts"] not in allowed:
+            skipped+=1
+            continue
         if snap["strict_observed_equity"] is None:
             skipped+=1
             continue
