@@ -2300,7 +2300,7 @@ def v13_scan():
                         views = []
                         for radius in (3, 6):
                             turns = pivots(rows, radius=radius)
-                            candidates = wave_candidates(turns)
+                            candidates = wave_candidates(turns, total_bars=len(rows), pivot_radius=radius)
                             candidates = [dict(c) for c in candidates]
                             for c in candidates:
                                 c['pivot_points'] = [
