@@ -7,9 +7,11 @@ from badang_causal_mark_lookup import observed_mark
 
 def replay(events, histories, observation_times, *, initial_capital=10000.0,
            margin_fraction=.05, max_margin_fraction=.30, max_age_ms=0,
-           include_active_positions=False):
+           include_active_positions=False, fixed_margin_per_trade=None):
     if initial_capital <= 0 or not 0 < margin_fraction <= 1 or not 0 < max_margin_fraction <= 1:
         raise ValueError("invalid capital or margin settings")
+    if fixed_margin_per_trade is not None and (not isinstance(fixed_margin_per_trade,(int,float)) or not 0 < fixed_margin_per_trade < float("inf")):
+        raise ValueError("invalid fixed margin")
     if max_age_ms < 0:
         raise ValueError("invalid age")
     timeline = {}
@@ -44,7 +46,8 @@ def replay(events, histories, observation_times, *, initial_capital=10000.0,
                 raise ValueError("duplicate active id")
             equity_realized = initial_capital + realized
             reserved = sum(p["margin"] for p in active.values())
-            margin = equity_realized * margin_fraction
+            margin = (float(fixed_margin_per_trade) if fixed_margin_per_trade is not None
+                      else equity_realized * margin_fraction)
             if margin > equity_realized - reserved + 1e-9 or reserved + margin > equity_realized * max_margin_fraction + 1e-9:
                 rejected.append({"id": e["id"], "ts": ts, "reason": "INSUFFICIENT_MARGIN"})
                 continue
