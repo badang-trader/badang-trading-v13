@@ -89,6 +89,23 @@ def audit(cases, histories):
                     if overlap:
                         possible.append((abs(s["entry_ts"]-e["entry_ts"]),
                                          s["id"],e["id"],s,e))
+            # Explain why cross-group temporal overlap does not produce
+            # strict same-market/same-frame pairs.
+            cross_all=[]
+            for s in trade_records["SELECTED"]:
+                for e in trade_records["EXCLUDED"]:
+                    if max(s["entry_ts"],e["entry_ts"])<min(s["end_ts"],e["end_ts"]):
+                        cross_all.append((s,e))
+            same_symbol=sum(s["symbol"]==e["symbol"] for s,e in cross_all)
+            same_frame=sum(s["timeframe"]==e["timeframe"] for s,e in cross_all)
+            strict_pairs=len(possible)
+            match_eligibility={
+                "cross_group_temporal_overlap_pairs":len(cross_all),
+                "overlap_pairs_same_symbol":same_symbol,
+                "overlap_pairs_same_timeframe":same_frame,
+                "overlap_pairs_same_symbol_and_timeframe":strict_pairs,
+                "reason_if_zero":("NO_CROSS_GROUP_OVERLAP_IN_SAME_SYMBOL_AND_TIMEFRAME"
+                                  if strict_pairs==0 else None)}
             possible.sort(key=lambda x:(x[0],x[1],x[2]))
             used_s,used_e=set(),set()
             pairs=[]
@@ -101,6 +118,7 @@ def audit(cases, histories):
                        if s["return"] is not None and e["return"] is not None]
             matched={"method":"GREEDY_NEAREST_ENTRY_SAME_SYMBOL_FRAME_OVERLAPPING_INTERVAL",
                      "one_to_one_pairs":len(pairs),
+                     "eligibility_breakdown":match_eligibility,
                      "both_completed_pairs":len(completed),
                      "pairs_with_censored_member":len(pairs)-len(completed),
                      "unmatched_selected":len(trade_records["SELECTED"])-len(pairs),
