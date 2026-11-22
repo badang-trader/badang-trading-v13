@@ -104,6 +104,7 @@ jobs:
           python badang_synchronized_equity.py
           python badang_portfolio_parity_audit.py
           python badang_censored_position_diagnostic.py
+          python badang_censored_equity_integration.py
       - name: Upload provenance and failure manifest
         if: always()
         uses: actions/upload-artifact@v4
@@ -156,6 +157,7 @@ jobs:
           python badang_synchronized_equity.py
           python badang_portfolio_parity_audit.py
           python badang_censored_position_diagnostic.py
+          python badang_censored_equity_integration.py
       - name: Preserve eight-page results and failure evidence
         if: always()
         uses: actions/upload-artifact@v4
