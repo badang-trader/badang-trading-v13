@@ -163,7 +163,13 @@ def divergence_details(
         ]
 
         for a, b in zip(relevant[-5:-1], relevant[-4:]):
-            age = total_bars - 1 - b[0]
+            # A radius-3 swing is only observable after three subsequent
+            # fully closed bars. Report age since confirmation, not pivot bar.
+            confirmation_radius = 3
+            confirmation_index = b[0] + confirmation_radius
+            if confirmation_index >= total_bars:
+                continue
+            age = total_bars - 1 - confirmation_index
             separation = b[0] - a[0]
 
             if age > max_age or not 5 <= separation <= 65:
@@ -202,6 +208,7 @@ def divergence_details(
                     'age_bars': age,
                     'first_pivot_index': a[0],
                     'second_pivot_index': b[0],
+                    'confirmation_bar_index': confirmation_index,
                     'price_change_pct': round(price_delta_pct, 3),
                     'rsi_change': round(rsi_delta, 2),
                     'confirmed': True
