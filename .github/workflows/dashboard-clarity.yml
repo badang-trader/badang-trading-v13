@@ -111,6 +111,7 @@ jobs:
           python badang_execution_causal_audit.py
           python badang_htf_ema_prefix_audit.py
           python badang_censored_trade_ledger.py
+          python badang_collision_forensics.py
       - name: Upload provenance and failure manifest
         if: always()
         uses: actions/upload-artifact@v4
@@ -170,6 +171,7 @@ jobs:
           python badang_execution_causal_audit.py
           python badang_htf_ema_prefix_audit.py
           python badang_censored_trade_ledger.py
+          python badang_collision_forensics.py
       - name: Preserve eight-page results and failure evidence
         if: always()
         uses: actions/upload-artifact@v4
