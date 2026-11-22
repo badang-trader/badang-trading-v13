@@ -26,5 +26,22 @@ class CensoredEquityReplayTests(unittest.TestCase):
         self.assertEqual(len(r["rejected"]),1)
         self.assertEqual(r["snapshots"][0]["reserved_margin"],0)
 
+    def test_partition_margin_reserved_then_released_without_realization(self):
+        e=[dict(id="train",symbol="BTC",timeframe="15m",side="LONG",
+                entry_ts=0,entry_price=100,leverage=2,reason="END_OF_PARTITION",
+                partition_end_ts=1800000),
+           dict(id="other",symbol="ETH",timeframe="15m",side="LONG",
+                entry_ts=900000,entry_price=100,leverage=2,reason="END_OF_DATA")]
+        h={("BTC","15m"):[[0,100,101,99,100,1],[900000,100,101,99,100,1]],
+           ("ETH","15m"):[[900000,100,101,99,100,1]]}
+        r=replay(e,h,[900000,1800000],initial_capital=1000,
+                 margin_fraction=.2,max_margin_fraction=.3)
+        self.assertEqual(len(r["rejected"]),1)
+        self.assertEqual(r["snapshots"][0]["reserved_margin"],200)
+        self.assertEqual(r["snapshots"][1]["reserved_margin"],0)
+        self.assertEqual(r["snapshots"][1]["realized_pnl"],0)
+        self.assertEqual(r["expired_partition_ids"],["train"])
+        self.assertEqual(r["unclosed_ids"],[])
+
 if __name__=="__main__":
     unittest.main()
