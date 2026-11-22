@@ -108,6 +108,7 @@ jobs:
           python badang_prospective_ema_eligibility.py
           python badang_paired_ema_equity.py
           python badang_reversal_prefix_replay.py
+          python badang_execution_causal_audit.py
       - name: Upload provenance and failure manifest
         if: always()
         uses: actions/upload-artifact@v4
@@ -164,6 +165,7 @@ jobs:
           python badang_prospective_ema_eligibility.py
           python badang_paired_ema_equity.py
           python badang_reversal_prefix_replay.py
+          python badang_execution_causal_audit.py
       - name: Preserve eight-page results and failure evidence
         if: always()
         uses: actions/upload-artifact@v4
