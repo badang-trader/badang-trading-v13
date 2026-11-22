@@ -6,7 +6,8 @@ synthetic exits, forward interpolation, or liquidation predictions.
 from badang_causal_mark_lookup import observed_mark
 
 def replay(events, histories, observation_times, *, initial_capital=10000.0,
-           margin_fraction=.05, max_margin_fraction=.30, max_age_ms=0):
+           margin_fraction=.05, max_margin_fraction=.30, max_age_ms=0,
+           include_active_positions=False):
     if initial_capital <= 0 or not 0 < margin_fraction <= 1 or not 0 < max_margin_fraction <= 1:
         raise ValueError("invalid capital or margin settings")
     if max_age_ms < 0:
@@ -77,6 +78,11 @@ def replay(events, histories, observation_times, *, initial_capital=10000.0,
                 raise ValueError("invalid side")
             unrealized += p["margin"] * e["leverage"] * direction * (mark["price"] / e["entry_price"] - 1)
         reserved = sum(p["margin"] for p in active.values())
+        positions = ([{"id": id_, "symbol": p["event"]["symbol"],
+                       "timeframe": p["event"]["timeframe"],
+                       "side": p["event"]["side"], "entry_price": p["event"]["entry_price"],
+                       "leverage": p["event"]["leverage"], "margin": p["margin"]}
+                      for id_, p in sorted(active.items())] if include_active_positions else None)
         snapshots.append({"ts": ts, "realized_pnl": realized,
                           "observed_unrealized_pnl": unrealized if exact else None,
                           "partial_observed_unrealized_pnl": unrealized,
@@ -84,7 +90,8 @@ def replay(events, histories, observation_times, *, initial_capital=10000.0,
                           "available_capital_realized_basis": initial_capital + realized - reserved,
                           "strict_observed_equity": initial_capital + realized + unrealized if exact else None,
                           "missing_marks": missing, "non_exact_marks": stale,
-                          "active_count": len(active)})
+                          "active_count": len(active),
+                          **({"active_positions": positions} if include_active_positions else {})})
     return {"research_only": True, "not_exchange_mark_price": True,
             "no_liquidation_model": True, "rejected": rejected, "snapshots": snapshots,
             "expired_partition_ids": expired_partition_ids,
