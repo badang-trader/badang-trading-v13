@@ -110,6 +110,7 @@ jobs:
           python badang_reversal_prefix_replay.py
           python badang_execution_causal_audit.py
           python badang_htf_ema_prefix_audit.py
+          python badang_censored_trade_ledger.py
       - name: Upload provenance and failure manifest
         if: always()
         uses: actions/upload-artifact@v4
@@ -168,6 +169,7 @@ jobs:
           python badang_reversal_prefix_replay.py
           python badang_execution_causal_audit.py
           python badang_htf_ema_prefix_audit.py
+          python badang_censored_trade_ledger.py
       - name: Preserve eight-page results and failure evidence
         if: always()
         uses: actions/upload-artifact@v4
