@@ -138,6 +138,13 @@ def run(cases,histories,filter_kind="SAME_FRAME"):
                 raise AssertionError("available capital accounting mismatch")
             if reserved < -1e-7 or reserved>max(0.,10000.+realized)*s["max_margin_fraction"]+1e-5:
                 raise AssertionError("margin cap breached")
+            exposure=metrics["exposure_on_common_clock"]
+            if exposure["observation_count"]!=s["common_exact_observations"]:
+                raise AssertionError("exposure observation count mismatch")
+            if exposure["mean_reserved_margin"] < -1e-8 or exposure["mean_gross_notional"] < -1e-8:
+                raise AssertionError("invalid average exposure")
+            if not 0<=exposure["observations_with_positions"]<=exposure["observation_count"]:
+                raise AssertionError("invalid active observation count")
             if not 0<=metrics["realized_mdd"]<=1 or not 0<=metrics["common_exact_close_mdd_lower_bound"]<=1:
                 raise AssertionError("invalid drawdown")
         difference=s["ema"]["at_last_common_exact"]["strict_observed_equity"]-s["all"]["at_last_common_exact"]["strict_observed_equity"]
