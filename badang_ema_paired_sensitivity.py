@@ -56,6 +56,11 @@ def run(cases,histories):
                     common=sorted(set(arms["ALL"]["snapshots"])&set(arms["EMA_ALIGNED"]["snapshots"]))
                     exact=[ts for ts in common if all(arms[m]["snapshots"][ts]["strict_observed_equity"] is not None
                                                        for m in arms)]
+                    # Pair both arms on the exact same observation timestamps.
+                    for mode in arms:
+                        arms[mode]["stress"]=stress_snapshots(
+                            list(arms[mode]["snapshots"].values()),histories,
+                            observation_times=exact)
                     def metrics(mode):
                         arm=arms[mode];snaps=arm["snapshots"]
                         realized_peak=10000.;realized_mdd=0.
@@ -81,6 +86,8 @@ def run(cases,histories):
                                     "strict_observed_equity","reserved_margin",
                                     "available_capital_realized_basis","active_count")} if last else None)}
                     a,b=metrics("ALL"),metrics("EMA_ALIGNED")
+                    if a["synchronized_ohlc_stress"]["exact_observations"]!=len(exact) or b["synchronized_ohlc_stress"]["exact_observations"]!=len(exact):
+                        raise AssertionError("paired OHLC stress observations differ")
                     outputs.append({"strategy":strategy,"leverage":lev,"margin_fraction":fraction,
                                     "max_margin_fraction":cap,"common_exact_observations":len(exact),
                                     "all":a,"ema":b,
