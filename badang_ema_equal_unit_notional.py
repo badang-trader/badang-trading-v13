@@ -25,6 +25,7 @@ def audit(cases, histories):
             groups = {"SELECTED": [], "EXCLUDED": []}
             censored = {"SELECTED": 0, "EXCLUDED": 0}
             intervals = {"SELECTED": [], "EXCLUDED": []}
+            trade_records = {"SELECTED": [], "EXCLUDED": []}
             for t in entries:
                 accepted = (bool(t["ema_aligned"]) if filter_kind == "SAME_FRAME"
                             else htf.get(t["trade_id"]) == "HTF_ALIGNED")
@@ -39,6 +40,9 @@ def audit(cases, histories):
                 if end_ts<=entry_ts:
                     raise AssertionError("invalid trade time interval")
                 intervals[group].append((entry_ts,end_ts))
+                trade_records[group].append({"id":t["trade_id"],"symbol":key[0],
+                    "timeframe":key[1],"entry_ts":entry_ts,"end_ts":end_ts,
+                    "return":float(raw["net_return"]) if raw["net_return"] is not None else None})
                 value = raw["net_return"]
                 if value is None:
                     censored[group] += 1
@@ -73,6 +77,39 @@ def audit(cases, histories):
                         "selected_mean_duration_hours":(sum((b-a) for a,b in intervals["SELECTED"])/len(intervals["SELECTED"])/3600000 if intervals["SELECTED"] else None),
                         "excluded_mean_duration_hours":(sum((b-a) for a,b in intervals["EXCLUDED"])/len(intervals["EXCLUDED"])/3600000 if intervals["EXCLUDED"] else None),
                         "causal_independence_established":False}
+            # Strictly descriptive nearest-entry, one-to-one matched pairs.
+            # Match within the same symbol/timeframe and overlapping holding
+            # intervals; no reuse of controls, no invented returns or exits.
+            possible=[]
+            for s in trade_records["SELECTED"]:
+                for e in trade_records["EXCLUDED"]:
+                    if s["symbol"]!=e["symbol"] or s["timeframe"]!=e["timeframe"]:
+                        continue
+                    overlap=max(s["entry_ts"],e["entry_ts"])<min(s["end_ts"],e["end_ts"])
+                    if overlap:
+                        possible.append((abs(s["entry_ts"]-e["entry_ts"]),
+                                         s["id"],e["id"],s,e))
+            possible.sort(key=lambda x:(x[0],x[1],x[2]))
+            used_s,used_e=set(),set()
+            pairs=[]
+            for distance,sid,eid,s,e in possible:
+                if sid in used_s or eid in used_e:
+                    continue
+                used_s.add(sid);used_e.add(eid)
+                pairs.append((distance,s,e))
+            completed=[(s["return"]-e["return"]) for _,s,e in pairs
+                       if s["return"] is not None and e["return"] is not None]
+            matched={"method":"GREEDY_NEAREST_ENTRY_SAME_SYMBOL_FRAME_OVERLAPPING_INTERVAL",
+                     "one_to_one_pairs":len(pairs),
+                     "both_completed_pairs":len(completed),
+                     "pairs_with_censored_member":len(pairs)-len(completed),
+                     "unmatched_selected":len(trade_records["SELECTED"])-len(pairs),
+                     "unmatched_excluded":len(trade_records["EXCLUDED"])-len(pairs),
+                     "mean_entry_gap_hours":(sum(p[0] for p in pairs)/len(pairs)/3600000 if pairs else None),
+                     "mean_completed_paired_return_difference":(sum(completed)/len(completed) if completed else None),
+                     "independent_statistical_inference":False,
+                     "causal_selection_effect_established":False,
+                     "warning":"MATCHED_TRADES_SHARE_MARKET_TIME_AND_MAY_REMAIN_CORRELATED"}
             # Welch uncertainty: independent-trade approximation only. Trades may
             # overlap in time and share market shocks; do not call this a valid
             # independent statistical significance test.
@@ -98,6 +135,7 @@ def audit(cases, histories):
                            "selected": selected, "excluded": excluded,
                            "difference_uncertainty":uncertainty,
                            "temporal_overlap_diagnostic":overlap_diagnostic(),
+                           "matched_trade_diagnostic":matched,
                            "closed_mean_difference": (
                                selected["unit_notional_mean_net_return"]-
                                excluded["unit_notional_mean_net_return"]
