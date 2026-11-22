@@ -5,6 +5,7 @@ not been allocated margin by the completed-trade-only portfolio simulator.
 No future candles, fabricated exits, or exchange mark prices are used.
 """
 import json
+from collections import Counter
 from pathlib import Path
 
 FRAME_MS={'15m':900000,'30m':1800000,'1H':3600000,'4H':14400000,'1D':86400000}
@@ -43,9 +44,17 @@ def audit_censored(cases,histories,*,fee_each_side=.0006,slippage_each_side=.000
                     'hypothetical_round_trip_net_proxy':gross-2*open_cost,
                     'not_realized':True,'not_exchange_mark_price':True,
                     'not_allocated_to_portfolio':True,
-                    'censored_reason':t['exit_reason']})
+                    'censored_reason':t['exit_reason'],
+                    'observed_holding_ms':int(rows[j][0])+FRAME_MS[key[1]]-int(rows[i][0]),
+                    'is_dataset_end_open_candidate':t['exit_reason']=='END_OF_DATA'})
+    by_reason=Counter(p['censored_reason'] for p in out)
+    by_partition=Counter(p['partition'] for p in out)
     return {'status':'CENSORED_LAST_CLOSED_PRICE_ONLY_NOT_PORTFOLIO_EQUITY',
-        'count':len(out),'positions':out,
+        'count':len(out),'counts_by_reason':dict(sorted(by_reason.items())),
+        'counts_by_partition':dict(sorted(by_partition.items())),
+        'dataset_end_open_candidates':by_reason.get('END_OF_DATA',0),
+        'partition_end_censored_not_current_positions':by_reason.get('END_OF_PARTITION',0),
+        'positions':out,
         'warnings':['NO_EXIT_ASSUMED','NOT_LIQUIDATION_VERIFIED',
             'NO_MARGIN_ALLOCATION_FOR_CENSORED_TRADES',
             'HYPOTHETICAL_CLOSE_COST_NOT_REALIZED']}
