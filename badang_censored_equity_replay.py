@@ -21,6 +21,10 @@ def replay(events, histories, observation_times, *, initial_capital=10000.0,
             raise ValueError("invalid reason")
         if event["reason"] == "CLOSED" and ("exit_ts" not in event or "net_return" not in event):
             raise ValueError("completed trade missing exit")
+        if event["reason"] == "END_OF_PARTITION":
+            # Partition-end trades are not transferable into the next period.
+            # Exclude from this continuous account replay, report separately.
+            continue
         timeline.setdefault(event["entry_ts"], []).append(("entry", event))
         if event["reason"] == "CLOSED":
             timeline.setdefault(event["exit_ts"], []).append(("exit", event))
