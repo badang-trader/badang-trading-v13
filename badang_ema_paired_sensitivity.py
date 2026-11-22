@@ -192,4 +192,11 @@ def main():
         json.dumps(higher,ensure_ascii=False,indent=2),encoding="utf-8")
     for s in higher["scenarios"]:
         print("paired HTF EMA sensitivity:",json.dumps(s))
+    # Additional equal-unit trade comparison, separate from account replay.
+    from badang_ema_equal_unit_notional import audit as unit_audit
+    unit_result=unit_audit(cases,histories)
+    (folder/"bitget_ema_equal_unit_notional.json").write_text(
+        json.dumps(unit_result,ensure_ascii=False,indent=2),encoding="utf-8")
+    for item in unit_result["results"]:
+        print("EMA equal unit notional:",json.dumps(item))
 if __name__=="__main__":main()
