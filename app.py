@@ -2312,9 +2312,16 @@ def v13_scan():
                                 c['radius'] = radius
                                 c['start_bar'] = c['pivot_points'][0]['bar_index'] if c['pivot_points'] else None
                                 c['end_bar'] = c['pivot_points'][-1]['bar_index'] if c['pivot_points'] else None
+                                # A pivot is actionable only after its confirmation
+                                # radius of subsequent CLOSED candles. Age from that
+                                # first observable bar, not from the pivot itself.
+                                observable = c.get('first_observable_bar_index')
                                 c['bars_since_last_pivot'] = (
-                                    len(closed) - 1 - c['end_bar']
-                                    if c['end_bar'] is not None else None
+                                    len(closed) - 1 - observable
+                                    if isinstance(observable, int)
+                                    and c.get('observable_in_snapshot') is True
+                                    and 0 <= observable < len(closed)
+                                    else None
                                 )
                                 # 4.19: Distinguish the confirmed historical pivot from
                                 # the latest closed candle. Do not label a rebound as a
@@ -2347,7 +2354,7 @@ def v13_scan():
                         for view in views:
                             for c in view['candidates']:
                                 age = c.get('bars_since_last_pivot')
-                                c['age_class'] = 'RECENT' if age is not None and age <= max_age else 'HISTORICAL'
+                                c['age_class'] = 'RECENT' if age is not None and 0 <= age <= max_age else 'HISTORICAL'
                                 c['completion'] = 'UNCONFIRMED'
                         broad = [c for c in views[1]['candidates'] if c['age_class'] == 'RECENT']
                         narrow = [c for c in views[0]['candidates'] if c['age_class'] == 'RECENT']
