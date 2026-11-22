@@ -78,10 +78,25 @@ def run(cases,histories,filter_kind="SAME_FRAME"):
                             eq=snaps[ts]["strict_observed_equity"]
                             exact_peak=max(exact_peak,eq)
                             exact_mdd=max(exact_mdd,(exact_peak-eq)/exact_peak)
+                        # Compare exposure on exactly the same paired observation clock.
+                        observations=[snaps[ts] for ts in exact]
+                        n=len(observations)
+                        avg_active=sum(s["active_count"] for s in observations)/n if n else None
+                        avg_reserved=sum(s["reserved_margin"] for s in observations)/n if n else None
+                        avg_notional=sum(sum(p["margin"]*p["leverage"] for p in s["active_positions"])
+                                         for s in observations)/n if n else None
+                        active_observations=sum(s["active_count"]>0 for s in observations)
                         last=snaps[exact[-1]] if exact else None
                         return {"realized_mdd":realized_mdd,
                                 "synchronized_ohlc_stress":arm["stress"],
                                 "common_exact_close_mdd_lower_bound":exact_mdd,
+                                "exposure_on_common_clock":{
+                                    "observation_count":n,
+                                    "mean_active_positions":avg_active,
+                                    "mean_reserved_margin":avg_reserved,
+                                    "mean_gross_notional":avg_notional,
+                                    "observations_with_positions":active_observations,
+                                    "exposure_adjusted_profitability_proven":False},
                                 "rejected":arm["rejected"],
                                 "expired_partition_count":arm["expired_partition_count"],
                                 "unclosed_count":arm["unclosed_count"],
@@ -132,6 +147,7 @@ def run(cases,histories,filter_kind="SAME_FRAME"):
             "filter_kind":filter_kind,
             "cutoff_ms":report["cutoff_ms"],"scenarios":outputs,
             "warnings":["FILTER_KIND_IS_RESEARCH_ONLY",
+                        "EXPOSURE_METRICS_ARE_DESCRIPTIVE_NOT_CAUSAL_EFFECT",
                         "COMMON_EXACT_CLOSE_MDD_IS_OBSERVATION_LOWER_BOUND",
                         "SYNCHRONIZED_OHLC_STRESS_IS_HYPOTHETICAL_NOT_TRUE_INTRABAR_MDD",
                         "NO_EXCHANGE_LIQUIDATION_MODEL",
