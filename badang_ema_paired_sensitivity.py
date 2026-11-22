@@ -8,10 +8,14 @@ from pathlib import Path
 from badang_prospective_ema_eligibility import audit
 from badang_censored_equity_replay import replay
 from badang_synchronized_ohlc_stress import stress_snapshots
+from badang_htf_ema_candidate_selection import audit as htf_audit
 from badang_causal_mark_lookup import FRAME_MS
 
-def run(cases,histories):
+def run(cases,histories,filter_kind="SAME_FRAME"):
+    if filter_kind not in ("SAME_FRAME","HIGHER_FRAME"):
+        raise ValueError("invalid EMA filter kind")
     report=audit(cases,histories)
+    htf_status={x["trade_id"]:x["status"] for x in htf_audit(cases,histories)["results"]} if filter_kind=="HIGHER_FRAME" else {}
     by_key={(c["symbol"],c["timeframe"]):c for c in cases}
     outputs=[]
     for strategy in ("early","confirmed"):
@@ -20,7 +24,7 @@ def run(cases,histories):
         for mode in ("ALL","EMA_ALIGNED"):
             events=[]
             for t in selected:
-                if mode=="EMA_ALIGNED" and not t["ema_aligned"]:continue
+                if mode=="EMA_ALIGNED" and not (t["ema_aligned"] if filter_kind=="SAME_FRAME" else htf_status.get(t["trade_id"])=="HTF_ALIGNED"):continue
                 key=(t["symbol"],t["timeframe"])
                 raw=by_key[key]["reversal_backtest"][strategy]["trades"][int(t["trade_id"].rsplit(":",1)[-1])]
                 rows=histories[key]
@@ -125,8 +129,9 @@ def run(cases,histories):
         if abs(difference-s["ema_minus_all_equity"])>1e-7:
             raise AssertionError("paired equity difference mismatch")
     return {"status":"RESEARCH_ONLY_NOT_INDEPENDENT_PROFITABILITY",
+            "filter_kind":filter_kind,
             "cutoff_ms":report["cutoff_ms"],"scenarios":outputs,
-            "warnings":["SAME_TIMEFRAME_EMA_ONLY; HTF_FILTER_NOT_EVALUATED",
+            "warnings":["FILTER_KIND_IS_RESEARCH_ONLY",
                         "COMMON_EXACT_CLOSE_MDD_IS_OBSERVATION_LOWER_BOUND",
                         "SYNCHRONIZED_OHLC_STRESS_IS_HYPOTHETICAL_NOT_TRUE_INTRABAR_MDD",
                         "NO_EXCHANGE_LIQUIDATION_MODEL",
@@ -142,4 +147,9 @@ def main():
         json.dumps(result,ensure_ascii=False,indent=2),encoding="utf-8")
     for s in result["scenarios"]:
         print("paired EMA sensitivity:",json.dumps(s))
+    higher=run(cases,histories,filter_kind="HIGHER_FRAME")
+    (folder/"bitget_htf_ema_paired_sensitivity.json").write_text(
+        json.dumps(higher,ensure_ascii=False,indent=2),encoding="utf-8")
+    for s in higher["scenarios"]:
+        print("paired HTF EMA sensitivity:",json.dumps(s))
 if __name__=="__main__":main()
