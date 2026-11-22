@@ -46,8 +46,9 @@ def audit(cases,histories):
                             "same_frame_ema_aligned":sample["ema_aligned"],
                             "censored":sample["net_return"] is None,
                             "closed_net_return":sample["net_return"]})
-    if len(results)!=48:
-        raise AssertionError(f"expected 48 post-cutoff candidates, got {len(results)}")
+    expected_count=sum(len(m["sample_entries"]) for m in base["results"])
+    if len(results)!=expected_count:
+        raise AssertionError(f"candidate count mismatch: {len(results)} != {expected_count}")
     categories={s:sum(x["status"]==s for x in results)
                 for s in ("HTF_ALIGNED","HTF_EXCLUDED","INSUFFICIENT_HIGHER_HISTORY","NO_HIGHER_TIMEFRAME")}
     if sum(categories.values())!=len(results):
