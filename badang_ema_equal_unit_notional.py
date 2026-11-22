@@ -10,6 +10,7 @@ import math
 from pathlib import Path
 from badang_prospective_ema_eligibility import audit as ema_audit
 from badang_htf_ema_candidate_selection import audit as htf_audit
+from badang_causal_mark_lookup import FRAME_MS
 
 
 def audit(cases, histories):
@@ -23,12 +24,21 @@ def audit(cases, histories):
         for filter_kind in ("SAME_FRAME", "HIGHER_FRAME"):
             groups = {"SELECTED": [], "EXCLUDED": []}
             censored = {"SELECTED": 0, "EXCLUDED": 0}
+            intervals = {"SELECTED": [], "EXCLUDED": []}
             for t in entries:
                 accepted = (bool(t["ema_aligned"]) if filter_kind == "SAME_FRAME"
                             else htf.get(t["trade_id"]) == "HTF_ALIGNED")
                 group = "SELECTED" if accepted else "EXCLUDED"
                 raw = lookup[(t["symbol"], t["timeframe"])]["reversal_backtest"][strategy]["trades"][
                     int(t["trade_id"].rsplit(":", 1)[-1])]
+                key=(t["symbol"],t["timeframe"])
+                candles=histories[key]
+                entry_bar,exit_bar=int(raw["entry_bar"]),int(raw["exit_bar"])
+                entry_ts=int(candles[entry_bar][0])
+                end_ts=int(candles[exit_bar][0])+FRAME_MS[key[1]]
+                if end_ts<=entry_ts:
+                    raise AssertionError("invalid trade time interval")
+                intervals[group].append((entry_ts,end_ts))
                 value = raw["net_return"]
                 if value is None:
                     censored[group] += 1
@@ -48,6 +58,21 @@ def audit(cases, histories):
                         "sample_std": math.sqrt(variance) if variance is not None else None,
                         "standard_error": math.sqrt(variance/n) if variance is not None else None}
             selected, excluded = summary("SELECTED"), summary("EXCLUDED")
+            def overlap_diagnostic():
+                all_intervals=[(a,b,g) for g in intervals for a,b in intervals[g]]
+                overlapping_pairs=0
+                cross_group_pairs=0
+                for i,(a,b,g) in enumerate(all_intervals):
+                    for x,y,h in all_intervals[i+1:]:
+                        if max(a,x)<min(b,y):
+                            overlapping_pairs+=1
+                            cross_group_pairs+=int(g!=h)
+                return {"trade_intervals":len(all_intervals),
+                        "overlapping_trade_pairs":overlapping_pairs,
+                        "selected_excluded_overlap_pairs":cross_group_pairs,
+                        "selected_mean_duration_hours":(sum((b-a) for a,b in intervals["SELECTED"])/len(intervals["SELECTED"])/3600000 if intervals["SELECTED"] else None),
+                        "excluded_mean_duration_hours":(sum((b-a) for a,b in intervals["EXCLUDED"])/len(intervals["EXCLUDED"])/3600000 if intervals["EXCLUDED"] else None),
+                        "causal_independence_established":False}
             # Welch uncertainty: independent-trade approximation only. Trades may
             # overlap in time and share market shocks; do not call this a valid
             # independent statistical significance test.
@@ -72,6 +97,7 @@ def audit(cases, histories):
                            "candidate_count": len(entries),
                            "selected": selected, "excluded": excluded,
                            "difference_uncertainty":uncertainty,
+                           "temporal_overlap_diagnostic":overlap_diagnostic(),
                            "closed_mean_difference": (
                                selected["unit_notional_mean_net_return"]-
                                excluded["unit_notional_mean_net_return"]
