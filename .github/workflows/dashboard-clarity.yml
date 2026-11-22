@@ -60,6 +60,7 @@ jobs:
       - run: python -m unittest discover -s tests -p 'test_censored_position_diagnostic.py' -v
       - run: python -m unittest discover -s tests -p 'test_causal_mark_lookup.py' -v
       - run: python -m unittest discover -s tests -p 'test_censored_equity_replay.py' -v
+      - run: python -m unittest discover -s tests -p 'test_censored_ohlc_stress.py' -v
       - run: python -m unittest discover -s tests -p 'test_elliott_research.py' -v
       - run: python -m unittest discover -s tests -p 'test_wave_divergence_association.py' -v
 
