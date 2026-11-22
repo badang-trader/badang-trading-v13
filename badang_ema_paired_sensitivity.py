@@ -107,9 +107,25 @@ def run(cases,histories,filter_kind="SAME_FRAME"):
                     a,b=metrics("ALL"),metrics("EMA_ALIGNED")
                     if a["synchronized_ohlc_stress"]["exact_observations"]!=len(exact) or b["synchronized_ohlc_stress"]["exact_observations"]!=len(exact):
                         raise AssertionError("paired OHLC stress observations differ")
+                    # Exposure-normalized descriptive comparison; not a counterfactual replay.
+                    def normalized(m):
+                        exposure=m["exposure_on_common_clock"]["mean_gross_notional"]
+                        if exposure is None or exposure<=0:
+                            return {"status":"ZERO_EXPOSURE_NOT_COMPARABLE",
+                                    "stress_mdd_per_10000_mean_notional":None,
+                                    "close_mdd_per_10000_mean_notional":None}
+                        factor=exposure/10000.
+                        return {"status":"DESCRIPTIVE_ONLY",
+                                "stress_mdd_per_10000_mean_notional":m["synchronized_ohlc_stress"]["synchronized_ohlc_stress_mdd"]/factor,
+                                "close_mdd_per_10000_mean_notional":m["common_exact_close_mdd_lower_bound"]/factor}
+                    normalized_all,normalized_ema=normalized(a),normalized(b)
                     outputs.append({"strategy":strategy,"leverage":lev,"margin_fraction":fraction,
                                     "max_margin_fraction":cap,"common_exact_observations":len(exact),
                                     "all":a,"ema":b,
+                                    "exposure_normalized_descriptive":{
+                                        "all":normalized_all,"ema":normalized_ema,
+                                        "causal_signal_quality_established":False,
+                                        "warning":"RATIO_OF_PATH_DEPENDENT_MDD_TO_MEAN_NOTIONAL_NOT_AN_EQUAL_EXPOSURE_REPLAY"},
                                     "ema_minus_all_equity":(
                                         b["at_last_common_exact"]["strict_observed_equity"]-
                                         a["at_last_common_exact"]["strict_observed_equity"] if exact else None)})
@@ -155,6 +171,7 @@ def run(cases,histories,filter_kind="SAME_FRAME"):
             "cutoff_ms":report["cutoff_ms"],"scenarios":outputs,
             "warnings":["FILTER_KIND_IS_RESEARCH_ONLY",
                         "EXPOSURE_METRICS_ARE_DESCRIPTIVE_NOT_CAUSAL_EFFECT",
+                        "EXPOSURE_NORMALIZED_MDD_RATIO_IS_NOT_A_COUNTERFACTUAL",
                         "COMMON_EXACT_CLOSE_MDD_IS_OBSERVATION_LOWER_BOUND",
                         "SYNCHRONIZED_OHLC_STRESS_IS_HYPOTHETICAL_NOT_TRUE_INTRABAR_MDD",
                         "NO_EXCHANGE_LIQUIDATION_MODEL",
