@@ -19,6 +19,7 @@ def ema(values, span):
 def audit(cases, histories):
     cutoff=cutoff_ms()
     output=[]
+    all_opportunities=[]
     for case in cases:
         symbol,frame=case["symbol"],case["timeframe"]
         rows=histories[(symbol,frame)]
@@ -30,7 +31,7 @@ def audit(cases, histories):
         for strategy in ("early","confirmed"):
             counts=Counter()
             samples=[]
-            for trade in case["reversal_backtest"][strategy]["trades"]:
+            for trade_index,trade in enumerate(case["reversal_backtest"][strategy]["trades"]):
                 i=int(trade["entry_bar"])
                 if not 0<=i<len(rows):
                     raise ValueError("invalid entry")
@@ -50,15 +51,40 @@ def audit(cases, histories):
                 if aligned is None:
                     raise ValueError("invalid side")
                 counts["EMA_ALIGNED" if aligned else "EMA_EXCLUDED"]+=1
-                samples.append({"entry_ts":opens[i],"side":side,"ema_aligned":aligned,
+                samples.append({"trade_id":f"{strategy}:{symbol}:{frame}:{trade_index}",
+                                "symbol":symbol,"timeframe":frame,"strategy":strategy,
+                                "entry_ts":opens[i],"side":side,"ema_aligned":aligned,
                                 "entry_bar":i,"exit_reason":trade["exit_reason"],
                                 "net_return":trade["net_return"],
                                 "note":"NOT_PROSPECTIVE_OUTCOME_VALIDATED"})
+            all_opportunities.extend(samples)
             output.append({"symbol":symbol,"timeframe":frame,"strategy":strategy,
                            "counts":dict(counts),"sample_entries":samples,
                            "higher_timeframe_filter":"NOT_EVALUATED",
                            "independent_performance":"NOT_ESTABLISHED"})
+    # Diagnostic net-return averages are NOT independent performance or account PnL.
+    summary={}
+    for name,predicate in (("EMA_ALIGNED",lambda x:x["ema_aligned"]),
+                           ("EMA_EXCLUDED",lambda x:not x["ema_aligned"]),
+                           ("ALL",lambda x:True)):
+        selected=[x for x in all_opportunities if predicate(x)]
+        closed=[x for x in selected if x["net_return"] is not None]
+        summary[name]={"candidates":len(selected),"closed":len(closed),
+                       "censored":len(selected)-len(closed),
+                       "sum_trade_net_return":sum(float(x["net_return"]) for x in closed),
+                       "mean_closed_trade_net_return":(
+                           sum(float(x["net_return"]) for x in closed)/len(closed)
+                           if closed else None)}
+    duplicate_keys=Counter((x["symbol"],x["timeframe"],x["entry_ts"],x["side"])
+                           for x in all_opportunities)
+    duplicates=[{"symbol":k[0],"timeframe":k[1],"entry_ts":k[2],
+                 "side":k[3],"count":n}
+                for k,n in duplicate_keys.items() if n>1]
     return {"cutoff_ms":cutoff,"warmup_only_before_cutoff":True,
+            "outcome_diagnostic":summary,
+            "duplicate_market_opportunities":duplicates,
+            "opportunity_count_unique":len(duplicate_keys),
+            "performance_warning":"CLOSED_ONLY_RETURNS_EXCLUDE_CENSORED; NO_EQUITY_OR_INDEPENDENT_PROFIT_CLAIM",
             "ema_rule":"previous closed candle EMA20>EMA50>EMA200 for LONG; reverse for SHORT",
             "warning":"Historical 70/30 candidate selection and exits cannot certify prospective performance",
             "results":output}
@@ -76,6 +102,8 @@ def main():
     for row in report["results"]:
         totals.update(row["counts"])
     print("prospective EMA eligibility:",json.dumps(dict(totals)))
+    print("EMA closed-only diagnostic:",json.dumps(report["outcome_diagnostic"]))
+    print("EMA duplicate opportunities:",len(report["duplicate_market_opportunities"]))
     print("independent EMA profitability: NOT_ESTABLISHED")
 if __name__=="__main__":
     main()
