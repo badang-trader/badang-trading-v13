@@ -17,6 +17,17 @@ class SharedCloseStressTests(unittest.TestCase):
         self.assertEqual(out["exact_observations"],1)
         self.assertAlmostEqual(out["worst_observation"]["stress_equity"],9700.)
         self.assertAlmostEqual(out["synchronized_ohlc_stress_mdd"],.03)
+    def test_explicit_paired_timestamps_restrict_observations(self):
+        histories={("BTC","1H"):[[0,100,110,90,100,1],[3600000,100,120,80,100,1]]}
+        snaps=[{"ts":ts,"realized_pnl":0.,"strict_observed_equity":10000.,
+                "active_positions":[{"symbol":"BTC","timeframe":"1H","side":"LONG",
+                "entry_price":100.,"margin":500.,"leverage":2}]}
+               for ts in (3600000,7200000)]
+        out=stress_snapshots(snaps,histories,observation_times=[3600000])
+        self.assertEqual(out["exact_observations"],1)
+        self.assertEqual(out["skipped_observations"],1)
+        self.assertAlmostEqual(out["synchronized_ohlc_stress_mdd"],.01)
+
     def test_missing_shared_close_is_skipped_not_forward_filled(self):
         histories={("BTC","1H"):[[0,100,110,90,100,1]]}
         snap={"ts":7200000,"realized_pnl":0.,"strict_observed_equity":10000.,
