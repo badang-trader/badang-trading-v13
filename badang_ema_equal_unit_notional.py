@@ -48,9 +48,30 @@ def audit(cases, histories):
                         "sample_std": math.sqrt(variance) if variance is not None else None,
                         "standard_error": math.sqrt(variance/n) if variance is not None else None}
             selected, excluded = summary("SELECTED"), summary("EXCLUDED")
+            # Welch uncertainty: independent-trade approximation only. Trades may
+            # overlap in time and share market shocks; do not call this a valid
+            # independent statistical significance test.
+            uncertainty={"method":"WELCH_INDEPENDENT_TRADE_APPROXIMATION",
+                         "valid_independent_inference":False,
+                         "warning":"OVERLAPPING_CORRELATED_TRADES_AND_CENSORING"}
+            if selected["closed_count"]>1 and excluded["closed_count"]>1:
+                var_sel=selected["sample_std"]**2/selected["closed_count"]
+                var_exc=excluded["sample_std"]**2/excluded["closed_count"]
+                se=math.sqrt(var_sel+var_exc)
+                denom=(var_sel**2/(selected["closed_count"]-1)+
+                       var_exc**2/(excluded["closed_count"]-1))
+                uncertainty.update({"difference_standard_error":se,
+                                    "welch_degrees_of_freedom":(var_sel+var_exc)**2/denom if denom else None,
+                                    "approx_normal_95_interval":[
+                                        selected["unit_notional_mean_net_return"]-excluded["unit_notional_mean_net_return"]-1.96*se,
+                                        selected["unit_notional_mean_net_return"]-excluded["unit_notional_mean_net_return"]+1.96*se],
+                                    "interval_is_descriptive_only":True})
+            else:
+                uncertainty["status"]="INSUFFICIENT_COMPLETED_TRADES"
             result.append({"strategy": strategy, "filter_kind": filter_kind,
                            "candidate_count": len(entries),
                            "selected": selected, "excluded": excluded,
+                           "difference_uncertainty":uncertainty,
                            "closed_mean_difference": (
                                selected["unit_notional_mean_net_return"]-
                                excluded["unit_notional_mean_net_return"]
