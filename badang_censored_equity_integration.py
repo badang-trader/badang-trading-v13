@@ -56,6 +56,10 @@ def run_scenario(cases,histories,strategy,partition,*,initial_capital=10000,
             exact_count+=1
             observed_peak=max(observed_peak,equity)
             observed_dd=max(observed_dd,(observed_peak-equity)/observed_peak)
+    exact_rows=[row for row in snapshots if row["strict_observed_equity"] is not None]
+    last_exact=exact_rows[-1] if exact_rows else None
+    missing_count=sum(bool(row["missing_marks"]) for row in snapshots)
+    nonexact_count=sum(bool(row["non_exact_marks"]) for row in snapshots)
     counts=Counter(e["reason"] for e in events)
     return {"strategy":strategy,"partition":partition,"event_counts":dict(counts),
             "total_candidates":len(events),"accepted":len(events)-len(out["rejected"]),
@@ -66,6 +70,16 @@ def run_scenario(cases,histories,strategy,partition,*,initial_capital=10000,
             "realized_drawdown":realized_dd,
             "exact_close_observed_drawdown_lower_bound":observed_dd,
             "exact_snapshots":exact_count,"snapshots":len(snapshots),
+            "missing_price_snapshots":missing_count,
+            "non_exact_price_snapshots":nonexact_count,
+            "max_reserved_margin":max((row["reserved_margin"] for row in snapshots),default=0.),
+            "last_exact_common_observation":({
+                "ts":last_exact["ts"],
+                "strict_observed_equity":last_exact["strict_observed_equity"],
+                "observed_unrealized_pnl":last_exact["observed_unrealized_pnl"],
+                "reserved_margin":last_exact["reserved_margin"],
+                "active_count":last_exact["active_count"]}
+                if last_exact is not None else None),
             "unclosed_ids":out["unclosed_ids"],
             "expired_partition_ids":out["expired_partition_ids"],
             "warnings":["EXACT_CLOSE_DRAWDOWN_IS_NOT_INTRABAR_OR_EXCHANGE_MARK_DRAWDOWN",
