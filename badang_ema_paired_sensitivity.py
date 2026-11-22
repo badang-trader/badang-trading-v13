@@ -171,8 +171,35 @@ def run(cases,histories,filter_kind="SAME_FRAME"):
                     for arm in (fixed_all,fixed_ema):
                         if arm["last_exact"]["reserved_margin"] > cap*max(0.,10000.+arm["last_exact"]["realized_pnl"])+1e-5:
                             raise AssertionError("fixed-budget margin cap breached")
+                    # Compare ACTUAL timestamp-by-timestamp exposure, not only
+                    # averages. Zero EMA exposure with positive ALL exposure is
+                    # infeasible to match without inventing additional trades.
+                    gaps=[]
+                    zero_ema_positive_all=0
+                    exact_match=0
+                    positive_both=0
+                    for ts in fixed_exact:
+                        def gross(mode):
+                            return sum(p["margin"]*p["leverage"] for p in
+                                       fixed_arms[mode]["snaps"][ts]["active_positions"])
+                        gross_all,gross_ema=gross("ALL"),gross("EMA_ALIGNED")
+                        gaps.append(gross_ema-gross_all)
+                        zero_ema_positive_all+=int(gross_ema==0 and gross_all>0)
+                        exact_match+=int(abs(gross_ema-gross_all)<1e-8)
+                        positive_both+=int(gross_ema>0 and gross_all>0)
+                    exposure_gap_diagnostic={
+                        "common_exact_observations":len(fixed_exact),
+                        "exact_equal_exposure_observations":exact_match,
+                        "zero_ema_with_positive_all_observations":zero_ema_positive_all,
+                        "both_positive_exposure_observations":positive_both,
+                        "mean_absolute_notional_gap":sum(abs(g) for g in gaps)/len(gaps),
+                        "maximum_absolute_notional_gap":max(abs(g) for g in gaps),
+                        "mean_signed_notional_gap":sum(gaps)/len(gaps),
+                        "equal_exposure_counterfactual_executed":False,
+                        "warning":"NO_SYNTHETIC_TRADES_OR_MARGIN_CAP_BREACH_TO_FORCE_EQUAL_EXPOSURE"}
                     fixed_budget={"status":"EQUAL_FIXED_MARGIN_PER_ACCEPTED_TRADE_NOT_EQUAL_TIME_EXPOSURE",
                                   "common_exact_observations":len(fixed_exact),
+                                  "timewise_exposure_gap":exposure_gap_diagnostic,
                                   "all":fixed_all,"ema":fixed_ema,
                                   "mean_notional_gap_ema_minus_all":fixed_ema["mean_gross_notional"]-fixed_all["mean_gross_notional"],
                                   "independent_signal_quality_proven":False}
