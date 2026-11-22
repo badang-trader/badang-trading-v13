@@ -47,8 +47,8 @@ class DashboardClarityTests(unittest.TestCase):
     def test_main_page_plain_language_grouping(self):
         main = (ROOT / "app.py").read_text(encoding="utf-8")
         for phrase in ("현재 판단: 진입 대기", "참고용 계산과 최종 판단의 차이:",
-                       "상세 보류 사유", "groupedReasons", "지지·저항은 참고할 수 있지만", "점수는 승률이나 매수·매도 허가가 아닙니다",
-                       "최종 계획 미확정", "다음 확인:"):
+                       "상세 보류 사유", "groupedReasons", "groupedReasons.slice(0,3)", "기술적 점수는 조건 충족도",
+                       "최종 계획 미확정", "현재 5파로 확정할 수 없음"):
             self.assertIn(phrase, main)
 
     def test_main_page_links_to_read_only_dashboard(self):
