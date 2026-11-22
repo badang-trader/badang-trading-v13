@@ -118,11 +118,12 @@ def main():
             'end-of-data exits excluded as censored',
             'returns are unit-notional, not account equity or leveraged PnL'],
         'results':[]}
+    market_asof={m['market']:m['asof_ms'] for m in manifest['bitget']['markets']} if 'bitget' in manifest else {m['market']:m['asof_ms'] for m in manifest['markets']}
     for symbol in ('BTC','ETH'):
         frames={}
         for frame in ('15m','30m','1H','4H','1D'):
             payload=json.loads((folder/f'bitget_{symbol}_{frame}.json').read_text(encoding='utf-8'))
-            audit_historical_candles(payload['candles'],frame,asof_ms=manifest['collected_at_ms'])
+            audit_historical_candles(payload['candles'],frame,asof_ms=market_asof[f'{symbol}_{frame}'])
             frames[frame]=payload['candles']
         for mode in MODES:
             output['results'].append({'symbol':symbol,'mode':mode,
