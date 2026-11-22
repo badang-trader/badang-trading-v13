@@ -107,6 +107,7 @@ jobs:
           python badang_censored_equity_integration.py
           python badang_prospective_ema_eligibility.py
           python badang_paired_ema_equity.py
+          python badang_ema_paired_sensitivity.py
           python badang_reversal_prefix_replay.py
           python badang_execution_causal_audit.py
           python badang_htf_ema_prefix_audit.py
@@ -167,6 +168,7 @@ jobs:
           python badang_censored_equity_integration.py
           python badang_prospective_ema_eligibility.py
           python badang_paired_ema_equity.py
+          python badang_ema_paired_sensitivity.py
           python badang_reversal_prefix_replay.py
           python badang_execution_causal_audit.py
           python badang_htf_ema_prefix_audit.py
