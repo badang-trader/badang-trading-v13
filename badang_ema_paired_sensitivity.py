@@ -83,6 +83,36 @@ def run(cases,histories):
                                     "ema_minus_all_equity":(
                                         b["at_last_common_exact"]["strict_observed_equity"]-
                                         a["at_last_common_exact"]["strict_observed_equity"] if exact else None)})
+    # Hard fail on arithmetic errors; a green CI must not hide broken account identities.
+    if len(outputs)!=24:
+        raise AssertionError(f"expected 24 scenarios, got {len(outputs)}")
+    expected={(strategy,lev,fraction,cap) for strategy in ("early","confirmed")
+              for lev in (1,2,3) for fraction in (.03,.05) for cap in (.20,.30)}
+    actual={(s["strategy"],s["leverage"],s["margin_fraction"],s["max_margin_fraction"]) for s in outputs}
+    if actual!=expected:
+        raise AssertionError("scenario grid missing or duplicated")
+    for s in outputs:
+        for mode in ("all","ema"):
+            metrics=s[mode]
+            last=metrics["at_last_common_exact"]
+            if last is None:
+                raise AssertionError("no comparable exact close")
+            realized=last["realized_pnl"]
+            unrealized=last["observed_unrealized_pnl"]
+            equity=last["strict_observed_equity"]
+            reserved=last["reserved_margin"]
+            available=last["available_capital_realized_basis"]
+            if abs(equity-(10000.+realized+unrealized))>1e-7:
+                raise AssertionError("equity accounting mismatch")
+            if abs(available-(10000.+realized-reserved))>1e-7:
+                raise AssertionError("available capital accounting mismatch")
+            if reserved < -1e-7 or reserved>max(0.,10000.+realized)*s["max_margin_fraction"]+1e-5:
+                raise AssertionError("margin cap breached")
+            if not 0<=metrics["realized_mdd"]<=1 or not 0<=metrics["common_exact_close_mdd_lower_bound"]<=1:
+                raise AssertionError("invalid drawdown")
+        difference=s["ema"]["at_last_common_exact"]["strict_observed_equity"]-s["all"]["at_last_common_exact"]["strict_observed_equity"]
+        if abs(difference-s["ema_minus_all_equity"])>1e-7:
+            raise AssertionError("paired equity difference mismatch")
     return {"status":"RESEARCH_ONLY_NOT_INDEPENDENT_PROFITABILITY",
             "cutoff_ms":report["cutoff_ms"],"scenarios":outputs,
             "warnings":["SAME_TIMEFRAME_EMA_ONLY; HTF_FILTER_NOT_EVALUATED",
