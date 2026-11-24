@@ -20,13 +20,13 @@ class DashboardClarityTests(unittest.TestCase):
         self.assertEqual(dashboard.status_code, 200)
         self.assertIn('바당의 쉬운 판단'.encode('utf-8'), dashboard.data)
 
-    def test_position_calculator_is_connected_to_main_screen(self):
+    def test_position_calculator_is_removed(self):
+        from app import app
         main = (ROOT / 'app.py').read_text(encoding='utf-8')
-        self.assertIn('id="positionScenario"', main)
-        self.assertIn('id="psCalc"', main)
-        self.assertIn('fetch("/api/position-scenario"', main)
-        self.assertIn('평균 진입가 ', main)
-        self.assertIn('실제 수수료·펀딩비·청산가', main)
+        for marker in ('positionScenario', 'psCalc', '/api/position-scenario', 'psAddQty'):
+            self.assertNotIn(marker, main)
+        client = app.test_client()
+        self.assertEqual(client.post('/api/position-scenario', json={}).status_code, 404)
 
     def test_scan_exposes_separate_technical_candidate_feed(self):
         main = (ROOT / 'app.py').read_text(encoding='utf-8')
