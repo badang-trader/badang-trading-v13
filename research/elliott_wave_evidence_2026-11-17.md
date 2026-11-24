@@ -77,3 +77,24 @@ Existing GitHub Actions on commit `36cd56d1` (2026-11-15 UTC) show **807 tests, 
 - `badang_wave_causal_replay_588.py` replays prefixes of closed candles, but it has no out-of-sample forecast evaluation, execution simulation or calibrated accuracy.
 - `badang_wave_live_research_589.py` counts repeated observations, not independent trades. The report output newline was corrected in the validation branch in this review.
 - No new predictive accuracy, net profitability, or independent-sample statistics were computed during this review. No main/Render/order changes.
+
+## Follow-up causal candidate audit — 2026-11-24
+
+### New verified code-level observation
+- The research-only `badang_wave_choice_response_587.py` previously invoked `wave_candidates(pivots(rows))` without `total_bars`. As a result, the candidate engine's `observable_in_snapshot` metadata was not computed as true in this path, even when pivots were confirmed. The selection output did not expose `first_observable_bar_index` to the downstream replay. This is a causal traceability gap, not evidence of historical profitability.
+- The research path now supplies `total_bars=len(rows)`, excludes candidates explicitly marked `observable_in_snapshot=False`, and carries confirmation metadata. Legacy/mock candidates with no metadata remain labeled `pivot_timing_verified=False`, not falsely certified.
+- Regression tests cover unconfirmed-pivot rejection and confirmed-pivot timing metadata. The GitHub Actions result for the new commits must be checked separately; a committed test is not a passing test.
+- This does **not** establish true nested-wave detection, completed 5th waves, or independent market outcomes.
+
+### Theory and source comparison
+- EWI Waveopedia explains that diagonal overlap is a pattern-specific exception; ending diagonals commonly have 3-3-3-3-3 subdivisions, while leading diagonal subdivision conventions are unsettled: https://www.elliottwave.com/waveopedia/elliott-wave-pattern-diagonals/
+- ELWAVE distinguishes diagonal type 1 (3-3-3-3-3) from type 2 (5-3-5-3-5): https://elwave.com/elwave/faq/principle/principle2.html . This differs from sources that insist all diagonals subdivide into threes. The implementation must store the selected rulebook/version, rather than merge incompatible conventions.
+- Vantuch, Zelinka & Vasant (2018), *An algorithm for Elliott Waves pattern detection*, evaluates pattern detection under different settings; its abstract does not establish BTC/ETH out-of-sample net trading returns: https://doi.org/10.3233/IDT-170319
+- Elliott's original 1938/1946 texts were not directly authenticated in this run. Later pattern-taxonomy claims should not be presented as quotations from Elliott.
+
+### Next falsifiable experiment
+1. Archive closed Bitget BTC/ETH candles with exact timestamp and instrument metadata; reject gaps and open bars.
+2. At each `t`, preserve candidate `first_observable_bar_index <= t`; test whether a candidate changes on subsequent prefixes. Record first detection, disappearance, and replacement.
+3. Pre-register alternative hypotheses: H1 downward 5-wave exhaustion versus H2 nested downward third-wave extension. Label both as `unconfirmed` without nested degree evidence; define fixed future 5/10/20-bar outcomes independently from wave labels.
+4. Compare against no-wave and simple trend baselines, walk-forward split with horizon embargo, distinct market regimes, fees/spread/slippage/funding. Report sample size, false signals, calibration, and net performance only after actual computation.
+5. Separate wave-count invalidation from risk-stop distance; no automatic order execution or forced reversal.
