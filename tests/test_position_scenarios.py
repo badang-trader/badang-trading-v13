@@ -21,19 +21,11 @@ class PositionScenarioTests(unittest.TestCase):
         self.assertEqual(r['average_entry'],100)
         self.assertEqual(r['gross_pnl_usdt'],10)
 
-    def test_read_only_flask_endpoint(self):
+    def test_removed_flask_endpoint(self):
         from app import app
         client=app.test_client()
-        payload={'side':'LONG','existing_quantity':2,'existing_entry':100,
-                 'added_quantity':1,'added_entry':90,'exit_price':110,
-                 'fee_pct':0.1,'slippage_pct':0.1}
-        response=client.post('/api/position-scenario',json=payload)
-        self.assertEqual(response.status_code,200)
-        self.assertAlmostEqual(response.get_json()['average_entry'],290/3)
-        self.assertIsNone(response.get_json()['probability'])
-        self.assertEqual(client.post('/api/position-scenario',
-                         json={**payload,'added_quantity':-1}).status_code,400)
-        self.assertEqual(client.get('/api/position-scenario').status_code,405)
+        self.assertEqual(client.post('/api/position-scenario',json={}).status_code,404)
+        self.assertEqual(client.get('/api/position-scenario').status_code,404)
 
     def test_invalid_values(self):
         for args in [('LONG',1,100,-1,90,110),('LONG',1,100,1,90,float('nan')),
