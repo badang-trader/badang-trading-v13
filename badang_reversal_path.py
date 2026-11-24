@@ -15,11 +15,15 @@ def reversal_path(item, frame_data, mode, now_ms):
     out = {'status':'UNAVAILABLE','reference_price':price,'probability_status':'NOT_BACKTEST_VALIDATED',
            'probability':None,'valid_frames':list(valid),'required_frames':list(frames),'paths':[],
            'history':[], 'score_is_probability':False}
-    if not price or price <= 0 or not valid:
+    if not valid:
         return out
     base = next(iter(valid))
     bars = valid[base]
-    atr = sum(max(bars[i][2]-bars[i][3],abs(bars[i][2]-bars[i-1][4]),abs(bars[i][3]-bars[i-1][4])) for i in range(len(bars)-14,len(bars)))/14
+    tr = [max(bars[i][2]-bars[i][3],abs(bars[i][2]-bars[i-1][4]),abs(bars[i][3]-bars[i-1][4])) for i in range(1,len(bars))]
+    atr = sum(tr[:14])/14
+    for value in tr[14:]:
+        atr = (13*atr+value)/14
+    out['atr14_wilder'] = atr
     if atr <= 0:
         return out
     out['history'] = [{'time':b[0],'price':b[4]} for b in bars[-24:]]
@@ -36,10 +40,12 @@ def reversal_path(item, frame_data, mode, now_ms):
     ema_levels = []
     fibs = []
     wave_targets = []
+    all_turns = []
     for tf, rows in valid.items():
         turns = confirmed_turns(rows[-160:])
         for t in turns:
             p=t['price']
+            all_turns.append((p,t['kind']))
             if t['kind']=='L' and p<price: points['DOWN'].append((p,tf))
             if t['kind']=='H' and p>price: points['UP'].append((p,tf))
         for period in (20,50,200):
@@ -50,13 +56,17 @@ def reversal_path(item, frame_data, mode, now_ms):
         structure=(item.get('structure_427') or {}).get(tf,{})
         for w in (structure.get('wave') or {}).get('alternatives',[]):
             p=w.get('pivot_prices',[])
-            if w.get('wave')==5 and len(p)==5 and w.get('direction') in ('UP','DOWN'):
+            if structure.get('status')=='OK' and w.get('wave')==5 and len(p)==5 and w.get('direction') in ('UP','DOWN'):
                 sign=1 if w['direction']=='UP' else -1
+                if not ((p[1]-p[0])*sign>0 and (p[2]-p[0])*sign>0 and (p[1]-p[2])*sign>0 and (p[3]-p[1])*sign>0 and (p[3]-p[4])*sign>0 and (p[4]-p[1])*sign>0):
+                    continue
+                if (rows[-1][4]-p[3])*sign<=0:
+                    continue
                 target=p[4]+sign*abs(p[1]-p[0])
-                if target>0: wave_targets.append((target,w['direction'],tf))
+                if target>0 and (target-price)*sign>0 and abs(p[3]-p[2])>=min(abs(p[1]-p[0]),abs(target-p[4])): wave_targets.append((target,w['direction'],tf))
                 for ratio in (.618,1.618):
                     target=p[4]+sign*abs(p[1]-p[0])*ratio
-                    if target>0: fibs.append((target,w['direction'],tf))
+                    if target>0 and (target-price)*sign>0 and abs(p[3]-p[2])>=min(abs(p[1]-p[0]),abs(target-p[4])): fibs.append((target,w['direction'],tf))
     for side in (('DOWN','UP') if direction=='MIXED' else (direction,)):
         groups=[]
         for p,tf in sorted(points[side],reverse=side=='DOWN'):
@@ -81,14 +91,14 @@ def reversal_path(item, frame_data, mode, now_ms):
                 components['ema']=10; reasons.append('현재 확정봉 EMA 중첩')
             score=sum(components.values())
             zones.append({'low':lo,'high':hi,'center':center,'expected_score':score,
-                          'confirmation_score':None,'components':components,'reasons':reasons,
+                          'confirmation_score':None,'expected_score_ceiling':50,'components':components,'reasons':reasons,
                           'unverified':['구간 도달 후 반전 캔들','다이버전스','거래량·OI·CVD'],
                           'probability':None,'change_pct':(center/price-1)*100,
                           'invalidation':lo if side=='DOWN' else hi,
                           'reversal_target':None,'next_target':None})
         for i,z in enumerate(zones):
             if i+1<len(zones): z['next_target']=zones[i+1]['center']
-            opposite=[p for p,_ in points['UP' if side=='DOWN' else 'DOWN'] if (p>z['high'] if side=='DOWN' else p<z['low'])]
+            opposite=[p for p,kind in all_turns if (kind=='H' and p>z['high']+tol if side=='DOWN' else kind=='L' and p<z['low']-tol)]
             if opposite: z['reversal_target']=min(opposite) if side=='DOWN' else max(opposite)
         out['paths'].append({'direction':side,'zones':zones})
     return out
