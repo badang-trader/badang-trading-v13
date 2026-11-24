@@ -12,10 +12,14 @@ def wave_choice_response(candles):
         return {"status": "invalid_data", "trading_ready": False, "scenarios": []}
     if len(rows) < 25:
         return {"status": "insufficient_data", "trading_ready": False, "scenarios": []}
-    candidates = wave_candidates(pivots(rows))
+    candidates = wave_candidates(pivots(rows), total_bars=len(rows))
     close = rows[-1]["close"]
     scenarios = []
     for candidate in candidates:
+        # Reject a candidate if its final pivot was not observable at this close.
+        # Legacy candidates without timing metadata remain unverified.
+        if candidate.get("observable_in_snapshot") is False:
+            continue
         invalidation = candidate.get("invalidation_price")
         if (not isinstance(invalidation, (int, float))
                 or isinstance(invalidation, bool)
@@ -33,6 +37,9 @@ def wave_choice_response(candles):
             "invalidation_price": invalidation,
             "current_close": close,
             "invalidation_status": "not_evaluated",
+            "first_observable_bar_index": candidate.get("first_observable_bar_index"),
+            "pivot_confirmation_bars": candidate.get("pivot_confirmation_bars"),
+            "pivot_timing_verified": candidate.get("observable_in_snapshot") is True,
             "level_semantics": "structural_reference_only",
             "invalidation_rule_verified": False,
             "response_if_invalidated": "recount_wave_and_reassess; do_not_auto_reverse",
