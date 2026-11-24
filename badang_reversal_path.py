@@ -27,7 +27,9 @@ def reversal_path(item, frame_data, mode, now_ms):
     if atr <= 0:
         return out
     out['history'] = [{'time':b[0],'price':b[4]} for b in bars[-24:]]
+    out['scan_reference_price'] = price
     out['reference_time'] = bars[-1][0]
+    out['reference_time_kind'] = 'CANDLE_OPEN'
     out['history_timeframe'] = base
     out['reference_price'] = price = bars[-1][4]
     trends = item.get('timeframe_trends') or {}
@@ -46,8 +48,13 @@ def reversal_path(item, frame_data, mode, now_ms):
         for t in turns:
             p=t['price']
             all_turns.append((p,t['kind']))
-            if t['kind']=='L' and p<price: points['DOWN'].append((p,tf))
-            if t['kind']=='H' and p>price: points['UP'].append((p,tf))
+            later = rows[-160:][t['i']+1:]
+            # A broken level is not an intact support/resistance. Role reversal
+            # requires separate retest evidence, not merely a historical pivot.
+            if t['kind']=='L' and p<price and not any(b[4]<p-tol for b in later):
+                points['DOWN'].append((p,tf))
+            if t['kind']=='H' and p>price and not any(b[4]>p+tol for b in later):
+                points['UP'].append((p,tf))
         for period in (20,50,200):
             if len(rows)<period: continue
             v=sum(b[4] for b in rows[:period])/period
@@ -60,7 +67,7 @@ def reversal_path(item, frame_data, mode, now_ms):
                 sign=1 if w['direction']=='UP' else -1
                 if not ((p[1]-p[0])*sign>0 and (p[2]-p[0])*sign>0 and (p[1]-p[2])*sign>0 and (p[3]-p[1])*sign>0 and (p[3]-p[4])*sign>0 and (p[4]-p[1])*sign>0):
                     continue
-                if (rows[-1][4]-p[3])*sign<=0:
+                if (rows[-1][4]-p[3])*sign<=0 or abs(p[3]-p[2]) < min(abs(p[1]-p[0]),abs(rows[-1][4]-p[4])):
                     continue
                 target=p[4]+sign*abs(p[1]-p[0])
                 if target>0 and (target-price)*sign>0 and abs(p[3]-p[2])>=min(abs(p[1]-p[0]),abs(target-p[4])): wave_targets.append((target,w['direction'],tf))
@@ -70,7 +77,7 @@ def reversal_path(item, frame_data, mode, now_ms):
     for side in (('DOWN','UP') if direction=='MIXED' else (direction,)):
         groups=[]
         for p,tf in sorted(points[side],reverse=side=='DOWN'):
-            if groups and abs(p-groups[-1][0][0])<=tol:
+            if groups and abs(p-groups[-1][-1][0])<=tol and abs(p-groups[-1][0][0])<=2*tol:
                 groups[-1].append((p,tf))
             else: groups.append([(p,tf)])
         zones=[]
