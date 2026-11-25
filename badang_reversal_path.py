@@ -61,19 +61,20 @@ def reversal_path(item, frame_data, mode, now_ms):
             for b in rows[period:]: v+=(b[4]-v)*2/(period+1)
             ema_levels.append((v,tf))
         structure=(item.get('structure_427') or {}).get(tf,{})
+        if structure.get('status')!='OK' or structure.get('last_closed_time')!=rows[-1][0]:
+            continue
         for w in (structure.get('wave') or {}).get('alternatives',[]):
-            p=w.get('pivot_prices',[])
-            if structure.get('status')=='OK' and w.get('wave')==5 and len(p)==5 and w.get('direction') in ('UP','DOWN'):
-                sign=1 if w['direction']=='UP' else -1
-                if not ((p[1]-p[0])*sign>0 and (p[2]-p[0])*sign>0 and (p[1]-p[2])*sign>0 and (p[3]-p[1])*sign>0 and (p[3]-p[4])*sign>0 and (p[4]-p[1])*sign>0):
+            if w.get('stage')!='BREAKOUT_PROGRESS' or w.get('direction') not in ('UP','DOWN'):
+                continue
+            if w.get('reference_price')!=rows[-1][4]:
+                continue
+            sign=1 if w['direction']=='UP' else -1
+            for target in w.get('future_targets',[]):
+                p=_f(target.get('price'))
+                if target.get('timeframe')!=tf or target.get('reached') is not False or p is None or p<=0 or (p-price)*sign<=0:
                     continue
-                if (rows[-1][4]-p[3])*sign<=0 or abs(p[3]-p[2]) < min(abs(p[1]-p[0]),abs(rows[-1][4]-p[4])):
-                    continue
-                target=p[4]+sign*abs(p[1]-p[0])
-                if target>0 and (target-price)*sign>0 and abs(p[3]-p[2])>=min(abs(p[1]-p[0]),abs(target-p[4])): wave_targets.append((target,w['direction'],tf))
-                for ratio in (.618,1.618):
-                    target=p[4]+sign*abs(p[1]-p[0])*ratio
-                    if target>0 and (target-price)*sign>0 and abs(p[3]-p[2])>=min(abs(p[1]-p[0]),abs(target-p[4])): fibs.append((target,w['direction'],tf))
+                # Shared engine targets are hypotheses, not confirmed endings.
+                wave_targets.append((p,w['direction'],tf))
     for side in (('DOWN','UP') if direction=='MIXED' else (direction,)):
         groups=[]
         for p,tf in sorted(points[side],reverse=side=='DOWN'):
@@ -91,14 +92,14 @@ def reversal_path(item, frame_data, mode, now_ms):
             reasons=['확정 스윙 지지·저항: '+', '.join(tfs)]
             # Wave and Fibonacci projections share the same anchors; do not double count.
             if any(s==side and lo<=p<=hi for p,s,_ in wave_targets):
-                components['wave']=20; reasons.append('일반 5파 길이 가설 중첩')
+                components['wave']=10; reasons.append('돌파 이후 파동 목표 가설 중첩 (종료 미확정)')
             elif any(s==side and lo<=p<=hi for p,s,_ in fibs):
                 components['fibonacci']=15; reasons.append('5파 피보나치 확장 가설 중첩')
             if any(lo<=p<=hi for p,_ in ema_levels):
                 components['ema']=10; reasons.append('현재 확정봉 EMA 중첩')
             score=sum(components.values())
             zones.append({'low':lo,'high':hi,'center':center,'expected_score':score,
-                          'confirmation_score':None,'expected_score_ceiling':50,'components':components,'reasons':reasons,
+                          'confirmation_score':None,'expected_score_ceiling':40,'components':components,'reasons':reasons,
                           'unverified':['구간 도달 후 반전 캔들','다이버전스','거래량·OI·CVD'],
                           'probability':None,'change_pct':(center/price-1)*100,
                           'invalidation':lo if side=='DOWN' else hi,
