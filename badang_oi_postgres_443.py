@@ -21,6 +21,13 @@ def _connection():
         url = 'postgresql://' + url[len('postgres://'):]
     return psycopg2.connect(url, connect_timeout=5)
 
+def retention_days():
+    # Preserve longer swing history while bounding database growth.
+    try:
+        return max(30,min(365,int(os.environ.get('BADANG_OI_RETENTION_DAYS','90'))))
+    except (ValueError,TypeError):
+        return 90
+
 def record(symbol, oi, observed_ms=None):
     symbol = _valid_symbol(symbol)
     oi = float(oi)
@@ -37,7 +44,7 @@ def record(symbol, oi, observed_ms=None):
                 cur.execute(SCHEMA)
                 cur.execute('INSERT INTO badang_oi_observations VALUES (%s,%s,%s,%s) ON CONFLICT DO NOTHING',
                             (symbol, 'bitget', observed_ms, oi))
-                cur.execute('DELETE FROM badang_oi_observations WHERE observed_ms < %s', (now-86_400_000,))
+                cur.execute('DELETE FROM badang_oi_observations WHERE observed_ms < %s', (now-retention_days()*86_400_000,))
     return {'symbol':symbol,'oi':oi,'observed_ms':observed_ms}
 
 def changes(symbol, now_ms=None, tolerance_ms=90_000, freshness_ms=180_000):
@@ -45,6 +52,7 @@ def changes(symbol, now_ms=None, tolerance_ms=90_000, freshness_ms=180_000):
     now_ms = int(time.time()*1000) if now_ms is None else int(now_ms)
     result = {'source_exchange':'bitget','symbol':symbol,'status':'INSUFFICIENT_HISTORY',
               'collection':'EXTERNAL_SCHEDULE_REQUIRED','storage_durable':True,
+              'retention_days':retention_days(),
               'oi_change_15m_pct':None,'oi_change_1h_pct':None,
               'reason':'동일 거래소의 과거 관측값 필요'}
     with closing(_connection()) as con:
