@@ -331,6 +331,19 @@ def structure_review(raw,tf,now_ms=None):
         candidate['active_leg_invalidation']=origin
         candidate['last_pivot_confirmed_close_ms']=candidate['last_pivot_confirmed_at']+FRAME_MS[tf]
         candidate['flow_validation']={'status':'UNVERIFIED','oi_change_pct':None,'cvd':None,'used_in_score':False}
+        # Compare candle volume on the completed wave 1 and wave 2 intervals.
+        # Volume is unsigned and cannot substitute for OI or trade-side CVD.
+        pivot_times=[t['time'] for t in turns[-candidate['wave']:]]
+        leg_stats=[]
+        for start,end in zip(pivot_times,pivot_times[1:]):
+            segment=[b for b in recent if start<b[0]<=end]
+            leg_stats.append({'start_open_ms':start,'end_open_ms':end,
+                'bar_count':len(segment),'volume_sum':sum(b[5] for b in segment),
+                'volume_mean':sum(b[5] for b in segment)/len(segment) if segment else None})
+        candidate['leg_volume_context']={'legs':leg_stats,
+            'source':'CLOSED_CANDLE_UNSIGNED_VOLUME','used_in_score':False,
+            'boundary_note':'Start pivot candle excluded; end pivot candle included; intrabar pivot timing unknown'}
+
         candidate['pivot_times']=[t['time'] for t in turns[-candidate['wave']:]]
         valid.append(candidate)
     wave['alternatives']=valid
@@ -469,7 +482,8 @@ def decision_review(item,structures,mode):
                                    'active_leg_invalidation':candidate.get('active_leg_invalidation'),
                                    'future_targets':candidate.get('future_targets',[]),
                                    'wave2_retrace_ratio':candidate.get('wave2_retrace_ratio'),
-                                   'flow_validation':candidate.get('flow_validation')})
+                                   'flow_validation':candidate.get('flow_validation'),
+                                   'leg_volume_context':candidate.get('leg_volume_context')})
     # Compare only independently confirmed frames; direction agreement is
     # context, not proof that lower-degree waves belong to a higher wave.
     frame_wave_context=[]
@@ -482,7 +496,7 @@ def decision_review(item,structures,mode):
                 'wave':w.get('wave'),'stage':w.get('stage'),
                 'invalidation':w.get('invalidation'),
                 'known_at_ms':w.get('last_pivot_confirmed_close_ms'),
-                'reference_close_ms':st['last_closed_time']+FRAME_MS[tf]})
+                'reference_close_ms':(st['last_closed_time']+FRAME_MS[tf] if isinstance(st.get('last_closed_time'),int) else None)})
     directions={w['direction'] for w in frame_wave_context if w['direction'] in ('UP','DOWN')}
     frame_count=len({w['timeframe'] for w in frame_wave_context})
     wave_alignment={'status':'CONFLICT' if len(directions)>1 else
