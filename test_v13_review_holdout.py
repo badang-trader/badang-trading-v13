@@ -23,12 +23,17 @@ class V13ReviewReplayTests(unittest.TestCase):
         last[2], last[4], last[5] = 103.90, 103.75, 30
         return history
 
-    def run_signals(self, history):
-        return collect_signals(history, 'BTC', 'scalp', self.as_of - 2 * FRAME_MS['15m'])
+    def run_signals(self, history, *, reviews=None):
+        return collect_signals(history, 'BTC', 'scalp', self.as_of - 2 * FRAME_MS['15m'],
+                               reviews=reviews)
 
     def test_uses_review_plan_and_cannot_see_later_higher_frame(self):
         history = self.history()
-        technical, ready, counts = self.run_signals(history)
+        reviews = []
+        technical, ready, counts = self.run_signals(history, reviews=reviews)
+        review, = reviews
+        self.assertEqual(review['stage'], 'READY_REVIEW')
+        self.assertEqual(review['blocked_by'], [])
         self.assertEqual(counts['final_review_signals'], 1)
         self.assertEqual(technical[0]['score'], ready[0]['score'])
         self.assertNotEqual(technical[0]['target'], ready[0]['target'])
@@ -41,7 +46,11 @@ class V13ReviewReplayTests(unittest.TestCase):
         history = self.history()
         for row in history['BTC', '1H']:
             row[1:5] = [204 - row[1], 204 - row[3], 204 - row[2], 204 - row[4]]
-        technical, ready, counts = self.run_signals(history)
+        reviews = []
+        technical, ready, counts = self.run_signals(history, reviews=reviews)
+        review, = reviews
+        self.assertEqual(review['stage'], 'ENTRY_CHECKS_WAIT')
+        self.assertIn('timeframe_alignment', {failure['check'] for failure in review['blocked_by']})
         self.assertEqual(len(technical), 1)
         self.assertEqual(counts['price_action_signals'], 1)
         self.assertEqual(counts['entry_checks_passed'], 0)

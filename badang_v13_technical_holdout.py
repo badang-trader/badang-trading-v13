@@ -23,7 +23,7 @@ REPLAY_WINDOW_BARS = 350
 BANDS = ('80-84', '85-89', '90+')
 
 
-def collect_signals(histories, symbol, mode, cutoff):
+def collect_signals(histories, symbol, mode, cutoff, *, reviews=None):
     frames = V13_MODE_FRAMES[mode]
     setup = frames[0]
     rows = histories[symbol, setup]
@@ -69,21 +69,43 @@ def collect_signals(histories, symbol, mode, cutoff):
         inputs = {tf: prefix + [[prefix[-1][0] + FRAME_MS[tf], *prefix[-1][1:]]]
                   for tf, prefix in prefixes.items()}
         action = price_action_45(inputs[setup], trends, mode)
+        review = {
+            'symbol': symbol, 'mode': mode, 'signal_close_ms': as_of, 'technical_side': side,
+            'technical_score': score, 'trends': trends, 'price_action_side': action.get('side'),
+            'price_action': action.get('kind'), 'blocked_by': [],
+        }
+        if reviews is not None:
+            reviews.append(review)
         if action.get('side') not in ('LONG', 'SHORT'):
+            review.update(stage='PRICE_ACTION_WAIT', blocked_by=[
+                {'check': 'price_action', 'reason': action['reason']}])
             continue
         counts['price_action_signals'] += 1
         audits = {tf: inspect_frame_410({'candles': data, 'exchange': 'bitget'}, tf, as_of)
                   for tf, data in inputs.items()}
         output.update(exchange='bitget', analysis_reference_price=output['entry_reference'])
         apply_v13_entry_checks(output, action, trends, audits, current_structure, mode)
-        if output['signal_precision_418']['status'] != 'CANDIDATE':
+        precision = output['signal_precision_418']
+        if precision['status'] != 'CANDIDATE':
+            review.update(stage='ENTRY_CHECKS_WAIT', blocked_by=[
+                {'check': name, 'reason': check['reason']}
+                for name, check in precision['checks'].items() if not check['passed']
+            ])
             continue
         counts['entry_checks_passed'] += 1
         structures = {tf: structure_review(data, tf, as_of) for tf, data in inputs.items()}
         decision = decision_review(output, structures, mode)
         output['decision_427'] = decision
-        if decision['state'] != 'READY_REVIEW' or reconcile(output)['status'] != 'REVIEW_ONLY':
+        if decision['state'] != 'READY_REVIEW':
+            review.update(stage='DECISION_WAIT', blocked_by=[
+                {'check': 'decision', 'reason': reason} for reason in decision['reasons']])
             continue
+        reconciliation = reconcile(output)
+        if reconciliation['status'] != 'REVIEW_ONLY':
+            review.update(stage='RECONCILIATION_WAIT', blocked_by=[
+                {'check': 'reconciliation', 'reason': reason} for reason in reconciliation['reasons']])
+            continue
+        review['stage'] = 'READY_REVIEW'
         counts['final_review_signals'] += 1
         plan = decision['plan']
         ready.append(dict(signal, stop=plan['stop'], target=plan['tp1']))
@@ -226,14 +248,14 @@ def run(folder, cutoff, *, end_ms=None):
         raise ValueError('Replay end must be a verifiable 15m close after cutoff')
     histories = {key: [row for row in rows if row[0] + FRAME_MS[key[1]] <= end]
                  for key, rows in histories.items()}
-    cohorts = []
+    cohorts, reviews = [], []
     trades = {'technical': [], 'final_review': []}
     for symbol in ('BTC', 'ETH'):
         for mode, (setup, *_) in V13_MODE_FRAMES.items():
             rows = histories[symbol, setup]
             eligible_rows = [row for row in rows if row[0] > cutoff]
             gate = audit_nonoverlap(eligible_rows, cutoff=cutoff, min_bars=1)
-            technical, ready, counts = collect_signals(histories, symbol, mode, cutoff)
+            technical, ready, counts = collect_signals(histories, symbol, mode, cutoff, reviews=reviews)
             fills, missing_execution = {}, {}
             for scope, signals in (('technical', technical), ('final_review', ready)):
                 executions, missing_execution[scope] = audit_signals_on_15m(
@@ -257,6 +279,7 @@ def run(folder, cutoff, *, end_ms=None):
             'trades': trade_ledger(trades['technical']),
             'final_review': {
                 'status': 'DESCRIPTIVE_ONLY' if trades['final_review'] else 'NO_FILLED_POSITIONS',
+                'reviews': sorted(reviews, key=lambda row: (row['signal_close_ms'], row['symbol'], row['mode'])),
                 'groups': group_metrics(trades['final_review']),
                 'trades': trade_ledger(trades['final_review']),
                 'account': account_metrics(trades['final_review'], histories, cutoff, end),
