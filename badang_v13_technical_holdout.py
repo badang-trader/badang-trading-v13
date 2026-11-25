@@ -90,6 +90,28 @@ def collect_signals(histories, symbol, mode, cutoff):
     return technical, ready, counts
 
 
+def audit_signals_on_15m(rows, signals, signal_timeframe):
+    """Fill after signal confirmation and use one observable clock for exits."""
+    step = FRAME_MS['15m']
+    close_indices = {row[0] + step: index for index, row in enumerate(rows)}
+    indexed = []
+    missing = 0
+    for signal in signals:
+        signal_close = signal['signal_timestamp'] + FRAME_MS[signal_timeframe]
+        index = close_indices.get(signal_close)
+        if index is None:
+            missing += 1
+            continue
+        # audit_trades will enter at the next bar open. The mapped row
+        # ends at the signal close and its price never enters the trade.
+        indexed.append(dict(signal, bar=index, known_at_bar=index, signal_timestamp=rows[index][0]))
+    report = audit_trades(rows, indexed, fee_rate=ROUNDTRIP_FEE_PCT / 200,
+                          slippage_rate=ROUNDTRIP_SLIPPAGE_PCT / 200)
+    trades = [dict(trade, timeframe='15m', signal_timeframe=signal_timeframe)
+              for trade in report['trades']]
+    return trades, missing
+
+
 def group_metrics(trades):
     """Closed trades determine outcome statistics. Open trades stay censored."""
     groups = []
@@ -122,8 +144,7 @@ def group_metrics(trades):
 def account_metrics(trades, histories, cutoff, end):
     events = []
     for i, t in enumerate(trades):
-        # Mark all positions on the same 15m Bitget grid while preserving
-        # each strategy's close time for exit recognition.
+        # Recognize executions and mark all positions on the Bitget 15m grid.
         event = {'id': str(i), 'symbol': t['symbol'], 'timeframe': '15m',
                  'side': t['side'], 'entry_ts': t['entry_timestamp'],
                  'entry_price': t['entry_price'], 'leverage': 1,
@@ -168,6 +189,7 @@ def trade_ledger(trades):
         rows.append({
             'symbol': trade['symbol'], 'mode': trade['mode'], 'side': trade['side'],
             'score_band': trade['band'],
+            'signal_timeframe': trade['signal_timeframe'], 'execution_timeframe': trade['timeframe'],
             'signal_close_ms': trade['signal_timestamp'] + duration,
             'entry_ms': trade['entry_timestamp'], 'entry': trade['entry_price'],
             'stop': trade['stop_price'], 'target': trade['target_price'],
@@ -212,22 +234,24 @@ def run(folder, cutoff, *, end_ms=None):
             eligible_rows = [row for row in rows if row[0] > cutoff]
             gate = audit_nonoverlap(eligible_rows, cutoff=cutoff, min_bars=1)
             technical, ready, counts = collect_signals(histories, symbol, mode, cutoff)
-            fills = {}
+            fills, missing_execution = {}, {}
             for scope, signals in (('technical', technical), ('final_review', ready)):
-                report = audit_trades(rows, signals, fee_rate=ROUNDTRIP_FEE_PCT / 200,
-                                      slippage_rate=ROUNDTRIP_SLIPPAGE_PCT / 200)
-                trades[scope].extend(dict(t, symbol=symbol, timeframe=setup) for t in report['trades'])
-                fills[scope] = len(report['trades'])
+                executions, missing_execution[scope] = audit_signals_on_15m(
+                    histories[symbol, '15m'], signals, setup)
+                trades[scope].extend(dict(trade, symbol=symbol) for trade in executions)
+                fills[scope] = len(executions)
             cohorts.append({'symbol': symbol, 'mode': mode, 'post_cutoff_bars': len(eligible_rows),
                             'temporal_gate': gate['status'] if eligible_rows else 'NO_POST_CUTOFF_BARS',
                             **counts, 'technical_signals': len(technical),
-                            'filled_positions': fills['technical'], 'final_review_fills': fills['final_review']})
+                            'filled_positions': fills['technical'], 'final_review_fills': fills['final_review'],
+                            'signals_without_execution_coverage': missing_execution})
     return {'source': 'BITGET_PUBLIC_HISTORY_API', 'cutoff_ms': cutoff, 'end_ms': end,
             'status': 'DESCRIPTIVE_ONLY' if trades['technical'] else 'NO_FILLED_POSITIONS',
             'scope': 'Technical candidate and final scanner review; historical OI/CVD unavailable',
             'analysis_window_max_bars': REPLAY_WINDOW_BARS,
-            'execution': 'Next open, first target only, stop first on collision, costs on both sides, '
-                         'one position per symbol and mode',
+            'execution_timeframe': '15m',
+            'execution': 'Next 15m open after signal close, first target only, stop first on same 15m bar, '
+                         'costs on both sides, one position per symbol and mode',
             'cohorts': cohorts, 'groups': group_metrics(trades['technical']),
             'account': account_metrics(trades['technical'], histories, cutoff, end),
             'trades': trade_ledger(trades['technical']),

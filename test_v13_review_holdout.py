@@ -2,7 +2,7 @@
 import unittest
 
 from badang_historical_integrity import FRAME_MS
-from badang_v13_technical_holdout import collect_signals, trade_ledger
+from badang_v13_technical_holdout import audit_signals_on_15m, collect_signals, trade_ledger
 from badang_walkforward_audit import audit_trades
 
 
@@ -56,7 +56,7 @@ class V13ReviewReplayTests(unittest.TestCase):
 
         def position(rows):
             trades = audit_trades(rows, [signal])['trades']
-            return trade_ledger([dict(t, symbol='BTC', timeframe='15m') for t in trades])[0]
+            return trade_ledger([dict(t, symbol='BTC', timeframe='15m', signal_timeframe='15m') for t in trades])[0]
 
         marked, closed = position(candles[:3]), position(candles)
         for key in ('symbol', 'mode', 'side', 'entry_ms', 'signal_close_ms'):
@@ -71,6 +71,28 @@ class V13ReviewReplayTests(unittest.TestCase):
         self.assertEqual(closed['exit_price'], 95.)
         self.assertIsNone(closed['mark_price'])
         self.assertLess(closed['realized_net_return'], -.05)
+
+    def test_swing_executes_only_after_hour_close_and_resolves_later_stop(self):
+        step = FRAME_MS['15m']
+        rows = [[i * step, 100., 101., 99., 100.] for i in range(7)]
+        rows[2] = [2 * step, 100., 120., 80., 100.]
+        rows[4] = [4 * step, 100., 106., 99., 104.]
+        rows[5] = [5 * step, 100., 101., 94., 96.]
+        signal = dict(signal_timestamp=0, mode='swing', side='LONG', score=90,
+                      stop=98., target=104.)
+        trades, missing = audit_signals_on_15m(rows, [signal], '1H')
+        self.assertEqual(missing, 0)
+        position, = trade_ledger([dict(t, symbol='BTC') for t in trades])
+        self.assertEqual(position['entry_ms'], 4 * step)
+        self.assertEqual(position['signal_close_ms'], 4 * step)
+        self.assertEqual(position['exit_reason'], 'TARGET')
+        self.assertEqual(position['exit_confirmed_close_ms'], 5 * step)
+        self.assertEqual(position['signal_timeframe'], '1H')
+        self.assertEqual(position['execution_timeframe'], '15m')
+
+        trades, missing = audit_signals_on_15m(rows[4:], [signal], '1H')
+        self.assertEqual(trades, [])
+        self.assertEqual(missing, 1)
 
 
 if __name__ == '__main__':
