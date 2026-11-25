@@ -27,15 +27,15 @@ class ExcludedAddEntryUiTests(unittest.TestCase):
         source = (ROOT / "app.py").read_text(encoding="utf-8")
         self.assertNotIn("1차 목표 · 1.3R", source)
         self.assertNotIn("2차 목표 · 1.8R", source)
-        self.assertIn("n(a.rr1,2)", source)
-        self.assertIn("n(a.rr2,2)", source)
+        self.assertIn("n(rr1,2)", source)
+        self.assertIn("fmt(plan.tp2)", source)
 
     def test_scanner_card_requires_final_manual_gate(self):
         source = (ROOT / "app.py").read_text(encoding="utf-8")
         self.assertIn("const finalReady=x.decision_427?.state===\\'READY_REVIEW\\'", source)
         self.assertIn("x.integrated_audit_439?.status===\\'REVIEW_ONLY\\'", source)
         self.assertIn("const ready=d.state", source)
-        self.assertIn("const p=ready?", source)
+        self.assertIn("const plan=finalReady?", source)
         self.assertIn("최종 보류", source)
 
     def test_api_recommendations_require_both_final_gates(self):
