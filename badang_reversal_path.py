@@ -98,6 +98,7 @@ def reversal_path(item, frame_data, mode, now_ms):
                     continue
                 # Shared engine targets are hypotheses, not confirmed endings.
                 wave_targets.append((p,w['direction'],tf))
+    divergences=[dict(d,timeframe=tf) for tf,rows in valid.items() for d in reversal_divergences(rows)]
     # Historical reactions are evidence available before the forecast.
     reactions = []
     for tf, rows in valid.items():
@@ -125,7 +126,7 @@ def reversal_path(item, frame_data, mode, now_ms):
             if side=='DOWN': hi=min(hi,price)
             else: lo=max(lo,price)
             tfs=sorted(set(tf for _,tf in group))
-            components={'structure':min(20,8+6*(len(tfs)-1)), 'wave':0,'fibonacci':0,'ema':0,'volume':0}
+            components={'structure':min(20,8+6*(len(tfs)-1)), 'wave':0,'fibonacci':0,'ema':0,'volume':0,'divergence':0}
             reasons=['확정 스윙 지지·저항: '+', '.join(tfs)]
             if any(s==side and lo<=p<=hi for p,_,s in role_flips):
                 reasons.append('돌파 이후 재시험 확인된 역할 전환')
@@ -140,7 +141,11 @@ def reversal_path(item, frame_data, mode, now_ms):
             if any(s==side and lo<=p<=hi for p,s,_ in reactions):
                 components['volume']=5
                 reasons.append('과거 확정 피벗 거래량 증가 및 가격 반응')
-            ceiling=40+(5 if volume_available else 0)
+            matches=[d for d in divergences if d['type']=='REGULAR' and d['side']==side and lo<=d['price']<=hi]
+            if matches:
+                components['divergence']=10
+                reasons.append('유효한 일반 다이버전스: '+', '.join(sorted(set(d['indicator'] for d in matches))))
+            ceiling=50+(5 if volume_available else 0)
             score=sum(components.values())
             zones.append({'low':lo,'high':hi,'center':center,'expected_score':score,
                           'confirmation_score':None,'expected_score_ceiling':ceiling,'components':components,'reasons':reasons,
@@ -157,6 +162,7 @@ def reversal_path(item, frame_data, mode, now_ms):
             z['reversal_target']=z['near_reversal_target']
             z['reversal_change_pct']=(z['reversal_target']/z['center']-1)*100 if z['reversal_target'] is not None else None
         out['paths'].append({'direction':side,'zones':zones})
+    out['divergences']=divergences
     return out
 
 
@@ -289,3 +295,49 @@ def track_reversals(conn, symbol, mode, path, frame_data, now_ms):
                     cur.execute("INSERT INTO badang_reversal_forecast_514(id,symbol,mode,tf,reference_ms,direction,forecast) VALUES (%s,%s,%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING",(fid,symbol,mode,tf,rows[-1][0],side,Json(payload)))
                     tracked.append({'id':fid,'forecast':payload,'direction':side,'latest':{'state':'BEFORE_TOUCH','confirmation_score':None}})
     return {'status':'SAVED','tracking_mode':'ON_SCAN','tracked':tracked}
+
+def reversal_divergences(rows):
+    """Regular and hidden divergence on confirmed price pivots, using causal indicators."""
+    if len(rows)<40:
+        return []
+    closes=[b[4] for b in rows]
+    def ema(values,p):
+        out=[None]*len(values)
+        if len(values)<p:return out
+        v=sum(values[:p])/p
+        out[p-1]=v
+        for i in range(p,len(values)):
+            v+=(values[i]-v)*2/(p+1)
+            out[i]=v
+        return out
+    fast,slow=ema(closes,12),ema(closes,26)
+    macd=[None if b is None else a-b for a,b in zip(fast,slow)]
+    rsi=[None]*len(rows)
+    changes=[b-a for a,b in zip(closes,closes[1:])]
+    g=sum(max(x,0) for x in changes[:14])/14
+    l=sum(max(-x,0) for x in changes[:14])/14
+    for i in range(14,len(rows)):
+        if i>14:
+            d=changes[i-1]
+            g=(13*g+max(d,0))/14
+            l=(13*l+max(-d,0))/14
+        rsi[i]=100*g/(g+l) if g+l else 50
+    turns=confirmed_turns(rows)
+    out=[]
+    for kind in ('L','H'):
+        pivots=[t for t in turns if t['kind']==kind]
+        if len(pivots)<2:continue
+        a,b=pivots[-2:]
+        sign=1 if kind=='L' else -1
+        if len(rows)-1-b['i']>20:continue
+        if any((x[3 if sign>0 else 2]-b['price'])*sign<0 for x in rows[b['i']+1:]):continue
+        dp=(b['price']-a['price'])*sign
+        for name,values in (('RSI',rsi),('MACD',macd)):
+            u,v=values[a['i']],values[b['i']]
+            if u is None or v is None:continue
+            di=(v-u)*sign
+            if dp<0 and di>0:typ='REGULAR'
+            elif dp>0 and di<0:typ='HIDDEN'
+            else:continue
+            out.append({'indicator':name,'type':typ,'side':'DOWN' if sign>0 else 'UP','price':b['price'],'pivot_time':b['time'],'confirmed_at':b['confirmed_at']})
+    return out
