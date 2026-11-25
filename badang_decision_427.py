@@ -230,6 +230,33 @@ def structure_review(raw,tf,now_ms=None):
     supports=sorted({round(t['price'],8) for t in turns if t['kind']=='L' and t['price']<current},reverse=True)
     resistances=sorted({round(t['price'],8) for t in turns if t['kind']=='H' and t['price']>current})
     wave=impulse_state(turns,current,atr,as_of_open=recent[-1][0])
+    # Reject a hypothesis if any subsequent closed candle breached its origin.
+    valid=[]
+    for candidate in wave['alternatives']:
+        sign=1 if candidate['direction']=='UP' else -1
+        later=[b for b in recent if b[0]>candidate['last_pivot_time']]
+        origin=candidate['invalidation']
+        if any(((b[3] if sign>0 else b[2])-origin)*sign<=0 for b in later):
+            continue
+        p=candidate['pivot_prices']
+        length=abs(p[1]-p[0])
+        ratios=(1,1.618,2,2.618,4.236) if candidate['wave']==3 else (.618,1,1.272,1.618)
+        targets=[]
+        for ratio in ratios:
+            price=p[-1]+sign*length*ratio
+            if price<=0: continue
+            if candidate['wave']==5 and abs(p[3]-p[2])<min(length,abs(price-p[-1])): continue
+            reached=any((b[2] if sign>0 else b[3])*sign>=price*sign for b in later)
+            targets.append({'price':price,'ratio':ratio,'reached':reached,'timeframe':tf,'anchor':p[-1],'length':length})
+        candidate['targets']=targets
+        candidate['future_targets']=[t for t in targets if not t['reached'] and (t['price']-current)*sign>0]
+        candidate['reference_price']=current
+        candidate['pivot_times']=[t['time'] for t in turns[-candidate['wave']:]]
+        valid.append(candidate)
+    wave['alternatives']=valid
+    wave['status']='AMBIGUOUS' if len(valid)>1 else 'HYPOTHESIS' if valid else 'UNDETERMINED'
+    wave['label']='복수 파동 후보' if len(valid)>1 else ('상승' if valid[0]['direction']=='UP' else '하락')+' '+str(valid[0]['wave'])+'파 진행 후보' if valid else '현재 파동 미확정'
+
     return {'status':'OK','timeframe':tf,'last_closed_time':recent[-1][0],
             'last_closed_price':current,'atr14':round(atr,8),
             'support_levels':supports[:3], 'resistance_levels':resistances[:3],
