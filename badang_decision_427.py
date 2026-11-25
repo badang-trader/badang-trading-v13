@@ -486,17 +486,30 @@ def decision_review(item,structures,mode):
                                    'leg_volume_context':candidate.get('leg_volume_context')})
     # Compare only independently confirmed frames; direction agreement is
     # context, not proof that lower-degree waves belong to a higher wave.
-    frame_wave_context=[]
+    frame_wave_context = []
     for tf in required:
-        st=structures.get(tf) or {}
-        if st.get('status')!='OK':
+        structure = structures.get(tf)
+        if not isinstance(structure, dict) or structure.get('status') != 'OK':
             continue
-        for w in (st.get('wave') or {}).get('alternatives',[]):
-            frame_wave_context.append({'timeframe':tf,'direction':w.get('direction'),
-                'wave':w.get('wave'),'stage':w.get('stage'),
-                'invalidation':w.get('invalidation'),
-                'known_at_ms':w.get('last_pivot_confirmed_close_ms'),
-                'reference_close_ms':(st['last_closed_time']+FRAME_MS[tf] if isinstance(st.get('last_closed_time'),int) else None)})
+        wave = structure.get('wave')
+        alternatives = wave.get('alternatives') if isinstance(wave, dict) else None
+        if not isinstance(alternatives, list):
+            continue
+        last_open = structure.get('last_closed_time')
+        for candidate in alternatives:
+            if (not isinstance(candidate, dict)
+                    or candidate.get('direction') not in ('UP', 'DOWN')
+                    or type(candidate.get('wave')) is not int or candidate['wave'] not in (3, 5)):
+                continue
+            invalidation = _f(candidate.get('invalidation'))
+            if invalidation is None or invalidation <= 0:
+                continue
+            frame_wave_context.append({
+                'timeframe': tf, 'direction': candidate['direction'], 'wave': candidate['wave'],
+                'stage': candidate.get('stage'), 'invalidation': invalidation,
+                'known_at_ms': candidate.get('last_pivot_confirmed_close_ms'),
+                'reference_close_ms': last_open + FRAME_MS[tf] if type(last_open) is int else None,
+            })
     directions={w['direction'] for w in frame_wave_context if w['direction'] in ('UP','DOWN')}
     frame_count=len({w['timeframe'] for w in frame_wave_context})
     wave_alignment={'status':'CONFLICT' if len(directions)>1 else
