@@ -148,3 +148,54 @@ def reversal_path(item, frame_data, mode, now_ms):
             z['reversal_change_pct']=(z['reversal_target']/z['center']-1)*100 if z['reversal_target'] is not None else None
         out['paths'].append({'direction':side,'zones':zones})
     return out
+
+
+def confirmation_review(zone, side, rows, touched_index):
+    """Evaluate only candles observed after a recorded zone touch."""
+    if touched_index is None:
+        return {'confirmation_score':None,'state':'BEFORE_TOUCH'}
+    if not 0<=touched_index<len(rows) or side not in ('DOWN','UP'):
+        raise ValueError('invalid touch or direction')
+    sign=1 if side=='DOWN' else -1
+    lo,hi=zone['low'],zone['high']
+    observed=rows[touched_index:]
+    for b in observed:
+        if (b[3]<=zone['invalidation'] if sign>0 else b[2]>=zone['invalidation']):
+            return {'confirmation_score':None,'state':'INVALIDATED','invalidated_at':b[0]}
+    b=observed[-1]
+    span=b[2]-b[3]
+    body=(b[4]-b[1])*sign
+    wick=min(b[1],b[4])-b[3] if sign>0 else b[2]-max(b[1],b[4])
+    outside=(b[4]>hi if sign>0 else b[4]<lo)
+    components={'candle':0,'volume':0,'retest':0,'structure':0,'momentum':0}
+    maxima={'candle':15,'volume':0,'retest':0,'structure':0,'momentum':0}
+    if span>0 and body>0 and wick>=span*.35 and outside:
+        components['candle']=15
+    if len(rows)>=21:
+        avg=sum(x[5] for x in rows[-21:-1])/20
+        if avg>0:
+            maxima['volume']=10
+            if b[5]>=1.5*avg and body>0 and outside:
+                components['volume']=10
+    if len(observed)>=3:
+        maxima['retest']=15
+        if any((x[4]>hi if sign>0 else x[4]<lo) for x in observed[:-1]) and b[3]<=hi and b[2]>=lo and outside:
+            components['retest']=15
+        maxima['structure']=20
+        if outside and (b[4]>max(x[2] for x in observed[-3:-1]) if sign>0 else b[4]<min(x[3] for x in observed[-3:-1])):
+            components['structure']=20
+    if len(observed)>=4:
+        maxima['momentum']=10
+        if (b[4]-observed[-2][4])*sign>max(0,(observed[-2][4]-observed[-4][4])*sign/2) and outside:
+            components['momentum']=10
+    # A touch candle cannot establish the order of touch and target.
+    targets={}
+    for key in ('near_reversal_target','major_reversal_target'):
+        p=zone.get(key)
+        targets[key]=next((x[0] for x in observed[1:] if p is not None and (x[2]>=p if sign>0 else x[3]<=p)),None)
+    return {'confirmation_score':sum(components.values()),'confirmation_score_ceiling':sum(maxima.values()),
+            'confirmation_components':components,'confirmation_maxima':maxima,
+            'state':'TOUCHED','touch_time':observed[0][0],'evaluated_at':b[0],
+            'target_times':targets,'unverified':['RSI/MACD divergence','OI/CVD'],
+            'score_is_probability':False}
+
