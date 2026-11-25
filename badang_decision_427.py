@@ -216,6 +216,46 @@ def completed_impulse_rules(prices):
             'direction': 'UP' if direction > 0 else 'DOWN',
             'note': '일반 추진파 완성형 규칙 검사. 대각삼각형·절단파는 별도 분석 필요'}
 
+def historical_wave_shapes(turns, tf):
+    """Endpoint geometry only; subdivisions and wave degree remain unverified."""
+    out=[]
+    if len(turns)>=6:
+        q=turns[-6:]
+        p=[t['price'] for t in q]
+        s=1 if p[1]>p[0] else -1
+        d=[(p[i+1]-p[i])*s for i in range(5)]
+        if all(d[i]>0 for i in (0,2,4)) and all(d[i]<0 for i in (1,3)):
+            base=(p[2]-p[0])*s>0 and (p[3]-p[1])*s>0 and d[2]>=min(d[0],d[4])
+            if base and (p[4]-p[1])*s>0:
+                if (p[5]-p[3])*s<0:
+                    out.append(('TRUNCATED_FIFTH_GEOMETRY',q,s))
+                elif completed_impulse_rules(p)['valid']:
+                    for i in (0,2,4):
+                        if d[i]>=1.618*max(d[j] for j in (0,2,4) if j!=i):
+                            out.append(('EXTENDED_'+str(i+1)+'_GEOMETRY',q,s))
+            if base and (p[4]-p[2])*s>0 and (p[4]-p[1])*s<0 and (p[5]-p[3])*s>0:
+                if d[0]>d[2]>d[4] and abs(d[1])>abs(d[3]):
+                    out.append(('CONTRACTING_DIAGONAL_GEOMETRY',q,s))
+                elif d[0]<d[2]<d[4] and abs(d[1])<abs(d[3]):
+                    out.append(('EXPANDING_DIAGONAL_GEOMETRY',q,s))
+    if len(turns)>=4:
+        q=turns[-4:]
+        p=[t['price'] for t in q]
+        s=1 if p[1]>p[0] else -1
+        a=abs(p[1]-p[0])
+        if a>0 and (p[2]-p[1])*s<0 and (p[3]-p[2])*s>0:
+            b=abs(p[2]-p[1])/a
+            if 0<b<1 and (p[3]-p[1])*s>0:
+                out.append(('ABC_ZIGZAG_GEOMETRY',q,s))
+            elif .9<=b<=1.38 and (p[3]-p[1])*s>=0:
+                out.append(('ABC_FLAT_GEOMETRY',q,s))
+    return [{'pattern':kind,'direction':'UP' if s>0 else 'DOWN',
+             'pivot_prices':[t['price'] for t in q],
+             'pivot_times':[t['time'] for t in q],
+             'known_at_ms':q[-1]['confirmed_at']+FRAME_MS[tf],
+             'status':'HISTORICAL_GEOMETRY_ONLY','subdivision_verified':False,
+             'used_in_score':False} for kind,q,s in out]
+
 def structure_review(raw,tf,now_ms=None):
     bars,reason=closed_bars(raw,tf,now_ms)
     if bars is None:return {'status':'UNAVAILABLE','reason':reason}
@@ -267,6 +307,7 @@ def structure_review(raw,tf,now_ms=None):
             'last_closed_price':current,'atr14':round(atr,8),
             'support_levels':supports[:3], 'resistance_levels':resistances[:3],
             'swing_count':len(turns),'wave':wave,
+            'historical_wave_shapes':historical_wave_shapes(turns,tf),
             'note':'완료봉에서 확인된 과거 스윙 레벨. 향후 지지·저항을 보장하지 않음'}
 
 def decision_review(item,structures,mode):
