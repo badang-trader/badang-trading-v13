@@ -159,17 +159,19 @@ def impulse_state(turns, current, atr, as_of_open=None):
         if count==5:
             if (vals[3]-vals[1])*direction<=0:continue
             if (vals[4]-vals[1])*direction<=0:continue # conventional non-overlap
-            if abs(vals[3]-vals[2])<abs(vals[1]-vals[0])*.35:continue
         invalid=vals[-1]
         progress=(current-invalid)*direction
         if progress<=0:continue
-        # Wave 3 requires advance past wave1 extreme to be labelled 3-progress.
-        if wave==3 and (current-vals[1])*direction<=0:continue
-        if wave==5 and (current-vals[3])*direction<=0:continue
+        # Early impulse hypotheses are not confirmed breakouts.
+        previous_extreme=vals[1] if wave==3 else vals[3]
+        broken=(current-previous_extreme)*direction>0
+        stage='BREAKOUT_PROGRESS' if broken else 'EARLY_HYPOTHESIS'
+        if wave==5 and abs(vals[3]-vals[2])<min(abs(vals[1]-vals[0]),progress):continue
         strength=progress/max(atr,1e-12)
         possibilities.append({'wave':wave,'direction':'UP' if direction>0 else 'DOWN',
                               'invalidation':round(invalid,8),'last_pivot_time':p[-1]['time'],
                               'last_pivot_confirmed_at':p[-1].get('confirmed_at'),
+                              'stage':stage,'previous_extreme':previous_extreme,
                               'atr_progress':round(strength,2),'pivot_prices':[round(v,8) for v in vals]})
     if not possibilities:return {'status':'UNDETERMINED','label':'현재 3파·5파 판별 불가','alternatives':[],
                                  'note':'최근 확정 전환점이 일반 추진파 규칙을 충족하지 않음'}
