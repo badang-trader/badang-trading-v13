@@ -251,6 +251,12 @@ def structure_review(raw,tf,now_ms=None):
         candidate['targets']=targets
         candidate['future_targets']=[t for t in targets if not t['reached'] and (t['price']-current)*sign>0]
         candidate['reference_price']=current
+        candidate['wave1_length']=length
+        candidate['wave2_retrace_ratio']=abs(p[2]-p[1])/length
+        candidate['structural_invalidation']=p[0] if candidate['wave']==3 else p[1]
+        candidate['active_leg_invalidation']=origin
+        candidate['last_pivot_confirmed_close_ms']=candidate['last_pivot_confirmed_at']+FRAME_MS[tf]
+        candidate['flow_validation']={'status':'UNVERIFIED','oi_change_pct':None,'cvd':None,'used_in_score':False}
         candidate['pivot_times']=[t['time'] for t in turns[-candidate['wave']:]]
         valid.append(candidate)
     wave['alternatives']=valid
@@ -383,7 +389,12 @@ def decision_review(item,structures,mode):
             if type(number) is not int or number not in (3,5): continue
             wave_scenarios.append({'wave':number,'direction':direction,
                                    'invalidation':level,
-                                   'last_pivot_confirmed_at':candidate.get('last_pivot_confirmed_at')})
+                                   'last_pivot_confirmed_at':candidate.get('last_pivot_confirmed_at'),
+                                   'structural_invalidation':candidate.get('structural_invalidation'),
+                                   'active_leg_invalidation':candidate.get('active_leg_invalidation'),
+                                   'future_targets':candidate.get('future_targets',[]),
+                                   'wave2_retrace_ratio':candidate.get('wave2_retrace_ratio'),
+                                   'flow_validation':candidate.get('flow_validation')})
     unique=list(dict.fromkeys(reasons))
     ready=not unique
     return {'state':'READY_REVIEW' if ready else 'WAIT',
