@@ -80,3 +80,29 @@ def observe(symbol):
     oi = parse_open_interest(rows)
     record(symbol,oi)
     return changes(symbol)
+
+
+def wave_interval_change(symbol, start_ms, end_ms, tolerance_ms=90000):
+    """Read-only endpoint OI comparison; no observation after either boundary."""
+    symbol=_valid_symbol(symbol)
+    if not (0<=start_ms<end_ms<=int(time.time()*1000)) or not 0<tolerance_ms<=180000:
+        raise ValueError('Invalid wave interval')
+    result={'source_exchange':'bitget','status':'INSUFFICIENT_HISTORY',
+            'start_ms':start_ms,'end_ms':end_ms,'oi_change_pct':None,
+            'cvd':None,'used_in_score':False}
+    with closing(_connection()) as con:
+        with con.cursor() as cur:
+            points=[]
+            for boundary in (start_ms,end_ms):
+                cur.execute('SELECT observed_ms, oi FROM badang_oi_observations WHERE symbol=%s AND exchange=%s AND observed_ms BETWEEN %s AND %s ORDER BY observed_ms DESC LIMIT 1',
+                            (symbol,'bitget',boundary-tolerance_ms,boundary))
+                points.append(cur.fetchone())
+    if any(p is None or not math.isfinite(float(p[1])) or p[1]<=0 for p in points):
+        return result
+    first,last=points
+    if last[0]<=first[0]:
+        return result
+    result.update(status='ENDPOINTS_AVAILABLE',start_observed_ms=first[0],
+                  end_observed_ms=last[0],oi_change_pct=round((last[1]/first[1]-1)*100,5),
+                  continuous_coverage_verified=False)
+    return result
