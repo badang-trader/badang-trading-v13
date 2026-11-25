@@ -204,6 +204,18 @@ def confirmation_review(zone, side, rows, touched_index):
         maxima['momentum']=10
         if (b[4]-observed[-2][4])*sign>max(0,(observed[-2][4]-observed[-4][4])*sign/2) and outside:
             components['momentum']=10
+    maxima['divergence']=0
+    components['divergence']=0
+    if len(rows)>=40:
+        maxima['divergence']=20
+        matches=[d for d in reversal_divergences(rows)
+                 if d['type']=='REGULAR' and d['side']==side
+                 and d['pivot_time']>=observed[0][0]
+                 and lo<=d['price']<=hi]
+        if matches:
+            components['divergence']=15
+            if len(set(d['indicator'] for d in matches))>1:
+                components['divergence']=20
     # A touch candle cannot establish the order of touch and target.
     targets={}
     for key in ('near_reversal_target','major_reversal_target'):
@@ -212,7 +224,7 @@ def confirmation_review(zone, side, rows, touched_index):
     return {'confirmation_score':sum(components.values()),'confirmation_score_ceiling':sum(maxima.values()),
             'confirmation_components':components,'confirmation_maxima':maxima,
             'state':'TOUCHED','touch_time':observed[0][0],'evaluated_at':b[0],
-            'target_times':targets,'unverified':['RSI/MACD divergence','OI/CVD'],
+            'target_times':targets,'unverified':['OI/CVD'],
             'score_is_probability':False}
 
 
