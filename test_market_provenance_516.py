@@ -17,6 +17,15 @@ class CoherentFrameTests(unittest.TestCase):
         self.assertEqual(calls, [("BTCUSDT", "15m", ["bitget"]), ("BTCUSDT", "1H", ["bitget"])])
         self.assertFalse(attempts)
 
+    def test_scan_cutoff_excludes_a_candle_that_closed_during_fetch(self):
+        step = app.FRAME_MS_410['15m']
+        rows = [[i * step, 10, 11, 9, 10, 1] for i in range(4)]
+        record = {'exchange': 'bitget', 'candles': rows}
+        aligned = app.scan_frame_as_of(record, '15m', 3 * step - 1)
+        self.assertEqual(aligned['candles'][:-1], rows[:2])
+        self.assertEqual(aligned['candles'][-1], rows[2])
+        self.assertEqual(len(record['candles']), 4)
+
     def test_rejects_other_venue_even_when_fetcher_returns_data(self):
         def fetch(symbol, timeframe, exchanges=None):
             return {"exchange": "okx", "candles": [timeframe]}

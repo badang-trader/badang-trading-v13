@@ -151,7 +151,7 @@ def pivots(
 
 
 def divergence_details(
-    points, rsi_series, total_bars, max_age=18
+    points, rsi_series, total_bars, max_age=18, *, rows=None
 ):
     """Find recent regular and hidden RSI divergences."""
     found = []
@@ -176,6 +176,11 @@ def divergence_details(
                 continue
 
             pa, pb = a[2], b[2]
+            if rows is not None and any(
+                row['low'] < pb if typ == 'L' else row['high'] > pb
+                for row in rows[b[0] + 1:]
+            ):
+                continue
             ra, rb = rsi_series[a[0]], rsi_series[b[0]]
 
             price_delta_pct = (
@@ -566,7 +571,7 @@ def analyze(
     points = pivots(rows)
 
     div_details = divergence_details(
-        points, rs, len(rows)
+        points, rs, len(rows), rows=rows
     )
 
     div = [d['type'] for d in div_details]
@@ -695,7 +700,7 @@ def analyze(
         )
 
     if (
-        'hidden_bullish' in div
+        'bullish' not in div and 'hidden_bullish' in div
         and e20 > e50
     ):
         score(
@@ -704,7 +709,7 @@ def analyze(
         )
 
     if (
-        'hidden_bearish' in div
+        'bearish' not in div and 'hidden_bearish' in div
         and e20 < e50
     ):
         score(
@@ -923,6 +928,14 @@ def analyze(
             'Trendline breaks require backtesting'
         ]
     }
+
+
+def technical_direction(item):
+    """Use the same technical candidate direction in live and historical scans."""
+    long_score = item['long_score']
+    short_score = item['short_score']
+    side = 'LONG' if long_score > short_score else 'SHORT' if short_score > long_score else 'NEUTRAL'
+    return {'technical_side': side, 'technical_score': max(long_score, short_score)}
 
 
 def top_five(

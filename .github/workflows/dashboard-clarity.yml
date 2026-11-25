@@ -66,6 +66,7 @@ jobs:
       - run: python -m unittest discover -s tests -p 'test_wave_divergence_association.py' -v
 
   collect-okx-research:
+    if: github.ref_name != 'badang-514-validation-ui-bridge' && github.head_ref != 'badang-514-validation-ui-bridge'
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:

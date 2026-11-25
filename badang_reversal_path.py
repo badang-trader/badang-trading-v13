@@ -1,5 +1,8 @@
 """Conditional reversal zones, not probabilities or order signals."""
-from badang_decision_427 import closed_bars, confirmed_turns, _f
+from badang_analysis_v13 import ema, rsi
+from badang_decision_427 import FRAME_MS, closed_bars, confirmed_turns, _f
+
+CONFIRMATION_VERSION = '514-confirmation-2'
 
 def reversal_path(item, frame_data, mode, now_ms):
     price = _f(item.get('analysis_reference_price'))
@@ -33,7 +36,7 @@ def reversal_path(item, frame_data, mode, now_ms):
     out['scan_reference_price'] = price
     out['reference_time'] = bars[-1][0]
     out['reference_time_kind'] = 'CANDLE_OPEN'
-    out['reference_close_ms'] = bars[-1][0]+{'5m':300000,'15m':900000,'30m':1800000,'1H':3600000,'4H':14400000,'1D':86400000}[base]
+    out['reference_close_ms'] = bars[-1][0] + FRAME_MS[base]
     out['history_timeframe'] = base
     out['reference_price'] = price = bars[-1][4]
     trends = item.get('timeframe_trends') or {}
@@ -104,7 +107,8 @@ def reversal_path(item, frame_data, mode, now_ms):
                     continue
                 # Shared engine targets are hypotheses, not confirmed endings.
                 wave_targets.append((p,w['direction'],tf))
-    divergences=[dict(d,timeframe=tf) for tf,rows in valid.items() for d in reversal_divergences(rows)]
+    divergences=[dict(d, timeframe=tf, observable_close_ms=d['confirmed_at'] + FRAME_MS[tf])
+                 for tf, rows in valid.items() for d in reversal_divergences(rows)]
     # Historical reactions are evidence available before the forecast.
     reactions = []
     for tf, rows in valid.items():
@@ -148,7 +152,12 @@ def reversal_path(item, frame_data, mode, now_ms):
                 components['volume']=5
                 reasons.append('과거 확정 피벗 거래량 증가 및 가격 반응')
             matches=[d for d in divergences if d['type']=='REGULAR' and d['side']==side and lo<=d['price']<=hi]
-            if matches:
+            matching_frames = {d['timeframe'] for d in matches}
+            conflict = any(d['type'] == 'REGULAR' and d['side'] != side
+                           and d['timeframe'] in matching_frames for d in divergences)
+            if conflict:
+                reasons.append('같은 시간봉에 상승·하락 반전 단서가 함께 있어 점수 보류')
+            elif matches:
                 components['divergence']=10
                 reasons.append('유효한 일반 다이버전스: '+', '.join(sorted(set(d['indicator'] for d in matches))))
             # Historical rejection at this zone, distinct from volume evidence.
@@ -233,15 +242,17 @@ def confirmation_review(zone, side, rows, touched_index):
     maxima['divergence']=0
     components['divergence']=0
     if len(rows)>=40:
-        maxima['divergence']=20
-        matches=[d for d in reversal_divergences(rows)
+        current_divergences = reversal_divergences(rows)
+        matches=[d for d in current_divergences
                  if d['type']=='REGULAR' and d['side']==side
                  and d['pivot_time']>=observed[0][0]
                  and lo<=d['price']<=hi]
-        if matches:
-            components['divergence']=15
-            if len(set(d['indicator'] for d in matches))>1:
-                components['divergence']=20
+        conflicting = any(d['type'] == 'REGULAR' and d['side'] != side
+                          and d['pivot_time'] >= observed[0][0] for d in current_divergences)
+        if matches and not conflicting:
+            # Two oscillators on the same price pivot count as one event.
+            components['divergence'] = 15
+        maxima['divergence'] = 15
     # Candle and volume can describe the same rejection event.
     if components['candle'] and components['volume']:
         components['volume']=0
@@ -254,6 +265,7 @@ def confirmation_review(zone, side, rows, touched_index):
         targets[key]=next((x[0] for x in observed[1:] if p is not None and (x[2]>=p if sign>0 else x[3]<=p)),None)
     return {'confirmation_score':sum(components.values()),'confirmation_score_ceiling':sum(maxima.values()),
             'confirmation_components':components,'confirmation_maxima':maxima,
+            'confirmation_version':CONFIRMATION_VERSION,
             'state':'TOUCHED','touch_time':observed[0][0],'evaluated_at':b[0],
             'target_times':targets,'unverified':['OI/CVD'],
             'score_is_probability':False}
@@ -273,7 +285,7 @@ def track_reversals(conn, symbol, mode, path, frame_data, now_ms):
         return {'status':'NO_VALID_FRAME'}
     if path.get('reference_time') != rows[-1][0]:
         return {'status':'REFERENCE_MISMATCH'}
-    step={'5m':300000,'15m':900000,'30m':1800000,'1H':3600000,'4H':14400000,'1D':86400000}[tf]
+    step = FRAME_MS[tf]
     with conn:
         with conn.cursor() as cur:
             cur.execute("SELECT pg_advisory_xact_lock(hashtext(%s))",('reversal514:'+symbol+':'+mode+':'+tf,))
@@ -313,7 +325,9 @@ def track_reversals(conn, symbol, mode, path, frame_data, now_ms):
                         else:
                             result=confirmation_review(z,side,rows[:i+1],ti)
                             result['touch_time']=touch
-                            old=prev.get('confirmation_score')
+                            old = (prev.get('confirmation_score')
+                                   if prev.get('confirmation_version') == result.get('confirmation_version')
+                                   else None)
                             new=result.get('confirmation_score')
                             result['previous_confirmation_score']=old
                             if old is not None and new is not None:
@@ -335,7 +349,7 @@ def track_reversals(conn, symbol, mode, path, frame_data, now_ms):
                         continue
                     if any(a['direction']==side and a['latest'].get('state') not in ('INVALIDATED','EXPIRED','DATA_GAP','MAJOR_TARGET') and a['forecast']['low']<=z['high'] and a['forecast']['high']>=z['low'] for a in tracked):
                         continue
-                    payload=dict(z,algorithm_version='514-track-1',reference_ms=rows[-1][0])
+                    payload=dict(z,algorithm_version='514-track-2',reference_ms=rows[-1][0])
                     fid=hashlib.sha256(json.dumps([symbol,mode,tf,side,payload['reference_ms'],z['low'],z['high']],separators=(',',':')).encode()).hexdigest()
                     cur.execute("INSERT INTO badang_reversal_forecast_514(id,symbol,mode,tf,reference_ms,direction,forecast) VALUES (%s,%s,%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING",(fid,symbol,mode,tf,rows[-1][0],side,Json(payload)))
                     tracked.append({'id':fid,'forecast':payload,'direction':side,'latest':{'state':'BEFORE_TOUCH','confirmation_score':None}})
@@ -346,27 +360,9 @@ def reversal_divergences(rows):
     if len(rows)<40:
         return []
     closes=[b[4] for b in rows]
-    def ema(values,p):
-        out=[None]*len(values)
-        if len(values)<p:return out
-        v=sum(values[:p])/p
-        out[p-1]=v
-        for i in range(p,len(values)):
-            v+=(values[i]-v)*2/(p+1)
-            out[i]=v
-        return out
-    fast,slow=ema(closes,12),ema(closes,26)
-    macd=[None if b is None else a-b for a,b in zip(fast,slow)]
-    rsi=[None]*len(rows)
-    changes=[b-a for a,b in zip(closes,closes[1:])]
-    g=sum(max(x,0) for x in changes[:14])/14
-    l=sum(max(-x,0) for x in changes[:14])/14
-    for i in range(14,len(rows)):
-        if i>14:
-            d=changes[i-1]
-            g=(13*g+max(d,0))/14
-            l=(13*l+max(-d,0))/14
-        rsi[i]=100*g/(g+l) if g+l else 50
+    fast, slow = ema(closes, 12), ema(closes, 26)
+    macd = [None if i < 25 else a - b for i, (a, b) in enumerate(zip(fast, slow))]
+    rsi_values = rsi(closes)
     turns=confirmed_turns(rows)
     out=[]
     for kind in ('L','H'):
@@ -374,13 +370,18 @@ def reversal_divergences(rows):
         if len(pivots)<2:continue
         a,b=pivots[-2:]
         sign=1 if kind=='L' else -1
-        if len(rows)-1-b['i']>20:continue
+        if len(rows) - 1 - (b['i'] + 3) > 17 or not 5 <= b['i'] - a['i'] <= 65:continue
         if any((x[3 if sign>0 else 2]-b['price'])*sign<0 for x in rows[b['i']+1:]):continue
         dp=(b['price']-a['price'])*sign
-        for name,values in (('RSI',rsi),('MACD',macd)):
+        if abs(dp) / a['price'] < .0012:
+            continue
+        for name, values, threshold in (
+            ('RSI', rsi_values, 3), ('MACD', macd, b['price'] * .0002)
+        ):
             u,v=values[a['i']],values[b['i']]
             if u is None or v is None:continue
             di=(v-u)*sign
+            if abs(di) < threshold:continue
             if dp<0 and di>0:typ='REGULAR'
             elif dp>0 and di<0:typ='HIDDEN'
             else:continue

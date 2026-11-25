@@ -93,27 +93,55 @@ def observe(symbol):
     return changes(symbol)
 
 
-def wave_interval_change(symbol, start_ms, end_ms, tolerance_ms=90000):
-    """Read-only endpoint OI comparison; no observation after either boundary."""
-    symbol=_valid_symbol(symbol)
-    if not (0<=start_ms<end_ms<=int(time.time()*1000)) or not 0<tolerance_ms<=180000:
+def wave_interval_changes(symbol, intervals, *, as_of_ms=None, tolerance_ms=90000):
+    """Compare wave boundaries in a single Bitget PostgreSQL read."""
+    symbol = _valid_symbol(symbol)
+    now_ms = int(time.time() * 1000) if as_of_ms is None else as_of_ms
+    intervals = list(dict.fromkeys(intervals))
+    if not 0 < tolerance_ms <= 180000 or any(
+        not 0 <= start < end <= now_ms for start, end in intervals
+    ):
         raise ValueError('Invalid wave interval')
-    result={'source_exchange':'bitget','status':'INSUFFICIENT_HISTORY',
-            'start_ms':start_ms,'end_ms':end_ms,'oi_change_pct':None,
-            'cvd':None,'used_in_score':False}
+    if not intervals:
+        return {}
+
+    boundaries = sorted({boundary for interval in intervals for boundary in interval})
     with closing(_connection()) as con:
         with con.cursor() as cur:
-            points=[]
-            for boundary in (start_ms,end_ms):
-                cur.execute('SELECT observed_ms, oi FROM badang_oi_observations WHERE symbol=%s AND exchange=%s AND observed_ms BETWEEN %s AND %s ORDER BY observed_ms DESC LIMIT 1',
-                            (symbol,'bitget',boundary-tolerance_ms,boundary))
-                points.append(cur.fetchone())
-    if any(p is None or not math.isfinite(float(p[1])) or p[1]<=0 for p in points):
-        return result
-    first,last=points
-    if last[0]<=first[0]:
-        return result
-    result.update(status='ENDPOINTS_AVAILABLE',start_observed_ms=first[0],
-                  end_observed_ms=last[0],oi_change_pct=round((last[1]/first[1]-1)*100,5),
-                  continuous_coverage_verified=False)
-    return result
+            cur.execute("""
+                SELECT requested.boundary, observed.observed_ms, observed.oi
+                FROM unnest(%s::bigint[]) AS requested(boundary)
+                LEFT JOIN LATERAL (
+                    SELECT observed_ms, oi
+                    FROM badang_oi_observations
+                    WHERE symbol = %s AND exchange = 'bitget'
+                      AND observed_ms BETWEEN requested.boundary - %s AND requested.boundary
+                    ORDER BY observed_ms DESC LIMIT 1
+                ) AS observed ON true
+            """, (boundaries, symbol, tolerance_ms))
+            observations = {boundary: (stamp, oi) for boundary, stamp, oi in cur.fetchall()}
+
+    results = {}
+    for start, end in intervals:
+        result = {
+            'source_exchange': 'bitget', 'status': 'INSUFFICIENT_HISTORY',
+            'start_ms': start, 'end_ms': end, 'oi_change_pct': None,
+            'continuous_coverage_verified': False, 'cvd': None, 'used_in_score': False,
+        }
+        first, last = (observations.get(boundary, (None, None)) for boundary in (start, end))
+        if (first[0] is not None and last[0] is not None
+                and first[0] <= start and first[0] < last[0] <= end
+                and all(oi is not None and math.isfinite(oi) and oi > 0
+                        for oi in (first[1], last[1]))):
+            result.update(
+                status='ENDPOINTS_AVAILABLE', start_observed_ms=first[0],
+                end_observed_ms=last[0], start_lag_ms=start-first[0], end_lag_ms=end-last[0],
+                oi_change_pct=round((last[1] / first[1] - 1) * 100, 5),
+            )
+        results[start, end] = result
+    return results
+
+
+def wave_interval_change(symbol, start_ms, end_ms, tolerance_ms=90000):
+    interval = (start_ms, end_ms)
+    return wave_interval_changes(symbol, [interval], tolerance_ms=tolerance_ms)[interval]

@@ -39,7 +39,7 @@ class DashboardClarityTests(unittest.TestCase):
 
     def test_technical_candidates_are_not_hidden_by_final_gate(self):
         main = (ROOT / 'app.py').read_text(encoding='utf-8')
-        self.assertIn("const technicalCandidate=scoredValue>=80?scoredSide", main)
+        self.assertIn("const technicalCandidate=x.technical_candidate===true?scoredSide", main)
         self.assertIn("롱 기술적 후보 · 진입 조건 별도", main)
         self.assertIn("숏 기술적 후보 · 진입 조건 별도", main)
         self.assertNotIn("const d=finalReady?candidate:", main)
