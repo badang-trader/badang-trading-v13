@@ -65,11 +65,14 @@ def changes(symbol, now_ms=None, tolerance_ms=90_000, freshness_ms=180_000):
         result['status']='STALE_OR_MISSING_CURRENT'
         return result
     latest_t, latest_oi = rows[0]
+    if latest_oi is None or not math.isfinite(float(latest_oi)) or float(latest_oi) <= 0:
+        result['status'] = 'INVALID_CURRENT_OI'
+        return result
     result.update(current_oi=latest_oi,current_observed_ms=latest_t)
     for label, period in [('15m',900_000),('1h',3_600_000)]:
         target = latest_t-period
         matches = [(abs(t-target),t,oi) for t,oi in rows[1:]
-                   if abs(t-target)<=tolerance_ms and oi is not None
+                   if 0 <= target-t <= tolerance_ms and oi is not None
                    and math.isfinite(float(oi)) and float(oi)>0]
         if matches:
             _, baseline_t, baseline_oi = min(matches)
