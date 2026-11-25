@@ -256,6 +256,40 @@ def historical_wave_shapes(turns, tf):
              'status':'HISTORICAL_GEOMETRY_ONLY','subdivision_verified':False,
              'used_in_score':False} for kind,q,s in out]
 
+def complex_correction_geometry(turns, tf):
+    """Double/triple zigzag endpoint hypotheses, not verified subdivisions."""
+    results=[]
+    for count,label in ((8,'WXY'),(12,'WXYXZ')):
+        if len(turns)<count:
+            continue
+        q=turns[-count:]
+        p=[t['price'] for t in q]
+        s=1 if p[1]>p[0] else -1
+        legs=[]
+        valid=True
+        for i in range(0,count-3,4):
+            a=(p[i+1]-p[i])*s
+            b=(p[i+1]-p[i+2])*s
+            c=(p[i+3]-p[i+2])*s
+            if not (a>0 and 0<b<a and c>b):
+                valid=False
+                break
+            legs.append({'a_length':a,'b_retrace':b/a,'c_extension':c/a})
+            if i+4<count:
+                x=(p[i+3]-p[i+4])*s
+                net=(p[i+3]-p[i])*s
+                if not (0<x<net):
+                    valid=False
+                    break
+        if valid:
+            results.append({'pattern':label+'_DOUBLE_ZIGZAG_GEOMETRY' if count==8 else label+'_TRIPLE_ZIGZAG_GEOMETRY',
+                            'direction':'UP' if s>0 else 'DOWN',
+                            'pivot_prices':p,'pivot_times':[t['time'] for t in q],
+                            'known_at_ms':q[-1]['confirmed_at']+FRAME_MS[tf],
+                            'legs':legs,'status':'HISTORICAL_GEOMETRY_ONLY',
+                            'subdivision_verified':False,'used_in_score':False})
+    return results
+
 def structure_review(raw,tf,now_ms=None):
     bars,reason=closed_bars(raw,tf,now_ms)
     if bars is None:return {'status':'UNAVAILABLE','reason':reason}
@@ -307,7 +341,7 @@ def structure_review(raw,tf,now_ms=None):
             'last_closed_price':current,'atr14':round(atr,8),
             'support_levels':supports[:3], 'resistance_levels':resistances[:3],
             'swing_count':len(turns),'wave':wave,
-            'historical_wave_shapes':historical_wave_shapes(turns,tf),
+            'historical_wave_shapes':historical_wave_shapes(turns,tf)+complex_correction_geometry(confirmed_turns(bars[-160:]),tf),
             'note':'완료봉에서 확인된 과거 스윙 레벨. 향후 지지·저항을 보장하지 않음'}
 
 def decision_review(item,structures,mode):
