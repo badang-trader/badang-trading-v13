@@ -33,12 +33,15 @@ def reversal_path(item, frame_data, mode, now_ms):
     out['scan_reference_price'] = price
     out['reference_time'] = bars[-1][0]
     out['reference_time_kind'] = 'CANDLE_OPEN'
+    out['reference_close_ms'] = bars[-1][0]+{'5m':300000,'15m':900000,'30m':1800000,'1H':3600000,'4H':14400000,'1D':86400000}[base]
     out['history_timeframe'] = base
     out['reference_price'] = price = bars[-1][4]
     trends = item.get('timeframe_trends') or {}
     directions = {trends.get(tf) for tf in valid}
     direction = 'DOWN' if directions == {'DOWN'} else 'UP' if directions == {'UP'} else 'MIXED'
     out['trend'] = direction
+    out['coverage_status'] = 'COMPLETE' if len(valid)==len(frames) else 'PARTIAL'
+    out['missing_frames'] = [tf for tf in frames if tf not in valid]
     out['status'] = 'AVAILABLE'
     tol = atr * .25
     points = {'DOWN':[], 'UP':[]}
@@ -239,6 +242,11 @@ def confirmation_review(zone, side, rows, touched_index):
             components['divergence']=15
             if len(set(d['indicator'] for d in matches))>1:
                 components['divergence']=20
+    # Candle and volume can describe the same rejection event.
+    if components['candle'] and components['volume']:
+        components['volume']=0
+    if maxima['candle'] and maxima['volume']:
+        maxima['volume']=0
     # A touch candle cannot establish the order of touch and target.
     targets={}
     for key in ('near_reversal_target','major_reversal_target'):
@@ -376,5 +384,5 @@ def reversal_divergences(rows):
             if dp<0 and di>0:typ='REGULAR'
             elif dp>0 and di<0:typ='HIDDEN'
             else:continue
-            out.append({'indicator':name,'type':typ,'side':'DOWN' if sign>0 else 'UP','price':b['price'],'pivot_time':b['time'],'confirmed_at':b['confirmed_at']})
+            out.append({'indicator':name,'type':typ,'reversal_direction':'UP' if sign>0 else 'DOWN','side':'DOWN' if sign>0 else 'UP','price':b['price'],'pivot_time':b['time'],'confirmed_at':b['confirmed_at']})
     return out
