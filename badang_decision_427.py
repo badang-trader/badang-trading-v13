@@ -218,8 +218,11 @@ def structure_review(raw,tf,now_ms=None):
     bars,reason=closed_bars(raw,tf,now_ms)
     if bars is None:return {'status':'UNAVAILABLE','reason':reason}
     recent=bars[-64:]; current=recent[-1][4]
-    tr=[max(recent[i][2]-recent[i][3],abs(recent[i][2]-recent[i-1][4]),abs(recent[i][3]-recent[i-1][4])) for i in range(1,len(recent))]
-    atr=sum(tr[-14:])/14
+    # Wilder ATR uses all available validated closed candles for warm-up.
+    tr=[max(bars[i][2]-bars[i][3],abs(bars[i][2]-bars[i-1][4]),abs(bars[i][3]-bars[i-1][4])) for i in range(1,len(bars))]
+    atr=sum(tr[:14])/14
+    for value in tr[14:]:
+        atr=(13*atr+value)/14
     turns=confirmed_turns(recent)
     # previous swing highs/lows only; no forward-looking values
     supports=sorted({round(t['price'],8) for t in turns if t['kind']=='L' and t['price']<current},reverse=True)
