@@ -88,6 +88,20 @@ def reversal_path(item, frame_data, mode, now_ms):
                     continue
                 # Shared engine targets are hypotheses, not confirmed endings.
                 wave_targets.append((p,w['direction'],tf))
+    # Historical reactions are evidence available before the forecast.
+    reactions = []
+    for tf, rows in valid.items():
+        for t in confirmed_turns(rows[-160:]):
+            idx=len(rows)-min(160,len(rows))+t['i']
+            if idx<20 or idx+3>=len(rows):
+                continue
+            p=t['price']
+            sign=1 if t['kind']=='L' else -1
+            prior=sum(b[5] for b in rows[idx-20:idx])/20
+            later=rows[idx+1:idx+4]
+            if prior>0 and rows[idx][5]>=1.5*prior and (later[-1][4]-p)*sign>=atr:
+                if not any((b[4]-p)*sign < -tol for b in rows[idx+1:]):
+                    reactions.append((p,'DOWN' if sign>0 else 'UP',tf))
     for side in (('DOWN','UP') if direction=='MIXED' else (direction,)):
         groups=[]
         for p,tf in sorted(points[side],reverse=side=='DOWN'):
@@ -101,7 +115,7 @@ def reversal_path(item, frame_data, mode, now_ms):
             if side=='DOWN': hi=min(hi,price)
             else: lo=max(lo,price)
             tfs=sorted(set(tf for _,tf in group))
-            components={'structure':min(20,8+6*(len(tfs)-1)), 'wave':0,'fibonacci':0,'ema':0}
+            components={'structure':min(20,8+6*(len(tfs)-1)), 'wave':0,'fibonacci':0,'ema':0,'volume':0}
             reasons=['확정 스윙 지지·저항: '+', '.join(tfs)]
             if any(s==side and lo<=p<=hi for p,_,s in role_flips):
                 reasons.append('돌파 이후 재시험 확인된 역할 전환')
@@ -112,9 +126,14 @@ def reversal_path(item, frame_data, mode, now_ms):
                 components['fibonacci']=15; reasons.append('5파 피보나치 확장 가설 중첩')
             if any(lo<=p<=hi for p,_ in ema_levels):
                 components['ema']=10; reasons.append('현재 확정봉 EMA 중첩')
+            volume_available=any(len(rows)>=24 and any(b[5]>0 for b in rows[-160:]) for rows in valid.values())
+            if any(s==side and lo<=p<=hi for p,s,_ in reactions):
+                components['volume']=5
+                reasons.append('과거 확정 피벗 거래량 증가 및 가격 반응')
+            ceiling=40+(5 if volume_available else 0)
             score=sum(components.values())
             zones.append({'low':lo,'high':hi,'center':center,'expected_score':score,
-                          'confirmation_score':None,'expected_score_ceiling':40,'components':components,'reasons':reasons,
+                          'confirmation_score':None,'expected_score_ceiling':ceiling,'components':components,'reasons':reasons,
                           'unverified':['구간 도달 후 반전 캔들','다이버전스','거래량·OI·CVD'],
                           'probability':None,'change_pct':(center/price-1)*100,
                           'invalidation':lo if side=='DOWN' else hi,
