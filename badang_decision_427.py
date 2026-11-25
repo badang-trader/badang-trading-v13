@@ -470,12 +470,31 @@ def decision_review(item,structures,mode):
                                    'future_targets':candidate.get('future_targets',[]),
                                    'wave2_retrace_ratio':candidate.get('wave2_retrace_ratio'),
                                    'flow_validation':candidate.get('flow_validation')})
+    # Compare only independently confirmed frames; direction agreement is
+    # context, not proof that lower-degree waves belong to a higher wave.
+    frame_wave_context=[]
+    for tf in required:
+        st=structures.get(tf) or {}
+        if st.get('status')!='OK':
+            continue
+        for w in (st.get('wave') or {}).get('alternatives',[]):
+            frame_wave_context.append({'timeframe':tf,'direction':w.get('direction'),
+                'wave':w.get('wave'),'stage':w.get('stage'),
+                'invalidation':w.get('invalidation'),
+                'known_at_ms':w.get('last_pivot_confirmed_close_ms'),
+                'reference_close_ms':st['last_closed_time']+FRAME_MS[tf]})
+    directions={w['direction'] for w in frame_wave_context if w['direction'] in ('UP','DOWN')}
+    frame_count=len({w['timeframe'] for w in frame_wave_context})
+    wave_alignment={'status':'CONFLICT' if len(directions)>1 else
+        'ALIGNED_DIRECTION_ONLY' if frame_count>=2 and len(directions)==1 else 'INSUFFICIENT',
+        'frames':frame_wave_context,'degree_verified':False,'used_in_score':False}
     unique=list(dict.fromkeys(reasons))
     ready=not unique
     return {'state':'READY_REVIEW' if ready else 'WAIT',
             'label':'진입 검토 가능 · 주문 전 실시간 확인' if ready else '관망 · 진입 조건 미충족',
             'side':side,'score':score,'reasons':unique,'wave_context':wave_note,
             'wave_scenarios':wave_scenarios,
+            'wave_alignment':wave_alignment,
             'plan':{'entry':entry,'stop':stop,'tp1':tp1,'tp2':tp2,
                     'rr1_net_estimate':rr1,'rr2_net_estimate':rr2},
             'data_is_live_quote':False,'win_probability':None,
