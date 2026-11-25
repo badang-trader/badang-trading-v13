@@ -199,3 +199,83 @@ def confirmation_review(zone, side, rows, touched_index):
             'target_times':targets,'unverified':['RSI/MACD divergence','OI/CVD'],
             'score_is_probability':False}
 
+
+
+def track_reversals(conn, symbol, mode, path, frame_data, now_ms):
+    """Immutable forecasts and append-only candle evaluations in PostgreSQL."""
+    import json
+    import hashlib
+    from psycopg2.extras import Json
+    tf=path.get('history_timeframe')
+    if not tf or path.get('status')!='AVAILABLE':
+        return {'status':'NO_VALID_FRAME'}
+    rows,_=closed_bars((frame_data.get(tf) or {}).get('candles'),tf,now_ms)
+    if not rows:
+        return {'status':'NO_VALID_FRAME'}
+    step={'5m':300000,'15m':900000,'30m':1800000,'1H':3600000,'4H':14400000,'1D':86400000}[tf]
+    with conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT pg_advisory_xact_lock(hashtext(%s))",('reversal514:'+symbol+':'+mode+':'+tf,))
+            cur.execute("""CREATE TABLE IF NOT EXISTS badang_reversal_forecast_514 (
+                id TEXT PRIMARY KEY, symbol TEXT NOT NULL, mode TEXT NOT NULL, tf TEXT NOT NULL,
+                reference_ms BIGINT NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                direction TEXT NOT NULL, forecast JSONB NOT NULL)""")
+            cur.execute("""CREATE TABLE IF NOT EXISTS badang_reversal_event_514 (
+                forecast_id TEXT REFERENCES badang_reversal_forecast_514(id),
+                candle_ms BIGINT NOT NULL, result JSONB NOT NULL,
+                PRIMARY KEY(forecast_id,candle_ms))""")
+            cur.execute("""SELECT f.id,f.reference_ms,f.direction,f.forecast,e.candle_ms,e.result
+                FROM badang_reversal_forecast_514 f LEFT JOIN LATERAL
+                (SELECT candle_ms,result FROM badang_reversal_event_514 WHERE forecast_id=f.id ORDER BY candle_ms DESC LIMIT 1) e ON true
+                WHERE f.symbol=%s AND f.mode=%s AND f.tf=%s
+                AND COALESCE(e.result->>'state','') NOT IN ('INVALIDATED','EXPIRED','DATA_GAP','MAJOR_TARGET')""",(symbol,mode,tf))
+            active=cur.fetchall()
+            tracked=[]
+            for fid,ref,side,z,last,prev in active:
+                prev=prev or {}
+                touch=prev.get('touch_time')
+                cursor=last if last is not None else ref
+                pending=[(i,b) for i,b in enumerate(rows) if b[0]>cursor]
+                for i,b in pending:
+                    if b[0]!=cursor+step:
+                        result={'state':'DATA_GAP','touch_time':touch}
+                    elif b[0]-ref>48*step:
+                        result={'state':'EXPIRED','touch_time':touch}
+                    else:
+                        if touch is None and b[3]<=z['high'] and b[2]>=z['low']:
+                            touch=b[0]
+                        ti=next((j for j,x in enumerate(rows[:i+1]) if x[0]==touch),None)
+                        if touch is not None and ti is None:
+                            result={'state':'DATA_GAP','touch_time':touch}
+                        elif (b[3]<=z['invalidation'] if side=='DOWN' else b[2]>=z['invalidation']):
+                            result={'state':'INVALIDATED','touch_time':touch}
+                        else:
+                            result=confirmation_review(z,side,rows[:i+1],ti)
+                            result['touch_time']=touch
+                            old=prev.get('confirmation_score')
+                            new=result.get('confirmation_score')
+                            result['previous_confirmation_score']=old
+                            if old is not None and new is not None:
+                                result['score_change']=new-old
+                                result['state']='STRENGTHENING' if new>old else 'WEAKENING' if new<old else 'TOUCHED'
+                            if (result.get('target_times') or {}).get('major_reversal_target') is not None:
+                                result['state']='MAJOR_TARGET'
+                    cur.execute("INSERT INTO badang_reversal_event_514 VALUES (%s,%s,%s) ON CONFLICT DO NOTHING",(fid,b[0],Json(result)))
+                    prev=result
+                    cursor=b[0]
+                    if result['state'] in ('INVALIDATED','EXPIRED','DATA_GAP','MAJOR_TARGET'):
+                        break
+                tracked.append({'id':fid,'forecast':z,'direction':side,'latest':prev})
+            for p in path.get('paths',[]):
+                side=p['direction']
+                for z in p['zones']:
+                    # Never backdate a forecast to a candle that has already touched it.
+                    if (rows[-1][3]<=z['high'] if side=='DOWN' else rows[-1][2]>=z['low']):
+                        continue
+                    if any(a['direction']==side and a['latest'].get('state') not in ('INVALIDATED','EXPIRED','DATA_GAP','MAJOR_TARGET') and a['forecast']['low']<=z['high'] and a['forecast']['high']>=z['low'] for a in tracked):
+                        continue
+                    payload=dict(z,algorithm_version='514-track-1',reference_ms=rows[-1][0])
+                    fid=hashlib.sha256(json.dumps([symbol,mode,tf,side,payload['reference_ms'],z['low'],z['high']],separators=(',',':')).encode()).hexdigest()
+                    cur.execute("INSERT INTO badang_reversal_forecast_514(id,symbol,mode,tf,reference_ms,direction,forecast) VALUES (%s,%s,%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING",(fid,symbol,mode,tf,rows[-1][0],side,Json(payload)))
+                    tracked.append({'id':fid,'forecast':payload,'direction':side,'latest':{'state':'BEFORE_TOUCH','confirmation_score':None}})
+    return {'status':'SAVED','tracking_mode':'ON_SCAN','tracked':tracked}
