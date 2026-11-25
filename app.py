@@ -2834,7 +2834,20 @@ def v13_scan():
                                 except Exception:
                                     oi_cache[key] = {'status':'OI_STORAGE_UNAVAILABLE',
                                                      'oi_change_pct':None,'used_in_score':False}
-                            legs.append(oi_cache[key])
+                            leg = dict(oi_cache[key])
+                            prices = wave.get('pivot_prices') or []
+                            index = len(legs)
+                            if index+1 < len(prices) and prices[index]>0:
+                                price_change = (prices[index+1]/prices[index]-1)*100
+                                leg['price_change_pct'] = round(price_change,5)
+                                oi_change = leg.get('oi_change_pct')
+                                if oi_change is not None:
+                                    leg['price_oi_context'] = (
+                                        ('PRICE_UP' if price_change>0 else 'PRICE_DOWN' if price_change<0 else 'PRICE_FLAT')
+                                        + '_' + ('OI_UP' if oi_change>0 else 'OI_DOWN' if oi_change<0 else 'OI_FLAT'))
+                                else:
+                                    leg['price_oi_context'] = 'UNAVAILABLE'
+                            legs.append(leg)
                         wave['flow_validation'] = {
                             'status':'ENDPOINTS_AVAILABLE' if legs and all(
                                 leg.get('status')=='ENDPOINTS_AVAILABLE' for leg in legs)
