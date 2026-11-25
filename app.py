@@ -2818,6 +2818,28 @@ def v13_scan():
                         item['structure_427'][tf] = structure_review(rec['candles'], tf, int(time.time()*1000))
                     else:
                         item['structure_427'][tf] = {'status':'UNAVAILABLE','reason':'해당 시간봉 데이터 없음'}
+                # OI endpoints are optional context, never a candidate gate.
+                from badang_decision_427 import FRAME_MS
+                from badang_oi_postgres_443 import wave_interval_change
+                oi_cache = {}
+                for tf, st in item['structure_427'].items():
+                    for wave in (st.get('wave') or {}).get('alternatives', []):
+                        legs = []
+                        times = wave.get('pivot_times') or []
+                        for start, end in zip(times, times[1:]):
+                            key = (start + FRAME_MS[tf], end + FRAME_MS[tf])
+                            if key not in oi_cache:
+                                try:
+                                    oi_cache[key] = wave_interval_change(symbol, *key)
+                                except Exception:
+                                    oi_cache[key] = {'status':'OI_STORAGE_UNAVAILABLE',
+                                                     'oi_change_pct':None,'used_in_score':False}
+                            legs.append(oi_cache[key])
+                        wave['flow_validation'] = {
+                            'status':'ENDPOINTS_AVAILABLE' if legs and all(
+                                leg.get('status')=='ENDPOINTS_AVAILABLE' for leg in legs)
+                                else 'PARTIAL_OR_UNAVAILABLE',
+                            'oi_legs':legs,'cvd':None,'used_in_score':False}
                 item['decision_427'] = decision_review(item, item['structure_427'], mode)
 
                 # 4.39: conservative reconciliation; never overrides the existing signal.
