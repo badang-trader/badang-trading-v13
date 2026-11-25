@@ -2837,6 +2837,22 @@ def v13_scan():
                 except Exception:
                     logger.exception('Reversal path unavailable')
                     item['reversal_path_514'] = {'status':'UNAVAILABLE','paths':[]}
+                # Reversal history is separate from legacy signal persistence.
+                try:
+                    from badang_reversal_path import track_reversals
+                    if not database_url():
+                        item['reversal_tracking_514'] = {'status':'DATABASE_NOT_CONFIGURED'}
+                    else:
+                        conn = db_connect()
+                        try:
+                            item['reversal_tracking_514'] = track_reversals(
+                                conn, symbol, mode, item['reversal_path_514'],
+                                frame_data, int(time.time()*1000))
+                        finally:
+                            conn.close()
+                except Exception:
+                    logger.exception('Reversal history unavailable')
+                    item['reversal_tracking_514'] = {'status':'STORAGE_ERROR'}
                 results.append(item)
 
             except Exception as exc:
