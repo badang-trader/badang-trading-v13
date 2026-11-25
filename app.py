@@ -1879,8 +1879,9 @@ def explain_rsi_divergences_46(candles, timeframe):
 # 4.7: optional multi-timeframe research. Never substitutes for execution timeframe.
 # 5m is a read-only timing context (trend, divergence, wave and audit).
 # Existing 15m primary score and price-action signals remain unchanged.
-SCALP_RESEARCH_FRAMES = ['5m', '15m', '30m', '1H']
-SWING_RESEARCH_FRAMES = ['1H', '4H', '1D']
+V13_MODE_FRAMES = {'scalp': ('15m', '30m', '1H'), 'swing': ('1H', '4H', '1D')}
+SCALP_RESEARCH_FRAMES = ['5m', *V13_MODE_FRAMES['scalp']]
+SWING_RESEARCH_FRAMES = list(V13_MODE_FRAMES['swing'])
 
 
 def aggregate_closed_hourly_47(hourly_rows, hours):
@@ -2155,6 +2156,93 @@ def validate_signal_precision_418(action, item, trends, frames, audits, mode):
             'warning':'확정봉 후보이며 실시간 호가·체결·수수료·슬리피지 미검증'}
 
 
+def v13_trend(e20, e50):
+    return 'UP' if e20 > e50 else 'DOWN' if e20 < e50 else 'NEUTRAL'
+
+
+def v13_current_structure(close, e20, e50):
+    return 'UP' if close > e20 > e50 else 'DOWN' if close < e20 < e50 else 'MIXED'
+
+
+def apply_v13_entry_checks(item, action, trends, audits, current_structure, mode):
+    """Populate the scan's entry evidence without network or storage access."""
+    frames = V13_MODE_FRAMES[mode]
+    unsafe_primary = [tf for tf in frames if not frame_freshness_416(audits.get(tf, {}), tf)[0]]
+    side = action.get('side','WAIT')
+    valid = (item.get('status') == 'ok' and side in ('LONG','SHORT')
+             and action.get('entry') and action.get('stop'))
+    if unsafe_primary:
+        valid = False
+        item['data_quality_warning_411'] = ('데이터 검증 미통과: ' +
+            ', '.join(unsafe_primary) + ' · 기술적 점수는 참고용, 신규 진입 신호 비활성')
+    # 4.15: Price-action reversals must not inherit the *opposite*
+    # technical score. An opposing stronger score is a conflict,
+    # not a directional confirmation. Keep the pattern as a
+    # reference but suppress an actionable recommendation.
+    direction_score = (item.get('long_score') or 0) if side == 'LONG' else (item.get('short_score') or 0)
+    opposite_score = (item.get('short_score') or 0) if side == 'LONG' else (item.get('long_score') or 0)
+    item['price_action_direction_score_415'] = direction_score if side in ('LONG', 'SHORT') else None
+    item['price_action_opposite_score_415'] = opposite_score if side in ('LONG', 'SHORT') else None
+    # 4.16: A five-minute reversal is NOT an entry authorization
+    # against the 15m/30m/1H context (or 1H/4H/1D for swing).
+    expected_trend = 'UP' if side == 'LONG' else 'DOWN'
+    opposing_frames = [tf for tf in frames if trends.get(tf) != expected_trend]
+    if valid and opposing_frames:
+        valid = False
+        item['direction_conflict_416'] = (
+            '상위/기준 시간봉 추세 충돌: ' + ', '.join(opposing_frames) +
+            ' · 가격 행동 후보만 관찰, 신규 진입 신호 아님')
+    if valid and opposite_score > direction_score:
+        valid = False
+        item['direction_conflict_415'] = ('가격 행동은 ' + ('롱' if side == 'LONG' else '숏') +
+            ' 후보이나 반대 방향 기술적 점수(' + str(opposite_score) +
+            ')가 해당 방향 점수(' + str(direction_score) +
+            ')보다 높아 진입 후보를 보류합니다.')
+    # 4.18: independent validation, never replace missing evidence
+    # with a high technical score or an Elliott-wave label.
+    precision = validate_signal_precision_418(
+        action, item, trends, frames, audits, mode)
+    # 4.20: the active structure and proposed direction must agree.
+    active_tf = '15m' if mode == 'scalp' else '4H'
+    active_structure = current_structure.get(active_tf)
+    expected_structure = 'UP' if side=='LONG' else 'DOWN'
+    if side in ('LONG','SHORT') and active_structure in ('UP','DOWN') and active_structure != expected_structure:
+        precision['checks']['current_structure_420'] = {
+            'passed':False,'reason':'현재 확정봉 가격·EMA 구조와 진입 방향 불일치'
+        }
+        precision['blockers'].append('현재 확정봉 구조 '+active_structure+' · '+side+' 방향 충돌')
+        precision['status'] = 'WAIT'
+        valid = False
+    else:
+        precision['checks']['current_structure_420'] = {
+            'passed':True,'reason':'현재 구조가 반대 방향으로 확정되지 않음'
+        }
+    item['signal_precision_418'] = precision
+    if precision['status'] != 'CANDIDATE':
+        valid = False
+    item['recommendation'] = side if valid else 'WAIT'
+    item['signal_grade'] = ('EARLY_COUNTERTREND' if action.get('countertrend') else 'PRICE_ACTION_CANDIDATE') if valid else 'WAIT'
+    item['entry_blockers'] = ([] if valid else
+        (['데이터 검증 미통과 (' + ', '.join(unsafe_primary) + ') · 진입 신호 보류']
+         if unsafe_primary else ([item['direction_conflict_416']] if item.get('direction_conflict_416')
+                                else [item['direction_conflict_415']] if item.get('direction_conflict_415')
+                                else [action.get('reason','PRICE_ACTION_NOT_CONFIRMED')])))
+    if not valid:
+        item['entry_blockers'] = list(dict.fromkeys(
+            (item.get('entry_blockers') or []) + precision['blockers']))
+    if valid:
+        item['trend_aligned'] = not opposing_frames
+        item['candidate_side'] = side
+        item['entry_reference'] = item['analysis_reference_price']
+        item['action_entry_reference'] = action['entry']
+        item['stop_loss'] = action['stop']
+        item['take_profit_1'] = action['tp1']
+        item['take_profit_2'] = action['tp2']
+        item['risk_reward_1'] = action['rr1']
+        item['risk_reward_2'] = action['rr2']
+    item['decision_plan_425'] = build_decision_plan_425(item, action, precision, mode)
+
+
 @app.route('/api/v13-scan')
 def v13_scan():
     from bitget_market_data import fastest_candles
@@ -2198,7 +2286,7 @@ def v13_scan():
         results, errors = [], []
         candle_map = {}
 
-        frames = (['15m', '30m', '1H'] if mode == 'scalp' else ['1H', '4H', '1D'])
+        frames = V13_MODE_FRAMES[mode]
         research_frames = SCALP_RESEARCH_FRAMES if mode == 'scalp' else SWING_RESEARCH_FRAMES
 
         for symbol in batch:
@@ -2268,11 +2356,7 @@ def v13_scan():
                     e20 = ema(closes, 20)[-1]
                     e50 = ema(closes, 50)[-1]
 
-                    trends[tf] = (
-                        'UP' if e20 > e50
-                        else 'DOWN' if e20 < e50
-                        else 'NEUTRAL'
-                    )
+                    trends[tf] = v13_trend(e20, e50)
 
                 # 4.10: retain the 4.9 response key/UI; add recent-gap and
                 # duplicate diagnostics. Never silently repair missing candles.
@@ -2548,8 +2632,7 @@ def v13_scan():
                         'ema20':round(e20_,6),'ema50':round(e50_,6),
                         'last_5_bar_change_pct':round(move5_,3),
                         'last_20_bar_change_pct':round(move20_,3),
-                        'current_structure':('UP' if last_>e20_>e50_ else
-                                             'DOWN' if last_<e20_<e50_ else 'MIXED'),
+                        'current_structure':v13_current_structure(last_, e20_, e50_),
                         'last_20_high':max(highs_[-20:]),
                         'last_20_low':min(lows_[-20:]),
                         'historical_wave_is_current_signal':False,
@@ -2769,80 +2852,11 @@ def v13_scan():
                          'aggregated': bool(frame_data[tf].get('aggregation_note'))}
                     for tf in research_frames if tf in frame_data
                 }
-                side = action.get('side','WAIT')
-                valid = (item.get('status') == 'ok' and side in ('LONG','SHORT')
-                         and action.get('entry') and action.get('stop'))
-                if unsafe_primary:
-                    valid = False
-                    item['data_quality_warning_411'] = ('데이터 검증 미통과: ' +
-                        ', '.join(unsafe_primary) + ' · 기술적 점수는 참고용, 신규 진입 신호 비활성')
-                # 4.15: Price-action reversals must not inherit the *opposite*
-                # technical score. An opposing stronger score is a conflict,
-                # not a directional confirmation. Keep the pattern as a
-                # reference but suppress an actionable recommendation.
-                direction_score = (item.get('long_score') or 0) if side == 'LONG' else (item.get('short_score') or 0)
-                opposite_score = (item.get('short_score') or 0) if side == 'LONG' else (item.get('long_score') or 0)
-                item['price_action_direction_score_415'] = direction_score if side in ('LONG', 'SHORT') else None
-                item['price_action_opposite_score_415'] = opposite_score if side in ('LONG', 'SHORT') else None
-                # 4.16: A five-minute reversal is NOT an entry authorization
-                # against the 15m/30m/1H context (or 1H/4H/1D for swing).
-                expected_trend = 'UP' if side == 'LONG' else 'DOWN'
-                opposing_frames = [tf for tf in frames if trends.get(tf) != expected_trend]
-                if valid and opposing_frames:
-                    valid = False
-                    item['direction_conflict_416'] = (
-                        '상위/기준 시간봉 추세 충돌: ' + ', '.join(opposing_frames) +
-                        ' · 가격 행동 후보만 관찰, 신규 진입 신호 아님')
-                if valid and opposite_score > direction_score:
-                    valid = False
-                    item['direction_conflict_415'] = ('가격 행동은 ' + ('롱' if side == 'LONG' else '숏') +
-                        ' 후보이나 반대 방향 기술적 점수(' + str(opposite_score) +
-                        ')가 해당 방향 점수(' + str(direction_score) +
-                        ')보다 높아 진입 후보를 보류합니다.')
-                # 4.18: independent validation, never replace missing evidence
-                # with a high technical score or an Elliott-wave label.
-                precision = validate_signal_precision_418(
-                    action, item, trends, frames, primary_audits, mode)
-                # 4.20: the active structure and proposed direction must agree.
-                active_tf = '15m' if mode == 'scalp' else '4H'
-                active = wave_context.get(active_tf,{})
-                active_structure = active.get('current_structure')
-                expected_structure = 'UP' if side=='LONG' else 'DOWN'
-                if side in ('LONG','SHORT') and active_structure in ('UP','DOWN') and active_structure != expected_structure:
-                    precision['checks']['current_structure_420'] = {
-                        'passed':False,'reason':'현재 확정봉 가격·EMA 구조와 진입 방향 불일치'
-                    }
-                    precision['blockers'].append('현재 확정봉 구조 '+active_structure+' · '+side+' 방향 충돌')
-                    precision['status'] = 'WAIT'
-                    valid = False
-                else:
-                    precision['checks']['current_structure_420'] = {
-                        'passed':True,'reason':'현재 구조가 반대 방향으로 확정되지 않음'
-                    }
-                item['signal_precision_418'] = precision
-                if precision['status'] != 'CANDIDATE':
-                    valid = False
-                item['recommendation'] = side if valid else 'WAIT'
-                item['signal_grade'] = ('EARLY_COUNTERTREND' if action.get('countertrend') else 'PRICE_ACTION_CANDIDATE') if valid else 'WAIT'
-                item['entry_blockers'] = ([] if valid else
-                    (['데이터 검증 미통과 (' + ', '.join(unsafe_primary) + ') · 진입 신호 보류']
-                     if unsafe_primary else ([item['direction_conflict_416']] if item.get('direction_conflict_416')
-                                            else [item['direction_conflict_415']] if item.get('direction_conflict_415')
-                                            else [action.get('reason','PRICE_ACTION_NOT_CONFIRMED')])))
-                if not valid:
-                    item['entry_blockers'] = list(dict.fromkeys(
-                        (item.get('entry_blockers') or []) + precision['blockers']))
-                if valid:
-                    item['trend_aligned'] = not opposing_frames
-                    item['candidate_side'] = side
-                    item['entry_reference'] = item['analysis_reference_price']
-                    item['action_entry_reference'] = action['entry']
-                    item['stop_loss'] = action['stop']
-                    item['take_profit_1'] = action['tp1']
-                    item['take_profit_2'] = action['tp2']
-                    item['risk_reward_1'] = action['rr1']
-                    item['risk_reward_2'] = action['rr2']
-                item['decision_plan_425'] = build_decision_plan_425(item, action, precision, mode)
+                apply_v13_entry_checks(
+                    item, action, trends, primary_audits,
+                    {tf: context.get('current_structure') for tf, context in wave_context.items()},
+                    mode,
+                )
                 # 4.27: closed-candle swing levels and CURRENT wave hypotheses.
                 item['structure_427'] = {}
                 for tf in research_frames:
