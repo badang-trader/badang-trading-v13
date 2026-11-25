@@ -43,18 +43,31 @@ def reversal_path(item, frame_data, mode, now_ms):
     fibs = []
     wave_targets = []
     all_turns = []
+    role_flips = []
     for tf, rows in valid.items():
         turns = confirmed_turns(rows[-160:])
         for t in turns:
             p=t['price']
-            all_turns.append((p,t['kind']))
             later = rows[-160:][t['i']+1:]
             # A broken level is not an intact support/resistance. Role reversal
             # requires separate retest evidence, not merely a historical pivot.
             if t['kind']=='L' and p<price and not any(b[4]<p-tol for b in later):
                 points['DOWN'].append((p,tf))
+                all_turns.append((p,'L'))
             if t['kind']=='H' and p>price and not any(b[4]>p+tol for b in later):
                 points['UP'].append((p,tf))
+                all_turns.append((p,'H'))
+            # A role flip requires a close beyond the level followed by a distinct retest.
+            sign = 1 if t['kind']=='H' else -1
+            broken = next((i for i,b in enumerate(later) if (b[4]-p)*sign>tol),None)
+            if broken is not None:
+                after=later[broken+1:]
+                if after and any(b[3]<=p+tol and b[2]>=p-tol and (b[4]-p)*sign>tol for b in after) and all((b[4]-p)*sign>=-tol for b in after):
+                    if (price-p)*sign>tol:
+                        side='DOWN' if sign>0 else 'UP'
+                        points[side].append((p,tf))
+                        all_turns.append((p,'L' if sign>0 else 'H'))
+                        role_flips.append((p,tf,side))
         for period in (20,50,200):
             if len(rows)<period: continue
             v=sum(b[4] for b in rows[:period])/period
@@ -90,6 +103,8 @@ def reversal_path(item, frame_data, mode, now_ms):
             tfs=sorted(set(tf for _,tf in group))
             components={'structure':min(20,8+6*(len(tfs)-1)), 'wave':0,'fibonacci':0,'ema':0}
             reasons=['확정 스윙 지지·저항: '+', '.join(tfs)]
+            if any(s==side and lo<=p<=hi for p,_,s in role_flips):
+                reasons.append('돌파 이후 재시험 확인된 역할 전환')
             # Wave and Fibonacci projections share the same anchors; do not double count.
             if any(s==side and lo<=p<=hi for p,s,_ in wave_targets):
                 components['wave']=10; reasons.append('돌파 이후 파동 목표 가설 중첩 (종료 미확정)')
@@ -107,6 +122,10 @@ def reversal_path(item, frame_data, mode, now_ms):
         for i,z in enumerate(zones):
             if i+1<len(zones): z['next_target']=zones[i+1]['center']
             opposite=[p for p,kind in all_turns if (kind=='H' and p>z['high']+tol if side=='DOWN' else kind=='L' and p<z['low']-tol)]
-            if opposite: z['reversal_target']=min(opposite) if side=='DOWN' else max(opposite)
+            targets=sorted(set(opposite),reverse=side=='UP')
+            z['near_reversal_target']=targets[0] if targets else None
+            z['major_reversal_target']=next((p for p in targets[1:] if abs(p-targets[0])>=atr),None) if targets else None
+            z['reversal_target']=z['near_reversal_target']
+            z['reversal_change_pct']=(z['reversal_target']/z['center']-1)*100 if z['reversal_target'] is not None else None
         out['paths'].append({'direction':side,'zones':zones})
     return out
