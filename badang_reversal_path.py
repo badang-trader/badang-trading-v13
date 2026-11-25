@@ -126,7 +126,7 @@ def reversal_path(item, frame_data, mode, now_ms):
             if side=='DOWN': hi=min(hi,price)
             else: lo=max(lo,price)
             tfs=sorted(set(tf for _,tf in group))
-            components={'structure':min(20,8+6*(len(tfs)-1)), 'wave':0,'fibonacci':0,'ema':0,'volume':0,'divergence':0}
+            components={'structure':min(20,8+6*(len(tfs)-1)), 'wave':0,'fibonacci':0,'ema':0,'volume':0,'divergence':0,'candle':0}
             reasons=['확정 스윙 지지·저항: '+', '.join(tfs)]
             if any(s==side and lo<=p<=hi for p,_,s in role_flips):
                 reasons.append('돌파 이후 재시험 확인된 역할 전환')
@@ -146,6 +146,25 @@ def reversal_path(item, frame_data, mode, now_ms):
                 components['divergence']=10
                 reasons.append('유효한 일반 다이버전스: '+', '.join(sorted(set(d['indicator'] for d in matches))))
             ceiling=50+(5 if volume_available else 0)
+            # Historical rejection at this zone, distinct from volume evidence.
+            candle_available=False
+            for tf,rows in valid.items():
+                for b in rows[-40:]:
+                    span=b[2]-b[3]
+                    if span<=0:continue
+                    candle_available=True
+                    if not (b[3]<=hi and b[2]>=lo):continue
+                    sign=1 if side=='DOWN' else -1
+                    wick=min(b[1],b[4])-b[3] if sign>0 else b[2]-max(b[1],b[4])
+                    if wick>=.5*span and (b[4]-b[1])*sign>0 and (b[4]>hi if sign>0 else b[4]<lo):
+                        components['candle']=10
+            if components['candle']:
+                reasons.append('과거 확정봉의 구간 가격 거부 반응')
+            # Volume and candle rejection can describe the same event.
+            if components['candle'] and components['volume']:
+                components['volume']=0
+                reasons=[r for r in reasons if r!='과거 확정 피벗 거래량 증가 및 가격 반응']
+            ceiling=50+max(10 if candle_available else 0,5 if volume_available else 0)
             score=sum(components.values())
             zones.append({'low':lo,'high':hi,'center':center,'expected_score':score,
                           'confirmation_score':None,'expected_score_ceiling':ceiling,'components':components,'reasons':reasons,
