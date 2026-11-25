@@ -19,6 +19,9 @@ def reversal_path(item, frame_data, mode, now_ms):
         return out
     base = next(iter(valid))
     bars = valid[base]
+    if len(bars) < 15:
+        out['reason'] = 'INSUFFICIENT_ATR_HISTORY'
+        return out
     tr = [max(bars[i][2]-bars[i][3],abs(bars[i][2]-bars[i-1][4]),abs(bars[i][3]-bars[i-1][4])) for i in range(1,len(bars))]
     atr = sum(tr[:14])/14
     for value in tr[14:]:
@@ -145,7 +148,6 @@ def reversal_path(item, frame_data, mode, now_ms):
             if matches:
                 components['divergence']=10
                 reasons.append('유효한 일반 다이버전스: '+', '.join(sorted(set(d['indicator'] for d in matches))))
-            ceiling=50+(5 if volume_available else 0)
             # Historical rejection at this zone, distinct from volume evidence.
             candle_available=False
             for tf,rows in valid.items():
@@ -194,6 +196,8 @@ def confirmation_review(zone, side, rows, touched_index):
     sign=1 if side=='DOWN' else -1
     lo,hi=zone['low'],zone['high']
     observed=rows[touched_index:]
+    if not (observed[0][3]<=hi and observed[0][2]>=lo):
+        raise ValueError('touch candle does not intersect zone')
     for b in observed:
         if (b[3]<=zone['invalidation'] if sign>0 else b[2]>=zone['invalidation']):
             return {'confirmation_score':None,'state':'INVALIDATED','invalidated_at':b[0]}
@@ -257,8 +261,10 @@ def track_reversals(conn, symbol, mode, path, frame_data, now_ms):
     if not tf or path.get('status')!='AVAILABLE':
         return {'status':'NO_VALID_FRAME'}
     rows,_=closed_bars((frame_data.get(tf) or {}).get('candles'),tf,now_ms)
-    if not rows:
+    if not rows or str((frame_data.get(tf) or {}).get('exchange','')).lower() != 'bitget':
         return {'status':'NO_VALID_FRAME'}
+    if path.get('reference_time') != rows[-1][0]:
+        return {'status':'REFERENCE_MISMATCH'}
     step={'5m':300000,'15m':900000,'30m':1800000,'1H':3600000,'4H':14400000,'1D':86400000}[tf]
     with conn:
         with conn.cursor() as cur:
