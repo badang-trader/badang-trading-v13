@@ -158,7 +158,31 @@ def account_metrics(trades, histories, cutoff, end):
     }
 
 
-def run(folder, cutoff):
+def trade_ledger(trades):
+    """Expose stable position keys and separate realized exits from open marks."""
+    rows = []
+    for trade in sorted(trades, key=lambda t: (t['entry_timestamp'], t['symbol'], t['mode'])):
+        duration = FRAME_MS[trade['timeframe']]
+        last_close = trade['exit_timestamp'] + duration
+        is_open = trade['exit_reason'] == 'END_OF_DATA'
+        rows.append({
+            'symbol': trade['symbol'], 'mode': trade['mode'], 'side': trade['side'],
+            'score_band': trade['band'],
+            'signal_close_ms': trade['signal_timestamp'] + duration,
+            'entry_ms': trade['entry_timestamp'], 'entry': trade['entry_price'],
+            'stop': trade['stop_price'], 'target': trade['target_price'],
+            'status': 'OPEN' if is_open else 'CLOSED',
+            'exit_reason': None if is_open else trade['exit_reason'],
+            'exit_confirmed_close_ms': None if is_open else last_close,
+            'exit_price': None if is_open else trade['exit_price'],
+            'realized_net_return': None if is_open else trade['net_return'],
+            'mark_close_ms': last_close if is_open else None,
+            'mark_price': trade['exit_price'] if is_open else None,
+        })
+    return rows
+
+
+def run(folder, cutoff, *, end_ms=None):
     histories = {}
     for symbol in ('BTC', 'ETH'):
         for tf in FRAME_MS:
@@ -172,7 +196,12 @@ def run(folder, cutoff):
             audit_historical_candles(rows, tf, asof_ms=provenance['asof_ms'])
             histories[symbol, tf] = rows
 
-    end = min(rows[-1][0] + FRAME_MS[tf] for (_, tf), rows in histories.items() if tf == '15m')
+    available_end = min(rows[-1][0] + FRAME_MS[tf]
+                        for (_, tf), rows in histories.items() if tf == '15m')
+    end = available_end if end_ms is None else end_ms
+    if end_ms is not None and (type(end) is not int or not cutoff < end <= available_end
+                               or end % FRAME_MS['15m']):
+        raise ValueError('Replay end must be a verifiable 15m close after cutoff')
     histories = {key: [row for row in rows if row[0] + FRAME_MS[key[1]] <= end]
                  for key, rows in histories.items()}
     cohorts = []
@@ -201,9 +230,11 @@ def run(folder, cutoff):
                          'one position per symbol and mode',
             'cohorts': cohorts, 'groups': group_metrics(trades['technical']),
             'account': account_metrics(trades['technical'], histories, cutoff, end),
+            'trades': trade_ledger(trades['technical']),
             'final_review': {
                 'status': 'DESCRIPTIVE_ONLY' if trades['final_review'] else 'NO_FILLED_POSITIONS',
                 'groups': group_metrics(trades['final_review']),
+                'trades': trade_ledger(trades['final_review']),
                 'account': account_metrics(trades['final_review'], histories, cutoff, end),
             }}
 
@@ -212,11 +243,21 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('history', type=Path)
     parser.add_argument('--cutoff', required=True, help='Prior research boundary in ISO 8601 with timezone.')
+    parser.add_argument('--end', help='Optional fixed 15m close in ISO 8601 with timezone.')
     args = parser.parse_args()
-    cutoff = datetime.fromisoformat(args.cutoff)
-    if cutoff.tzinfo is None:
-        parser.error('--cutoff must include a timezone')
-    print(json.dumps(run(args.history, int(cutoff.timestamp() * 1000)), indent=2))
+    bounds = {}
+    for name in ('cutoff', 'end'):
+        value = getattr(args, name)
+        if value is None:
+            continue
+        try:
+            instant = datetime.fromisoformat(value)
+        except ValueError:
+            parser.error(f'--{name} must be an ISO 8601 timestamp')
+        if instant.tzinfo is None:
+            parser.error(f'--{name} must include a timezone')
+        bounds[name] = int(instant.timestamp() * 1000)
+    print(json.dumps(run(args.history, bounds['cutoff'], end_ms=bounds.get('end')), indent=2))
 
 
 if __name__ == '__main__':

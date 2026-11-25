@@ -2,7 +2,8 @@
 import unittest
 
 from badang_historical_integrity import FRAME_MS
-from badang_v13_technical_holdout import collect_signals
+from badang_v13_technical_holdout import collect_signals, trade_ledger
+from badang_walkforward_audit import audit_trades
 
 
 class V13ReviewReplayTests(unittest.TestCase):
@@ -45,6 +46,31 @@ class V13ReviewReplayTests(unittest.TestCase):
         self.assertEqual(counts['price_action_signals'], 1)
         self.assertEqual(counts['entry_checks_passed'], 0)
         self.assertEqual(ready, [])
+
+    def test_ledger_keeps_position_identity_when_an_open_mark_becomes_a_stop(self):
+        step = FRAME_MS['15m']
+        candles = [[i * step, 100., 101., 99., 100.] for i in range(4)]
+        candles[-1] = [3 * step, 95., 96., 94., 95.]
+        signal = dict(bar=0, known_at_bar=0, signal_timestamp=0, mode='scalp',
+                      side='LONG', score=90, stop=98., target=104.)
+
+        def position(rows):
+            trades = audit_trades(rows, [signal])['trades']
+            return trade_ledger([dict(t, symbol='BTC', timeframe='15m') for t in trades])[0]
+
+        marked, closed = position(candles[:3]), position(candles)
+        for key in ('symbol', 'mode', 'side', 'entry_ms', 'signal_close_ms'):
+            self.assertEqual(marked[key], closed[key])
+        self.assertEqual(marked['status'], 'OPEN')
+        self.assertIsNone(marked['exit_price'])
+        self.assertIsNone(marked['realized_net_return'])
+        self.assertEqual(marked['mark_close_ms'], 3 * step)
+        self.assertEqual(closed['status'], 'CLOSED')
+        self.assertEqual(closed['exit_reason'], 'STOP')
+        self.assertEqual(closed['exit_confirmed_close_ms'], 4 * step)
+        self.assertEqual(closed['exit_price'], 95.)
+        self.assertIsNone(closed['mark_price'])
+        self.assertLess(closed['realized_net_return'], -.05)
 
 
 if __name__ == '__main__':
