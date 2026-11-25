@@ -68,6 +68,16 @@ def reversal_path(item, frame_data, mode, now_ms):
                         points[side].append((p,tf))
                         all_turns.append((p,'L' if sign>0 else 'H'))
                         role_flips.append((p,tf,side))
+        # Retracement of the latest confirmed swing; no wave projection reused.
+        if len(turns)>=2:
+            start,end=turns[-2:]
+            delta=end['price']-start['price']
+            side='DOWN' if delta>0 else 'UP'
+            if delta and all((b[4]-start['price'])*(1 if delta>0 else -1)>0 for b in rows[-160:][end['i']+1:]):
+                for ratio in (.382,.5,.618,.786):
+                    level=end['price']-delta*ratio
+                    if level>0 and (level<price if side=='DOWN' else level>price):
+                        fibs.append((level,side,tf))
         for period in (20,50,200):
             if len(rows)<period: continue
             v=sum(b[4] for b in rows[:period])/period
@@ -123,7 +133,7 @@ def reversal_path(item, frame_data, mode, now_ms):
             if any(s==side and lo<=p<=hi for p,s,_ in wave_targets):
                 components['wave']=10; reasons.append('돌파 이후 파동 목표 가설 중첩 (종료 미확정)')
             elif any(s==side and lo<=p<=hi for p,s,_ in fibs):
-                components['fibonacci']=15; reasons.append('5파 피보나치 확장 가설 중첩')
+                components['fibonacci']=10; reasons.append('최근 확정 스윙 피보나치 되돌림 중첩')
             if any(lo<=p<=hi for p,_ in ema_levels):
                 components['ema']=10; reasons.append('현재 확정봉 EMA 중첩')
             volume_available=any(len(rows)>=24 and any(b[5]>0 for b in rows[-160:]) for rows in valid.values())
