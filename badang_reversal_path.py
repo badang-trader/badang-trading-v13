@@ -153,9 +153,9 @@ def reversal_path(item, frame_data, mode, now_ms):
                 reasons.append('과거 확정 피벗 거래량 증가 및 가격 반응')
             matches=[d for d in divergences if d['type']=='REGULAR' and d['side']==side and lo<=d['price']<=hi]
             matching_frames = {d['timeframe'] for d in matches}
-            conflict = any(d['type'] == 'REGULAR' and d['side'] != side
-                           and d['timeframe'] in matching_frames for d in divergences)
-            if conflict:
+            conflicts = [d for d in divergences if d['type'] == 'REGULAR' and d['side'] != side
+                         and d['timeframe'] in matching_frames]
+            if conflicts:
                 reasons.append('같은 시간봉에 상승·하락 반전 단서가 함께 있어 점수 보류')
             elif matches:
                 components['divergence']=10
@@ -182,6 +182,10 @@ def reversal_path(item, frame_data, mode, now_ms):
             score=sum(components.values())
             zones.append({'low':lo,'high':hi,'center':center,'expected_score':score,
                           'confirmation_score':None,'expected_score_ceiling':ceiling,'components':components,'reasons':reasons,
+                          'divergence_evidence':{
+                              'status':'HELD_CONFLICT' if conflicts else 'APPLIED' if matches else 'NO_MATCH',
+                              'points':components['divergence'], 'matches':matches, 'conflicts':conflicts,
+                          },
                           'unverified':['구간 도달 후 반전 캔들','다이버전스','거래량·OI·CVD'],
                           'probability':None,'change_pct':(center/price-1)*100,
                           'invalidation':lo if side=='DOWN' else hi,

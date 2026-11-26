@@ -19,6 +19,7 @@ class DashboardClarityTests(unittest.TestCase):
         dashboard = client.get('/dashboard')
         self.assertEqual(dashboard.status_code, 200)
         self.assertIn('바당의 쉬운 판단'.encode('utf-8'), dashboard.data)
+        self.assertIn(b'type="search" enterkeyhint="search"', dashboard.data)
 
     def test_position_calculator_is_removed(self):
         from app import app
@@ -122,6 +123,18 @@ assert(waveReport.includes('일부 스윙 수 미확인'),'incomplete ABC eviden
 assert(waveReport.includes('지지·저항 구조 20점')&&waveReport.includes('캔들 반응 10점'),'score breakdown missing');
 assert(waveReport.includes('점수 보류')&&!waveReport.includes('다이버전스 0점'),'conflicting evidence presentation wrong');
 assert(waveReport.includes('반전 근거 30점'),'stateless reversal score missing');
+const matching=[{timeframe:'15m',indicator:'RSI'}];
+const opposite=[{timeframe:'15m',indicator:'MACD'}];
+const applied=zoneScoreText({components:{divergence:10},
+  divergence_evidence:{status:'APPLIED',points:10,matches:matching,conflicts:[]}});
+assert(applied.some(line=>line.includes('10점 가산 · 15m RSI')),'source for awarded points missing');
+const withheld=zoneScoreText({components:{divergence:0},divergence_evidence:{
+  status:'HELD_CONFLICT',points:0,matches:matching,conflicts:opposite}});
+assert(withheld.some(line=>line.includes('점수 보류')&&line.includes('15m RSI')&&line.includes('15m MACD')),
+  'source for conflict missing');
+const lower={status:'PIVOT_COUNTS_ONLY',timeframe:'15m',leg_turn_counts:[3,3,1,3,1]};
+assert(historicalShapeText({pattern:'CONTRACTING_DIAGONAL_GEOMETRY',lower_pivot_evidence:lower}).includes('1파 3 / 2파 3 / 3파 1'),'diagonal labels missing');
+assert(historicalShapeText({pattern:'WXY_DOUBLE_ZIGZAG_GEOMETRY',lower_pivot_evidence:lower}).includes('W의 C 1 / 첫 X 3 / Y의 A 1'),'WXY labels missing');
 const flow=flowStatus({structure_427:{'1H':{wave:{alternatives:[{flow_validation:{oi_legs:[{status:'ENDPOINTS_AVAILABLE'},{status:'INSUFFICIENT_HISTORY'}]}}]}}}});
 assert(flow.includes('1/2구간')&&flow.includes('CVD 미검증'),'partial OI coverage mistaken for CVD');
 """

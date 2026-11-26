@@ -22,7 +22,7 @@ HTML = r'''<!doctype html>
 <header><div><h1>🌊 BADANG <span style="color:#75b5ff">Trading</span></h1><div class="muted sub">v1.7.2 · 실시간 요청형 분석 대시보드 · 자동매매 아님</div></div><a href="/">기존 화면 ↗</a></header>
 <section class="stats"><div class="panel"><div class="muted sub">조회 완료</div><div class="number" id="total">–</div></div><div class="panel"><div class="muted sub">LONG</div><div class="number up" id="long">–</div></div><div class="panel"><div class="muted sub">SHORT</div><div class="number down" id="short">–</div></div></section>
 <section class="panel"><div class="toolbar"><label>분석 모드 <select id="mode"><option value="scalp">단타 (15m·30m·1H)</option><option value="swing">스윙 (1H·4H·1D)</option></select></label><button class="primary" id="load">분석 새로고침</button><button id="next" disabled>다음 종목</button></div>
-<form class="search" id="search"><label>코인 이름 또는 거래쌍<input id="symbol" placeholder="예: BTC, ETHUSDT" required maxlength="29" autocomplete="off"></label><button id="search-button" type="submit">종목 조회</button></form>
+<form class="search" id="search"><label>코인 이름 또는 거래쌍<input id="symbol" type="search" enterkeyhint="search" autocapitalize="characters" spellcheck="false" placeholder="예: BTC, ETHUSDT" required maxlength="29" autocomplete="off"></label><button id="search-button" type="submit">종목 조회</button></form>
 <div id="status" class="muted sub" role="status">분석을 시작하려면 종목을 조회하거나 새로고침을 눌러줘.</div><div id="updated" class="muted sub" style="margin-top:5px"></div></section>
 <div class="meta" style="justify-content:space-between;margin:22px 0 12px"><h2>종목별 분석</h2><div class="muted sub" id="range">한 종목씩 조회</div></div><div class="cards" id="cards"><div class="panel empty muted">데이터를 불러오지 않았어.</div></div>
 <div id="research"></div>
@@ -99,8 +99,12 @@ function historicalShapeText(shape){
   if(!label)return null;
   const evidence=shape.geometry_evidence;
   const lower=shape.lower_pivot_evidence;
+  const segmentLabels=shape.pattern.includes('DIAGONAL')?['1파','2파','3파','4파','5파']
+    : shape.pattern.startsWith('WXY')?['W의 A','W의 B','W의 C','첫 X','Y의 A','Y의 B','Y의 C',
+      '둘째 X','Z의 A','Z의 B','Z의 C']:[];
   const lowerText=lower?.status==='PIVOT_COUNTS_ONLY'
-    ? ' · '+lower.timeframe+' 구간별 스윙 '+lower.leg_turn_counts.map(n=>n??'미확인').join(' / ')
+    ? ' · '+lower.timeframe+' 구간별 스윙 '+lower.leg_turn_counts.map((n,i)=>
+      (segmentLabels[i]?segmentLabels[i]+' ':'')+(n??'미확인')).join(' / ')
     : lower ? ' · 하위봉 전환점 대조 불가' : '';
   if(!evidence)return label+lowerText;
   const variants={RUNNING:'러닝형',EXPANDED:'확장형',NEAR_REGULAR:'일반형에 가까움'};
@@ -119,8 +123,17 @@ function zoneScoreText(zone){
     .filter(([key,value])=>labels[key]&&Number.isFinite(value)&&value>0)
     .map(([key,value])=>labels[key]+' '+fmt(value,0)+'점');
   const details=components.length?['점수 구성: '+components.join(' · ')]:[];
-  for(const reason of zone.reasons||[]){
-    if(typeof reason==='string'&&reason.includes('점수 보류'))details.push(reason);
+  const evidence=zone.divergence_evidence;
+  const sourceText=rows=>[...new Set(rows.map(row=>row.timeframe+' '+row.indicator))].join(', ');
+  if(evidence?.status==='APPLIED'){
+    details.push('다이버전스 '+fmt(evidence.points,0)+'점 가산 · '+sourceText(evidence.matches));
+  }else if(evidence?.status==='HELD_CONFLICT'){
+    details.push('다이버전스 점수 보류 · 구간 근거 '+sourceText(evidence.matches)
+      +' · 같은 시간봉의 반대 단서 '+sourceText(evidence.conflicts));
+  }else{
+    for(const reason of zone.reasons||[]){
+      if(typeof reason==='string'&&reason.includes('점수 보류'))details.push(reason);
+    }
   }
   return details;
 }
