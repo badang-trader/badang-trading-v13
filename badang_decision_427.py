@@ -219,6 +219,7 @@ def completed_impulse_rules(prices):
 def historical_wave_shapes(turns, tf):
     """Endpoint geometry only; subdivisions and wave degree remain unverified."""
     out=[]
+    abc_evidence={}
     if len(turns)>=6:
         q=turns[-6:]
         p=[t['price'] for t in q]
@@ -245,16 +246,26 @@ def historical_wave_shapes(turns, tf):
         a=abs(p[1]-p[0])
         if a>0 and (p[2]-p[1])*s<0 and (p[3]-p[2])*s>0:
             b=abs(p[2]-p[1])/a
-            if 0<b<1 and (p[3]-p[1])*s>0:
+            c_vs_a_end=(p[3]-p[1])*s
+            ratios={'b_retrace':b,'c_extension':abs(p[3]-p[2])/a}
+            # Endpoint ranges can overlap. Keep both hypotheses pending subwaves.
+            if 0<b<1 and c_vs_a_end>0:
                 out.append(('ABC_ZIGZAG_GEOMETRY',q,s))
-            elif .9<=b<=1.38 and (p[3]-p[1])*s>=0:
+                abc_evidence['ABC_ZIGZAG_GEOMETRY']={**ratios,'expected_subdivision':[5,3,5]}
+            if .9<=b<=1.38 and (c_vs_a_end>=0 or b>1):
                 out.append(('ABC_FLAT_GEOMETRY',q,s))
+                variant='RUNNING' if c_vs_a_end<0 else 'EXPANDED' if b>1 and c_vs_a_end>0 else 'NEAR_REGULAR'
+                abc_evidence['ABC_FLAT_GEOMETRY']={
+                    **ratios,'expected_subdivision':[3,3,5],'variant':variant,
+                }
     return [{'pattern':kind,'direction':'UP' if s>0 else 'DOWN',
              'pivot_prices':[t['price'] for t in q],
              'pivot_times':[t['time'] for t in q],
              'known_at_ms':q[-1]['confirmed_at']+FRAME_MS[tf],
              'status':'HISTORICAL_GEOMETRY_ONLY','subdivision_verified':False,
-             'used_in_score':False} for kind,q,s in out]
+             'used_in_score':False,
+             **({'geometry_evidence':abc_evidence[kind]} if kind in abc_evidence else {})}
+            for kind,q,s in out]
 
 def complex_correction_geometry(turns, tf):
     """Double/triple zigzag endpoint hypotheses, not verified subdivisions."""

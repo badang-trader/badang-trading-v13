@@ -1,6 +1,6 @@
 """Pure wave-structure regression checks with synthetic closed candles."""
 import unittest
-from badang_decision_427 import closed_bars, structure_review, decision_review, FRAME_MS
+from badang_decision_427 import closed_bars, structure_review, decision_review, historical_wave_shapes, FRAME_MS
 
 def candles(tf='15m', count=80):
     step=FRAME_MS[tf]
@@ -11,6 +11,30 @@ def candles(tf='15m', count=80):
     return out
 
 class WaveStructureTests(unittest.TestCase):
+    def test_abc_keeps_overlapping_shapes_until_subdivisions_are_verified(self):
+        step = FRAME_MS['15m']
+        for points in ([100, 120, 101, 122], [120, 100, 119, 98]):
+            pivots = [{'price': price, 'time': i*step, 'confirmed_at': (i+3)*step}
+                      for i,price in enumerate(points)]
+            result = historical_wave_shapes(pivots, '15m')
+            self.assertEqual([x['pattern'] for x in result],
+                             ['ABC_ZIGZAG_GEOMETRY', 'ABC_FLAT_GEOMETRY'])
+            self.assertEqual([x['geometry_evidence']['expected_subdivision'] for x in result],
+                             [[5, 3, 5], [3, 3, 5]])
+            self.assertTrue(all(x['geometry_evidence']['b_retrace'] == .95 for x in result))
+            self.assertTrue(all(x['known_at_ms'] == 7*step and not x['used_in_score']
+                                and not x['subdivision_verified'] for x in result))
+
+    def test_flat_variants_use_c_endpoint_relative_to_a(self):
+        step = FRAME_MS['15m']
+        for prices,variant in (([100,120,98,123], 'EXPANDED'), ([100,120,98,118], 'RUNNING')):
+            pivots = [{'price': price, 'time': i*step, 'confirmed_at': (i+3)*step}
+                      for i,price in enumerate(prices)]
+            shape, = historical_wave_shapes(pivots, '15m')
+            self.assertEqual(shape['pattern'], 'ABC_FLAT_GEOMETRY')
+            self.assertEqual(shape['geometry_evidence']['variant'], variant)
+            self.assertFalse(shape['subdivision_verified'])
+
     def test_last_forming_candle_excluded(self):
         rows=candles()
         rows[-1][4]=rows[-1][1]+.1

@@ -87,14 +87,25 @@ const waveShapeLabels={
   CONTRACTING_DIAGONAL_GEOMETRY:'수렴 대각삼각형',EXPANDING_DIAGONAL_GEOMETRY:'확장 대각삼각형',
   TRUNCATED_FIFTH_GEOMETRY:'절단 5파',EXTENDED_1_GEOMETRY:'1파 연장',EXTENDED_3_GEOMETRY:'3파 연장',EXTENDED_5_GEOMETRY:'5파 연장'
 };
+function historicalShapeText(shape){
+  const label=waveShapeLabels[shape.pattern];
+  if(!label)return null;
+  const evidence=shape.geometry_evidence;
+  if(!evidence)return label;
+  const variants={RUNNING:'러닝형',EXPANDED:'확장형',NEAR_REGULAR:'일반형에 가까움'};
+  const variant=variants[evidence.variant];
+  return label+(variant?' '+variant:'')
+    +' · B 되돌림 '+fmt(evidence.b_retrace*100,1)+'% · C/A '+fmt(evidence.c_extension,2)+'배'
+    +' · 판별에 필요한 내부 구성 '+evidence.expected_subdivision.join('-');
+}
 function renderResearch(item){
   const structures=item.structure_427||{};
   const frames=(item.research_timeframes_47||Object.keys(structures)).map(tf=>{
     const frame=structures[tf]||{};
     const waves=waveLines(frame);
-    const shapes=(frame.historical_wave_shapes||[]).map(shape=>waveShapeLabels[shape.pattern]).filter(Boolean);
+    const shapes=(frame.historical_wave_shapes||[]).map(historicalShapeText).filter(Boolean);
     const lines=waves.length?waves:['현재 파동 미확정'];
-    if(shapes.length)lines.push('과거 형태 후보: '+shapes.join(', ')+' · 내부 파동 미검증');
+    for(const shape of shapes)lines.push('과거 형태 후보: '+shape+' · 내부 파동 미검증');
     return '<div><strong>'+esc(tf)+'</strong><ul>'+lines.map(line=>'<li>'+esc(line)+'</li>').join('')+'</ul></div>';
   });
   const path=item.reversal_path_514||{};
