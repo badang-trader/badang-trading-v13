@@ -35,6 +35,23 @@ function entryReason(x){
   if (action.side==='WAIT' && action.reason) return action.reason;
   return x.entry_blockers?.[0] || x.decision_427?.reasons?.[0] || '진입 조건 확인 대기';
 }
+function entryCheckDetails(x){
+  const checks=x.signal_precision_418?.checks||{};
+  const details=[];
+  const alignment=checks.timeframe_alignment;
+  if(alignment?.passed===false && alignment.evidence){
+    const names={UP:'상승',DOWN:'하락',NEUTRAL:'중립'};
+    const conflicts=Object.entries(alignment.evidence.off_trend)
+      .map(([frame,direction])=>frame+' '+(names[direction]||'미확인'));
+    details.push('진입에는 '+names[alignment.evidence.expected]+' 추세가 필요 · '+conflicts.join(', '));
+  }
+  const risk=checks.risk_distance;
+  if(risk?.passed===false && risk.evidence){
+    const {observed_pct,minimum_pct,maximum_pct}=risk.evidence;
+    details.push('손절 거리 '+fmt(observed_pct,4)+'% · 허용 '+fmt(minimum_pct,4)+'~'+fmt(maximum_pct,4)+'%');
+  }
+  return details;
+}
 function flowStatus(x){
   const legs=Object.values(x.structure_427||{}).flatMap(f=>(f.wave?.alternatives||[])
     .flatMap(w=>w.flow_validation?.oi_legs||[]));
@@ -60,9 +77,11 @@ function render(x){
     return tf+' · 지지 '+support.map(v=>fmt(v,8)).join(' → ')+' · 저항 '+resistance.map(v=>fmt(v,8)).join(' → ')+(wave?' · '+wave:'');
   }).map(esc).join('<br>');
   const caveats=(x.data_caveats||[]).map(esc).join(' · ');
+  const checks=ready?[]:entryCheckDetails(x);
   return `<article class="card"><div class="head"><span class="coin">${esc(x.symbol)} · ${x.mode==='swing'?'스윙':'단타'}</span><span class="badge ${side}">${side==='LONG'?'롱':'숏'} ${fmt(x.technical_score,0)}점</span></div>
   <div class="metric"><strong>바당의 쉬운 판단 · ${ready?'진입 조건 충족':'진입 대기 · 기술적 후보'}</strong>
   ${ready?'':`<p class="sub warn">${esc(entryReason(x))}</p>`}
+  ${checks.map(text=>`<p class="sub warn">${esc(text)}</p>`).join('')}
   <p class="sub flow">${esc(flowStatus(x))}</p>
   <p class="sub">확정봉 ${quality.candles==='VERIFIED'?'검증 통과':'점검 필요'} · ${caveats} · 검증된 승률 자료 없음</p>
   <p class="sub">${esc(divergenceText(x))}</p><p class="sub">${levels}</p></div>

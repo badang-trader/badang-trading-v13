@@ -70,11 +70,22 @@ class V13ReviewReplayTests(unittest.TestCase):
         technical, ready, counts = self.run_signals(history, reviews=reviews)
         review, = reviews
         self.assertEqual(review['stage'], 'ENTRY_CHECKS_WAIT')
-        self.assertIn('timeframe_alignment', {failure['check'] for failure in review['blocked_by']})
+        by_name = {failure['check']: failure for failure in review['blocked_by']}
+        self.assertEqual(by_name['timeframe_alignment']['evidence'],
+                         {'expected': 'UP', 'off_trend': {'1H': 'DOWN'}})
         self.assertEqual(len(technical), 1)
         self.assertEqual(counts['price_action_signals'], 1)
         self.assertEqual(counts['entry_checks_passed'], 0)
         self.assertEqual(ready, [])
+
+    def test_risk_blocker_reports_observed_distance_and_bounds(self):
+        frames = ('15m', '30m', '1H')
+        action = {'side': 'LONG', 'entry': 100, 'stop': 97.5, 'tp1': 105, 'tp2': 107}
+        checks = validate_signal_precision_418(action, {'long_score': 96, 'short_score': 50},
+                                               dict.fromkeys(frames, 'UP'), frames, {}, 'scalp')['checks']
+        self.assertFalse(checks['risk_distance']['passed'])
+        self.assertEqual(checks['risk_distance']['evidence'],
+                         {'observed_pct': 2.5, 'minimum_pct': 0.04, 'maximum_pct': 2.0})
 
     def test_ledger_keeps_position_identity_when_an_open_mark_becomes_a_stop(self):
         step = FRAME_MS['15m']

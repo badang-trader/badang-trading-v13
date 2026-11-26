@@ -88,8 +88,10 @@ def collect_signals(histories, symbol, mode, cutoff, *, reviews=None):
         precision = output['signal_precision_418']
         if precision['status'] != 'CANDIDATE':
             review.update(stage='ENTRY_CHECKS_WAIT', blocked_by=[
-                {'check': name, 'reason': check['reason']}
-                for name, check in precision['checks'].items() if not check['passed']
+                {'check': name, 'reason': check['reason'],
+                 **({'evidence': check['evidence']} if 'evidence' in check else {})}
+                for name, check in precision['checks'].items()
+                if not check['passed'] and check.get('applicable', True)
             ])
             continue
         counts['entry_checks_passed'] += 1

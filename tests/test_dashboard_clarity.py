@@ -90,6 +90,13 @@ assert(riskText({recommendation:'WAIT',entry_reference:100,stop_loss:95,take_pro
 assert(riskText({recommendation:'LONG',entry_reference:100,stop_loss:null,take_profit_1:110}).includes('검증 불가'),'null stop must not be zero');
 assert(riskText({recommendation:'SHORT',entry_reference:100,stop_loss:105,take_profit_1:90}).includes('1:2.00'),'short rr calculation wrong');
 assert(entryReason({price_action_45:{side:'WAIT',reason:'돌파 미확인'},entry_blockers:['기타']})==='돌파 미확인','actual wait reason missing');
+const checkReasons=entryCheckDetails({signal_precision_418:{checks:{
+  timeframe_alignment:{passed:false,evidence:{expected:'UP',off_trend:{'30m':'DOWN','1H':'DOWN'}}},
+  risk_distance:{passed:false,evidence:{observed_pct:2.4388,minimum_pct:0.04,maximum_pct:2}}
+}}});
+assert(checkReasons[0].includes('30m 하락, 1H 하락'),'conflicting timeframe evidence missing');
+assert(checkReasons[1].includes('2.4388')&&checkReasons[1].includes('0.0400~2.0000'),'risk distance evidence missing');
+assert(entryCheckDetails({signal_precision_418:{checks:{risk_distance:{passed:false,applicable:false}}}}).length===0,'unassessed risk shown as failed');
 assert(flowStatus({reversal_tracking_514:{status:'DATABASE_NOT_CONFIGURED'}}).includes('DB 미연결'),'missing storage shown as connected');
 const flow=flowStatus({structure_427:{'1H':{wave:{alternatives:[{flow_validation:{oi_legs:[{status:'ENDPOINTS_AVAILABLE'},{status:'INSUFFICIENT_HISTORY'}]}}]}}}});
 assert(flow.includes('1/2구간')&&flow.includes('CVD 미검증'),'partial OI coverage mistaken for CVD');

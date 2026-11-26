@@ -2127,8 +2127,13 @@ def validate_signal_precision_418(action, item, trends, frames, audits, mode):
     check('data_integrity', all(frame_freshness_416(audits.get(tf, {}), tf)[0] for tf in frames),
           '기준 시간봉 연속성·최신성 검증 실패')
     expected = 'UP' if side == 'LONG' else 'DOWN'
-    check('timeframe_alignment', all(trends.get(tf) == expected for tf in frames),
+    off_trend = {tf: trends.get(tf) for tf in frames if trends.get(tf) != expected}
+    check('timeframe_alignment', not off_trend,
           '단타/스윙 기준 시간봉 추세가 동일 방향으로 정렬되지 않음', applicable=has_direction)
+    if has_direction:
+        checks['timeframe_alignment']['evidence'] = {
+            'expected': expected, 'off_trend': off_trend,
+        }
     directional = finite_number(item.get('long_score' if side=='LONG' else 'short_score')) if has_direction else None
     opposing = finite_number(item.get('short_score' if side=='LONG' else 'long_score')) if has_direction else None
     check('score_direction', directional is not None and opposing is not None and
@@ -2144,9 +2149,14 @@ def validate_signal_precision_418(action, item, trends, frames, audits, mode):
                  (tp2 < tp1 < entry < stop) if side == 'SHORT' else False))
     check('stop_target_geometry', geometry, '진입·손절·목표가 방향 또는 순서 오류', applicable=has_direction)
     risk_pct = abs(entry-stop)/entry*100 if geometry else None
+    minimum = 0.04
     limit = 2.0 if mode == 'scalp' else 3.5
-    check('risk_distance', geometry and 0.04 <= risk_pct <= limit,
+    check('risk_distance', geometry and minimum <= risk_pct <= limit,
           '손절 거리 비정상 또는 '+str(limit)+'% 초과', applicable=has_direction)
+    if geometry:
+        checks['risk_distance']['evidence'] = {
+            'observed_pct': risk_pct, 'minimum_pct': minimum, 'maximum_pct': limit,
+        }
     # RR1/RR2 are price-distance ratios, not probabilities or expected profits.
     rr1 = abs(tp1-entry)/abs(entry-stop) if geometry else None
     rr2 = abs(tp2-entry)/abs(entry-stop) if geometry else None
