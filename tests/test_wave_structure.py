@@ -1,6 +1,9 @@
 """Pure wave-structure regression checks with synthetic closed candles."""
 import unittest
-from badang_decision_427 import closed_bars, structure_review, decision_review, historical_wave_shapes, FRAME_MS
+from badang_decision_427 import (
+    FRAME_MS, annotate_lower_wave_geometry, closed_bars, decision_review,
+    historical_wave_shapes, lower_pivot_evidence, structure_review,
+)
 
 def candles(tf='15m', count=80):
     step=FRAME_MS[tf]
@@ -11,6 +14,32 @@ def candles(tf='15m', count=80):
     return out
 
 class WaveStructureTests(unittest.TestCase):
+    def test_lower_pivots_use_matching_extrema_and_original_confirmation_cutoff(self):
+        step = FRAME_MS['5m']
+        points = [(0,108),(30,100),(34,115),(38,109),(42,120),(54,101),(66,122),(78,112)]
+        bars = []
+        for (left,start), (right,end) in zip(points, points[1:]):
+            for i in range(left,right):
+                price = start + (end-start)*(i-left)/(right-left)
+                bars.append([i*step,price,price+.1,price-.1,price,10])
+        shape = {'pattern':'ABC_FLAT_GEOMETRY',
+                 'pivot_times':[i*step for i in (30,42,54,66)],
+                 'pivot_prices':[bars[i][col] for i,col in ((30,3),(42,2),(54,3),(66,2))],
+                 'known_at_ms':75*step,'subdivision_verified':False}
+        prefix = lower_pivot_evidence(shape, 3*step, bars[:75], '5m')
+        whole = lower_pivot_evidence(shape, 3*step, bars, '5m')
+        self.assertEqual(prefix, whole)
+        self.assertEqual(whole['leg_turn_counts'], [3,1,1])
+        structures = {'15m': {'historical_wave_shapes':[shape]}}
+        annotate_lower_wave_geometry(structures, {'5m':{'exchange':'bitget','candles':bars}}, 77*step)
+        self.assertEqual(shape['lower_pivot_evidence'], whole)
+        self.assertFalse(shape['subdivision_verified'])
+        self.assertEqual(lower_pivot_evidence(shape, 3*step, bars[31:], '5m')['status'],
+                         'INSUFFICIENT_COVERAGE')
+        bars[31][3] = bars[30][3]
+        self.assertEqual(lower_pivot_evidence(shape, 3*step, bars, '5m')['status'],
+                         'AMBIGUOUS_ENDPOINT')
+
     def test_abc_keeps_overlapping_shapes_until_subdivisions_are_verified(self):
         step = FRAME_MS['15m']
         for points in ([100, 120, 101, 122], [120, 100, 119, 98]):

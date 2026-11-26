@@ -105,7 +105,7 @@ const waveReport=renderResearch({symbol:'BTCUSDT',research_timeframes_47:['15m']
     {direction:'DOWN',wave:5,invalidation:110,structural_invalidation:115}
   ]},historical_wave_shapes:[{pattern:'ABC_FLAT_GEOMETRY',geometry_evidence:{
     variant:'RUNNING',b_retrace:1.10,c_extension:1,expected_subdivision:[3,3,5]
-  }}]}},
+  },lower_pivot_evidence:{status:'PIVOT_COUNTS_ONLY',timeframe:'5m',leg_turn_counts:[3,null,5]}}]}},
   reversal_path_514:{paths:[{direction:'DOWN',zones:[{
     low:90,high:92,expected_score:30,invalidation:90,near_reversal_target:99
   }]}]}
@@ -114,6 +114,7 @@ assert(waveReport.includes('상승 3파 후보')&&waveReport.includes('하락 5�
 assert(waveReport.includes('현재 파동 무효화 95.00000000')&&waveReport.includes('구조 무효화 90.00000000'),'invalidation levels mixed');
 assert(waveReport.includes('1.618배')&&waveReport.includes('ABC 플랫 러닝형')&&waveReport.includes('내부 파동 미검증'),'wave evidence missing');
 assert(waveReport.includes('B 되돌림 110.0%')&&waveReport.includes('3-3-5'),'ABC evidence missing');
+assert(waveReport.includes('5m 구간별 스윙 3 / 미확인 / 5'),'lower-frame observations missing');
 assert(waveReport.includes('반전 근거 30점'),'stateless reversal score missing');
 const flow=flowStatus({structure_427:{'1H':{wave:{alternatives:[{flow_validation:{oi_legs:[{status:'ENDPOINTS_AVAILABLE'},{status:'INSUFFICIENT_HISTORY'}]}}]}}}});
 assert(flow.includes('1/2구간')&&flow.includes('CVD 미검증'),'partial OI coverage mistaken for CVD');

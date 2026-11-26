@@ -91,12 +91,16 @@ function historicalShapeText(shape){
   const label=waveShapeLabels[shape.pattern];
   if(!label)return null;
   const evidence=shape.geometry_evidence;
-  if(!evidence)return label;
+  const lower=shape.lower_pivot_evidence;
+  const lowerText=lower?.status==='PIVOT_COUNTS_ONLY'
+    ? ' · '+lower.timeframe+' 구간별 스윙 '+lower.leg_turn_counts.map(n=>n??'미확인').join(' / ')
+    : lower ? ' · 하위봉 전환점 대조 불가' : '';
+  if(!evidence)return label+lowerText;
   const variants={RUNNING:'러닝형',EXPANDED:'확장형',NEAR_REGULAR:'일반형에 가까움'};
   const variant=variants[evidence.variant];
   return label+(variant?' '+variant:'')
     +' · B 되돌림 '+fmt(evidence.b_retrace*100,1)+'% · C/A '+fmt(evidence.c_extension,2)+'배'
-    +' · 판별에 필요한 내부 구성 '+evidence.expected_subdivision.join('-');
+    +' · 판별에 필요한 내부 구성 '+evidence.expected_subdivision.join('-')+lowerText;
 }
 function renderResearch(item){
   const structures=item.structure_427||{};

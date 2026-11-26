@@ -2882,7 +2882,8 @@ def v13_scan():
                     else:
                         item['structure_427'][tf] = {'status':'UNAVAILABLE','reason':'해당 시간봉 데이터 없음'}
                 # OI endpoints are optional context, never a candidate gate.
-                from badang_decision_427 import FRAME_MS
+                from badang_decision_427 import FRAME_MS, annotate_lower_wave_geometry
+                annotate_lower_wave_geometry(item['structure_427'], frame_data, scan_as_of_ms)
                 from badang_oi_postgres_443 import wave_interval_changes
                 waves = []
                 for tf, structure in item['structure_427'].items():

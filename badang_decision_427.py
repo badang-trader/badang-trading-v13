@@ -2,6 +2,7 @@
 No trading execution, no win-rate claims. All levels derived from validated historical candles.
 """
 import math
+from bisect import bisect_left
 
 FRAME_MS={'5m':300000,'15m':900000,'30m':1800000,'1H':3600000,'2H':7200000,'4H':14400000,'1D':86400000}
 
@@ -300,6 +301,64 @@ def complex_correction_geometry(turns, tf):
                             'legs':legs,'status':'HISTORICAL_GEOMETRY_ONLY',
                             'subdivision_verified':False,'used_in_score':False})
     return results
+
+def lower_pivot_evidence(shape, parent_step, bars, timeframe):
+    """Count confirmed turns inside matched parent legs at the original confirmation time."""
+    times = shape['pivot_times']
+    prices = shape['pivot_prices']
+    step = FRAME_MS[timeframe]
+    opens = [bar[0] for bar in bars]
+    result = {'timeframe': timeframe, 'status': 'INSUFFICIENT_COVERAGE'}
+    if not opens or opens[0] > times[0] or opens[-1] + step < times[-1] + parent_step:
+        return result
+    end = bisect_left(opens, shape['known_at_ms'])
+    matched = []
+    for index, (stamp, price) in enumerate(zip(times, prices)):
+        is_high = price > prices[1] if index == 0 else price > prices[index-1]
+        price_column = 2 if is_high else 3
+        first = bisect_left(opens, stamp)
+        last = bisect_left(opens, stamp + parent_step)
+        matches = [bar[0] for bar in bars[first:last]
+                   if math.isclose(bar[price_column], price, rel_tol=1e-10, abs_tol=1e-10)]
+        if len(matches) != 1:
+            return dict(result, status='AMBIGUOUS_ENDPOINT' if matches else 'ENDPOINT_NOT_MATCHED')
+        matched.append((matches[0], 'H' if is_high else 'L'))
+    counts = []
+    for (left, first_kind), (right, last_kind) in zip(matched, matched[1:]):
+        start = max(0, bisect_left(opens, left) - 3)
+        stop = min(end, bisect_left(opens, right) + 4)
+        pivots = confirmed_turns(bars[start:stop])
+        kinds = [first_kind] + [p['kind'] for p in pivots if left < p['time'] < right] + [last_kind]
+        counts.append(len(kinds)-1 if all(a != b for a, b in zip(kinds, kinds[1:])) else None)
+    return dict(result, status='PIVOT_COUNTS_ONLY', leg_turn_counts=counts)
+
+
+def annotate_lower_wave_geometry(structures, frame_data, now_ms):
+    """Attach read-only lower-timeframe evidence from the same Bitget snapshot."""
+    validated = {}
+    for tf, structure in structures.items():
+        for shape in structure.get('historical_wave_shapes', []):
+            if not shape['pattern'].startswith(('WXY', 'ABC_', 'CONTRACTING_DIAGONAL', 'EXPANDING_DIAGONAL')):
+                continue
+            parent_step = FRAME_MS[tf]
+            candidates = sorted(
+                (key for key, data in frame_data.items() if key in FRAME_MS
+                 and FRAME_MS[key] < parent_step and parent_step % FRAME_MS[key] == 0
+                 and str(data.get('exchange', '')).lower() == 'bitget'),
+                key=FRAME_MS.__getitem__,
+            )
+            evidence = {'status': 'LOWER_TIMEFRAME_UNAVAILABLE'}
+            for candidate in candidates:
+                if candidate not in validated:
+                    validated[candidate] = closed_bars(frame_data[candidate].get('candles'), candidate, now_ms)[0]
+                bars = validated[candidate]
+                if not bars:
+                    continue
+                evidence = lower_pivot_evidence(shape, parent_step, bars, candidate)
+                if evidence['status'] != 'INSUFFICIENT_COVERAGE':
+                    break
+            shape['lower_pivot_evidence'] = evidence
+
 
 def structure_review(raw,tf,now_ms=None):
     bars,reason=closed_bars(raw,tf,now_ms)
