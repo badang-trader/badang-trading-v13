@@ -330,7 +330,14 @@ def lower_pivot_evidence(shape, parent_step, bars, timeframe):
         pivots = confirmed_turns(bars[start:stop])
         kinds = [first_kind] + [p['kind'] for p in pivots if left < p['time'] < right] + [last_kind]
         counts.append(len(kinds)-1 if all(a != b for a, b in zip(kinds, kinds[1:])) else None)
-    return dict(result, status='PIVOT_COUNTS_ONLY', leg_turn_counts=counts)
+    result.update(status='PIVOT_COUNTS_ONLY', leg_turn_counts=counts)
+    expected = (shape.get('geometry_evidence') or {}).get('expected_subdivision')
+    if expected:
+        comparison = 'INCOMPLETE'
+        if len(expected) == len(counts) and all(count is not None for count in counts):
+            comparison = 'MATCH' if counts == expected else 'MISMATCH'
+        result['expected_count_comparison'] = comparison
+    return result
 
 
 def annotate_lower_wave_geometry(structures, frame_data, now_ms):

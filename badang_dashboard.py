@@ -11,6 +11,13 @@ HTML = r'''<!doctype html>
 .cards{grid-template-columns:repeat(auto-fit,minmax(min(100%,285px),1fr))}.head{flex-wrap:wrap}.metric{min-width:0}.flow{overflow-wrap:anywhere}
 .research{margin-top:16px;overflow-wrap:anywhere}.research ul{padding-inline-start:1.3em}.research li{margin:.4em 0}.research details{margin-top:12px}.research summary{cursor:pointer}
 .search{display:flex;align-items:end;flex-wrap:wrap;gap:8px;margin-bottom:14px}.search input{display:block;width:min(100%,15rem);margin-top:5px;background:#1c2b42;color:#edf4ff;border:1px solid #38506d;border-radius:9px;padding:10px 13px;font:inherit}
+.zone-score{margin:.2em 0 .65em}
+@media(max-width:480px){
+  .toolbar{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .toolbar label{grid-column:1/-1}.toolbar select{width:100%}
+  .search{display:grid;grid-template-columns:minmax(0,1fr)}
+  .search input{width:100%}
+}
 </style></head><body><main>
 <header><div><h1>🌊 BADANG <span style="color:#75b5ff">Trading</span></h1><div class="muted sub">v1.7.2 · 실시간 요청형 분석 대시보드 · 자동매매 아님</div></div><a href="/">기존 화면 ↗</a></header>
 <section class="stats"><div class="panel"><div class="muted sub">조회 완료</div><div class="number" id="total">–</div></div><div class="panel"><div class="muted sub">LONG</div><div class="number up" id="long">–</div></div><div class="panel"><div class="muted sub">SHORT</div><div class="number down" id="short">–</div></div></section>
@@ -98,9 +105,24 @@ function historicalShapeText(shape){
   if(!evidence)return label+lowerText;
   const variants={RUNNING:'러닝형',EXPANDED:'확장형',NEAR_REGULAR:'일반형에 가까움'};
   const variant=variants[evidence.variant];
+  const countLabels={MATCH:'스윙 수 일치',MISMATCH:'스윙 수 다름',INCOMPLETE:'일부 스윙 수 미확인'};
+  const countLabel=countLabels[lower?.expected_count_comparison];
   return label+(variant?' '+variant:'')
     +' · B 되돌림 '+fmt(evidence.b_retrace*100,1)+'% · C/A '+fmt(evidence.c_extension,2)+'배'
-    +' · 판별에 필요한 내부 구성 '+evidence.expected_subdivision.join('-')+lowerText;
+    +' · 판별에 필요한 내부 구성 '+evidence.expected_subdivision.join('-')+lowerText
+    +(countLabel?' · '+countLabel:'');
+}
+function zoneScoreText(zone){
+  const labels={structure:'지지·저항 구조',wave:'파동 목표',fibonacci:'피보나치',ema:'EMA',
+    volume:'거래량 반응',divergence:'다이버전스',candle:'캔들 반응'};
+  const components=Object.entries(zone.components||{})
+    .filter(([key,value])=>labels[key]&&Number.isFinite(value)&&value>0)
+    .map(([key,value])=>labels[key]+' '+fmt(value,0)+'점');
+  const details=components.length?['점수 구성: '+components.join(' · ')]:[];
+  for(const reason of zone.reasons||[]){
+    if(typeof reason==='string'&&reason.includes('점수 보류'))details.push(reason);
+  }
+  return details;
 }
 function renderResearch(item){
   const structures=item.structure_427||{};
@@ -114,16 +136,19 @@ function renderResearch(item){
   });
   const path=item.reversal_path_514||{};
   const labels={DOWN:'지지',UP:'저항'};
-  const zones=(path.paths||[]).flatMap(({direction,zones})=>(zones||[]).map(zone=>
-    labels[direction]+' '+fmt(zone.low,8)+'~'+fmt(zone.high,8)
-    +' · 반전 근거 '+fmt(zone.expected_score,0)+'점'
-    +' · 이탈 기준 '+fmt(zone.invalidation,8)
-    +' · 반전 참고 목표 '+fmt(zone.near_reversal_target,8)));
+  const zones=(path.paths||[]).flatMap(({direction,zones})=>(zones||[]).map(zone=>{
+    const summary=labels[direction]+' '+fmt(zone.low,8)+'~'+fmt(zone.high,8)
+      +' · 반전 근거 '+fmt(zone.expected_score,0)+'점'
+      +' · 이탈 기준 '+fmt(zone.invalidation,8)
+      +' · 반전 참고 목표 '+fmt(zone.near_reversal_target,8);
+    const details=zoneScoreText(zone).map(line=>'<p class="sub muted zone-score">'+esc(line)+'</p>');
+    return '<li>'+esc(summary)+details.join('')+'</li>';
+  }));
   return `<section class="panel research"><h2>${esc(item.symbol)} · 파동과 반전 구간</h2>
     <details><summary>시간봉별 엘리엇 파동 후보</summary>
     <p class="sub muted">확정봉에서 가능한 파동 해석을 보여줘요.</p>${frames.join('')||'<p>파동 자료 없음</p>'}</details>
     <details><summary>지지·저항과 반전 근거</summary><p class="sub muted">반전 근거 점수는 현재 구간의 근거 합계예요. 구간 도달 후 반전 확인은 별도예요.</p>
-    ${zones.length?'<ul>'+zones.map(line=>'<li>'+esc(line)+'</li>').join('')+'</ul>':'<p>반전 구간 자료 없음</p>'}</details></section>`;
+    ${zones.length?'<ul>'+zones.join('')+'</ul>':'<p>반전 구간 자료 없음</p>'}</details></section>`;
 }
 function render(x){
   const side=x.technical_side;

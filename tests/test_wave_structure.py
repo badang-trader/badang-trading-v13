@@ -30,6 +30,11 @@ class WaveStructureTests(unittest.TestCase):
         whole = lower_pivot_evidence(shape, 3*step, bars, '5m')
         self.assertEqual(prefix, whole)
         self.assertEqual(whole['leg_turn_counts'], [3,1,1])
+        for expected, comparison in (([3,1,1], 'MATCH'), ([3,3,5], 'MISMATCH')):
+            hypothesis = dict(shape, geometry_evidence={'expected_subdivision':expected})
+            evidence = lower_pivot_evidence(hypothesis, 3*step, bars, '5m')
+            self.assertEqual(evidence['expected_count_comparison'], comparison)
+            self.assertEqual(evidence['status'], 'PIVOT_COUNTS_ONLY')
         structures = {'15m': {'historical_wave_shapes':[shape]}}
         annotate_lower_wave_geometry(structures, {'5m':{'exchange':'bitget','candles':bars}}, 77*step)
         self.assertEqual(shape['lower_pivot_evidence'], whole)

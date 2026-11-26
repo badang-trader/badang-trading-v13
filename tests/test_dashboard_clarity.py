@@ -105,9 +105,12 @@ const waveReport=renderResearch({symbol:'BTCUSDT',research_timeframes_47:['15m']
     {direction:'DOWN',wave:5,invalidation:110,structural_invalidation:115}
   ]},historical_wave_shapes:[{pattern:'ABC_FLAT_GEOMETRY',geometry_evidence:{
     variant:'RUNNING',b_retrace:1.10,c_extension:1,expected_subdivision:[3,3,5]
-  },lower_pivot_evidence:{status:'PIVOT_COUNTS_ONLY',timeframe:'5m',leg_turn_counts:[3,null,5]}}]}},
+  },lower_pivot_evidence:{status:'PIVOT_COUNTS_ONLY',timeframe:'5m',leg_turn_counts:[3,null,5],
+    expected_count_comparison:'INCOMPLETE'}}]}},
   reversal_path_514:{paths:[{direction:'DOWN',zones:[{
-    low:90,high:92,expected_score:30,invalidation:90,near_reversal_target:99
+    low:90,high:92,expected_score:30,invalidation:90,near_reversal_target:99,
+    components:{structure:20,candle:10,divergence:0},
+    reasons:['같은 시간봉에 상승·하락 반전 단서가 함께 있어 점수 보류']
   }]}]}
 });
 assert(waveReport.includes('상승 3파 후보')&&waveReport.includes('하락 5파 후보'),'wave alternatives missing');
@@ -115,6 +118,9 @@ assert(waveReport.includes('현재 파동 무효화 95.00000000')&&waveReport.in
 assert(waveReport.includes('1.618배')&&waveReport.includes('ABC 플랫 러닝형')&&waveReport.includes('내부 파동 미검증'),'wave evidence missing');
 assert(waveReport.includes('B 되돌림 110.0%')&&waveReport.includes('3-3-5'),'ABC evidence missing');
 assert(waveReport.includes('5m 구간별 스윙 3 / 미확인 / 5'),'lower-frame observations missing');
+assert(waveReport.includes('일부 스윙 수 미확인'),'incomplete ABC evidence shown as verified');
+assert(waveReport.includes('지지·저항 구조 20점')&&waveReport.includes('캔들 반응 10점'),'score breakdown missing');
+assert(waveReport.includes('점수 보류')&&!waveReport.includes('다이버전스 0점'),'conflicting evidence presentation wrong');
 assert(waveReport.includes('반전 근거 30점'),'stateless reversal score missing');
 const flow=flowStatus({structure_427:{'1H':{wave:{alternatives:[{flow_validation:{oi_legs:[{status:'ENDPOINTS_AVAILABLE'},{status:'INSUFFICIENT_HISTORY'}]}}]}}}});
 assert(flow.includes('1/2구간')&&flow.includes('CVD 미검증'),'partial OI coverage mistaken for CVD');
