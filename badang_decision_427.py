@@ -364,6 +364,7 @@ def decision_review(item,structures,mode):
     old=item.get('decision_plan_425') or {}
     if not isinstance(old,dict): old={}
     side=old.get('side');score=_f(old.get('score'))
+    has_direction = side in ('LONG', 'SHORT')
     raw_reasons=old.get('reasons')
     if isinstance(raw_reasons,(list,tuple)):
         reasons=[str(r)[:200] for r in raw_reasons[:30]]
@@ -381,18 +382,18 @@ def decision_review(item,structures,mode):
         structure=structures.get(tf)
         if not isinstance(structure,dict) or structure.get('status')!='OK':
             reasons.append(tf+' 확정봉·구조 검증 불가')
-    if side not in ('LONG','SHORT'):reasons.append('가격 행동 진입 방향 미확정')
+    if not has_direction:reasons.append('가격 행동 진입 방향 미확정')
     # The final decision must never resurrect a candidate rejected by the scanner.
-    if 'recommendation' in item and (item.get('recommendation') != side or side not in ('LONG','SHORT')):
+    if has_direction and 'recommendation' in item and item.get('recommendation') != side:
         reasons.append('스캔 최종 추천 방향 불일치 또는 진입 보류')
     if item.get('entry_blockers'):
         reasons.append('기존 스캔 진입 차단 사유 존재')
-    if score is None or score<80:reasons.append('진입 검토 기준 80점 미달')
+    if has_direction and (score is None or score<80):reasons.append('진입 검토 기준 80점 미달')
     rr1 = _f(old.get('rr1_net_estimate'))
-    if rr1 is None or rr1 < 1.5:
+    if has_direction and (rr1 is None or rr1 < 1.5):
         reasons.append('수수료·슬리피지 반영 손익비 1.5 미달 또는 산정 불가')
     entry, stop, tp1 = (_f(old.get(k)) for k in ('entry', 'stop', 'tp1'))
-    if any(v is None or v <= 0 for v in (entry, stop, tp1)):
+    if has_direction and any(v is None or v <= 0 for v in (entry, stop, tp1)):
         reasons.append('진입·손절·1차 목표 가격 누락 또는 오류')
     elif side == 'LONG' and not (stop < entry < tp1):
         reasons.append('롱 진입·손절·목표 가격 순서 오류')
@@ -434,7 +435,7 @@ def decision_review(item,structures,mode):
         elif all(v is not None and v > 0 for v in (entry, stop, tp1)) and side in ('LONG', 'SHORT'):
             if (side == 'LONG' and tp2 < tp1) or (side == 'SHORT' and tp2 > tp1):
                 reasons.append('2차 목표가가 1차 목표보다 불리함')
-    if cost_declared and (tp2 is None or tp2 <= 0):
+    if has_direction and cost_declared and (tp2 is None or tp2 <= 0):
         reasons.append('2차 목표 가격 누락 · 비용 반영 계획 검증 불가')
     if cost_declared and old.get('tp2') is not None and rr2 is None:
         reasons.append('2차 순손익비 누락 · 수수료·슬리피지 검증 불가')

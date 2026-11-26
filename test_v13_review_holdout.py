@@ -1,6 +1,8 @@
 """Exercise the scanner's real entry rules through the offline replay."""
 import unittest
 
+from app import build_decision_plan_425, validate_signal_precision_418
+from badang_decision_427 import decision_review
 from badang_historical_integrity import FRAME_MS
 from badang_v13_technical_holdout import audit_signals_on_15m, collect_signals, trade_ledger
 from badang_walkforward_audit import audit_trades
@@ -8,6 +10,24 @@ from badang_walkforward_audit import audit_trades
 
 class V13ReviewReplayTests(unittest.TestCase):
     as_of = 1795615200000
+
+    def test_wait_does_not_report_unassessed_direction_checks_as_blockers(self):
+        frames = ('15m', '30m', '1H')
+        trends = dict.fromkeys(frames, 'UP')
+        item = {'recommendation': 'WAIT', 'long_score': 96, 'short_score': 50}
+        action = {'side': 'WAIT'}
+        precision = validate_signal_precision_418(action, item, trends, frames, {}, 'scalp')
+        self.assertEqual(precision['status'], 'WAIT')
+        self.assertFalse(precision['checks']['timeframe_alignment']['applicable'])
+        self.assertIsNone(precision['directional_score'])
+        self.assertEqual(precision['blockers'], ['확정봉 가격 행동 진입 조건 미충족',
+                                                 '기준 시간봉 연속성·최신성 검증 실패'])
+        item['decision_plan_425'] = build_decision_plan_425(item, action, precision, 'scalp')
+        review = decision_review(item, {tf: {'status': 'OK'} for tf in frames}, 'scalp')
+        self.assertEqual(review['state'], 'WAIT')
+        self.assertIsNone(review['score'])
+        self.assertEqual(review['reasons'], ['최근 확정봉에서 가격 행동 트리거 없음',
+                                            '가격 행동 진입 방향 미확정', '기존 진입 검증 미충족'])
 
     def history(self):
         history = {}

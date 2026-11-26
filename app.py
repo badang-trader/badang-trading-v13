@@ -921,18 +921,19 @@ MIN_NET_RR = 1.5
 def build_decision_plan_425(item, action, precision, mode):
     """Read-only decision support; no additional-entry or automatic orders."""
     side = action.get('side')
-    score = finite_number(item.get('long_score' if side == 'LONG' else 'short_score'))
-    opposite = finite_number(item.get('short_score' if side == 'LONG' else 'long_score'))
-    result = {'state':'WAIT','label':'관망','side':side if side in ('LONG','SHORT') else None,
+    has_direction = side in ('LONG', 'SHORT')
+    score = finite_number(item.get('long_score' if side == 'LONG' else 'short_score')) if has_direction else None
+    result = {'state':'WAIT','label':'관망','side':side if has_direction else None,
               'score':score,'score_is_probability':False,'entry':None,'stop':None,
               'tp1':None,'tp2':None,'rr1_gross':None,'rr2_gross':None,
               'rr1_net_estimate':None,'rr2_net_estimate':None,
               'max_account_risk_pct':0.5,'fee_assumption_roundtrip_pct':ROUNDTRIP_FEE_PCT,
               'slippage_assumption_roundtrip_pct':ROUNDTRIP_SLIPPAGE_PCT,
               'reasons':[],'note':'분석용 조건부 시나리오. 자동 주문·수익 보장 아님'}
-    if side not in ('LONG','SHORT'):
+    if not has_direction:
         result['reasons'].append('최근 확정봉에서 가격 행동 트리거 없음')
         return result
+    opposite = finite_number(item.get('short_score' if side == 'LONG' else 'long_score'))
     entry,stop,tp1,tp2 = [finite_number(action.get(k)) for k in ('entry','stop','tp1','tp2')]
     if any(x is None or x <= 0 for x in (entry,stop,tp1,tp2)):
         result['reasons'].append('진입·손절·목표 가격 불완전')
@@ -2110,24 +2111,29 @@ def validate_signal_precision_418(action, item, trends, frames, audits, mode):
     become a candidate. No live-quote or fill-quality claim is made.
     """
     side = action.get('side', 'WAIT')
+    has_direction = side in ('LONG', 'SHORT')
     checks = {}
     blockers = []
-    def check(key, ok, reason):
+    def check(key, ok, reason, *, applicable=True):
+        if not applicable:
+            checks[key] = {'passed': False, 'reason': '진입 방향 미확정으로 검증 보류',
+                           'applicable': False}
+            return
         checks[key] = {'passed': bool(ok), 'reason': reason}
         if not ok: blockers.append(reason)
-    check('closed_candle_pattern', side in ('LONG', 'SHORT') and
+    check('closed_candle_pattern', has_direction and
           all(finite_number(action.get(k)) is not None for k in ('entry','stop','tp1','tp2')),
           '확정봉 가격 행동 진입 조건 미충족')
     check('data_integrity', all(frame_freshness_416(audits.get(tf, {}), tf)[0] for tf in frames),
           '기준 시간봉 연속성·최신성 검증 실패')
     expected = 'UP' if side == 'LONG' else 'DOWN'
-    check('timeframe_alignment', side in ('LONG','SHORT') and all(trends.get(tf) == expected for tf in frames),
-          '단타/스윙 기준 시간봉 추세가 동일 방향으로 정렬되지 않음')
-    directional = finite_number(item.get('long_score' if side=='LONG' else 'short_score'))
-    opposing = finite_number(item.get('short_score' if side=='LONG' else 'long_score'))
+    check('timeframe_alignment', all(trends.get(tf) == expected for tf in frames),
+          '단타/스윙 기준 시간봉 추세가 동일 방향으로 정렬되지 않음', applicable=has_direction)
+    directional = finite_number(item.get('long_score' if side=='LONG' else 'short_score')) if has_direction else None
+    opposing = finite_number(item.get('short_score' if side=='LONG' else 'long_score')) if has_direction else None
     check('score_direction', directional is not None and opposing is not None and
           directional >= opposing and directional >= 60,
-          '해당 방향 기술적 점수 60 미만 또는 반대 방향 점수 우세')
+          '해당 방향 기술적 점수 60 미만 또는 반대 방향 점수 우세', applicable=has_direction)
     entry = finite_number(action.get('entry'))
     stop = finite_number(action.get('stop'))
     tp1 = finite_number(action.get('tp1'))
@@ -2136,16 +2142,16 @@ def validate_signal_precision_418(action, item, trends, frames, audits, mode):
                 entry > 0 and stop > 0 and tp1 > 0 and tp2 > 0 and
                 ((stop < entry < tp1 < tp2) if side == 'LONG' else
                  (tp2 < tp1 < entry < stop) if side == 'SHORT' else False))
-    check('stop_target_geometry', geometry, '진입·손절·목표가 방향 또는 순서 오류')
+    check('stop_target_geometry', geometry, '진입·손절·목표가 방향 또는 순서 오류', applicable=has_direction)
     risk_pct = abs(entry-stop)/entry*100 if geometry else None
     limit = 2.0 if mode == 'scalp' else 3.5
     check('risk_distance', geometry and 0.04 <= risk_pct <= limit,
-          '손절 거리 비정상 또는 '+str(limit)+'% 초과')
+          '손절 거리 비정상 또는 '+str(limit)+'% 초과', applicable=has_direction)
     # RR1/RR2 are price-distance ratios, not probabilities or expected profits.
     rr1 = abs(tp1-entry)/abs(entry-stop) if geometry else None
     rr2 = abs(tp2-entry)/abs(entry-stop) if geometry else None
     check('reward_risk', geometry and rr1 >= 1.2-1e-8 and rr2 >= 1.5-1e-8,
-          '가격 기준 손익비 1차 1.2R 또는 2차 1.5R 미만')
+          '가격 기준 손익비 1차 1.2R 또는 2차 1.5R 미만', applicable=has_direction)
     return {'status':'CANDIDATE' if not blockers else 'WAIT',
             'checks':checks, 'blockers':blockers,
             'directional_score':directional, 'opposing_score':opposing,
