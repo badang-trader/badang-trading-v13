@@ -89,11 +89,54 @@ assert(riskText({recommendation:'LONG',entry_reference:100,stop_loss:105,take_pr
 assert(riskText({recommendation:'WAIT',entry_reference:100,stop_loss:95,take_profit_1:110}).includes('검증 불가'),'WAIT should not show rr');
 assert(riskText({recommendation:'LONG',entry_reference:100,stop_loss:null,take_profit_1:110}).includes('검증 불가'),'null stop must not be zero');
 assert(riskText({recommendation:'SHORT',entry_reference:100,stop_loss:105,take_profit_1:90}).includes('1:2.00'),'short rr calculation wrong');
+assert(entryReason({price_action_45:{side:'WAIT',reason:'돌파 미확인'},entry_blockers:['기타']})==='돌파 미확인','actual wait reason missing');
+assert(flowStatus({reversal_tracking_514:{status:'DATABASE_NOT_CONFIGURED'}}).includes('DB 미연결'),'missing storage shown as connected');
+const flow=flowStatus({structure_427:{'1H':{wave:{alternatives:[{flow_validation:{oi_legs:[{status:'ENDPOINTS_AVAILABLE'},{status:'INSUFFICIENT_HISTORY'}]}}]}}}});
+assert(flow.includes('1/2구간')&&flow.includes('CVD 미검증'),'partial OI coverage mistaken for CVD');
 """
         with tempfile.TemporaryDirectory() as directory:
             js = pathlib.Path(directory) / "fixtures.js"
             js.write_text("const esc=x=>String(x);\n" + helpers + fixture, encoding="utf-8")
             run = subprocess.run(["node", str(js)], capture_output=True, text=True)
+            self.assertEqual(run.returncode, 0, run.stderr)
+
+    def test_body_timeout_restores_scan_controls(self):
+        if not shutil.which("node"):
+            self.skipTest("Node.js not available")
+        script = re.findall(r"<script>(.*?)</script>", SOURCE, flags=re.S)[0]
+        fixture = r"""
+const nodes=new Map();
+const document={getElementById(id){
+  if(!nodes.has(id))nodes.set(id,{disabled:false,value:'scalp',addEventListener(){}});
+  return nodes.get(id);
+}};
+let timeout;
+const setTimeout=fn=>{timeout=fn;return 1};
+const clearTimeout=()=>{timeout=null};
+let readBody;
+const fetch=async (_, {signal})=>({ok:true,json(){
+  return new Promise((resolve,reject)=>{
+    signal.addEventListener('abort',()=>reject(new Error('aborted')));
+    readBody=true;
+  });
+}});
+"""
+        checks = r"""
+(async()=>{
+  const pending=load();
+  await Promise.resolve();
+  if(!readBody || !timeout || !$('mode').disabled)throw Error('body timeout or mode lock missing');
+  timeout();
+  await pending;
+  if($('load').disabled || $('mode').disabled || !$('status').innerHTML.includes('대기 시간')){
+    throw Error('timeout did not restore scan controls');
+  }
+})().catch(error=>{console.error(error);process.exitCode=1});
+"""
+        with tempfile.TemporaryDirectory() as directory:
+            js = pathlib.Path(directory) / "fixtures.js"
+            js.write_text(fixture + script + checks, encoding="utf-8")
+            run = subprocess.run(["node", str(js)], capture_output=True, text=True, timeout=5)
             self.assertEqual(run.returncode, 0, run.stderr)
 
     def test_embedded_javascript_syntax(self):

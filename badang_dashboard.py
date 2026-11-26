@@ -8,6 +8,7 @@ HTML = r'''<!doctype html>
 <title>BADANG Trading | Dashboard</title>
 <style>
 :root{color-scheme:dark;font-family:system-ui,-apple-system,'Malgun Gothic',sans-serif;background:#0b1220;color:#eef4ff}*{box-sizing:border-box}body{margin:0}main{max-width:1200px;margin:auto;padding:24px 16px 70px}header,.toolbar,.cards,.stats,.meta{display:flex;align-items:center;gap:12px;flex-wrap:wrap}header{justify-content:space-between;margin-bottom:24px}h1{font-size:clamp(24px,4vw,34px);margin:0}h2{font-size:18px;margin:0 0 12px}.muted{color:#98a8c1}.sub{font-size:13px}.panel,.card{background:#141f32;border:1px solid #293a55;border-radius:16px;padding:18px}.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));margin:18px 0}.stats .panel{padding:16px}.number{font-size:28px;font-weight:750;margin-top:4px}.toolbar{margin:16px 0}button,select{background:#1c2b42;color:#edf4ff;border:1px solid #38506d;border-radius:9px;padding:10px 13px;font:inherit}button{cursor:pointer}button.primary{background:#2563eb;border-color:#2563eb}button:disabled{opacity:.6;cursor:wait}.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(285px,1fr));align-items:stretch}.card{min-width:0}.head{display:flex;align-items:center;justify-content:space-between;gap:8px}.coin{font-size:20px;font-weight:750}.badge{padding:5px 9px;border-radius:7px;font-size:12px;font-weight:800;background:#374151}.LONG{background:#124c3e;color:#8df1cc}.SHORT{background:#63303a;color:#ffb1bc}.WAIT{background:#364152;color:#d6deeb}.price{font-size:25px;font-weight:750;margin:13px 0 3px;overflow-wrap:anywhere}.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:16px 0}.metric{background:#10192a;border-radius:9px;padding:10px}.metric .val{font-weight:650;margin-top:4px;overflow-wrap:anywhere}.warn{color:#ffd28a}.up{color:#8df1cc}.down{color:#ffacb7}.foot{border-top:1px solid #30405a;margin-top:13px;padding-top:12px}.error{color:#ffb2b2}.empty{padding:26px;text-align:center}.detail{margin-top:12px}.detail summary{cursor:pointer;color:#a9c7ff}.detail pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:11px;color:#becbe0}a{color:#9cc3ff}@media(max-width:550px){.stats{grid-template-columns:repeat(2,minmax(0,1fr))}main{padding:18px 12px 50px}.panel,.card{padding:14px}}
+.cards{grid-template-columns:repeat(auto-fit,minmax(min(100%,285px),1fr))}.head{flex-wrap:wrap}.metric{min-width:0}.flow{overflow-wrap:anywhere}
 </style></head><body><main>
 <header><div><h1>🌊 BADANG <span style="color:#75b5ff">Trading</span></h1><div class="muted sub">v1.7.2 · 실시간 요청형 분석 대시보드 · 자동매매 아님</div></div><a href="/">기존 화면 ↗</a></header>
 <section class="stats"><div class="panel"><div class="muted sub">조회 완료</div><div class="number" id="total">–</div></div><div class="panel"><div class="muted sub">LONG</div><div class="number up" id="long">–</div></div><div class="panel"><div class="muted sub">SHORT</div><div class="number down" id="short">–</div></div></section>
@@ -29,6 +30,23 @@ const divergenceText=x=>{const d=x.divergence_explained_46;if(!d||typeof d!=='ob
 const waveText=x=>{const data=x.wave_by_timeframe_32||{};if(!data||typeof data!=='object')return '파동 자료 없음';const parts=[];for(const [tf,rec] of Object.entries(data)){if(!rec||rec.status!=='AVAILABLE'||!Array.isArray(rec.candidates))continue;const v=rec.candidates.filter(z=>z&&z.structure_status==='TIME_ORDER_VALID'&&z.age_class==='RECENT'&&z.completion==='UNCONFIRMED');if(!v.length)continue;const z=v[0];const side=String(z.direction||'').toLowerCase()==='up'?'상승':String(z.direction||'').toLowerCase()==='down'?'하락':'방향 불명';parts.push(tf+': '+side+' 과거 전환점 파동 후보 (현재 진행·완료 미확정)')}return parts.length?parts.join(' · '):'현재 유효한 파동 후보를 확인할 수 없어.'};
 const riskText=x=>{const values=[x.entry_reference,x.stop_loss,x.take_profit_1];const side=x.recommendation;if(values.some(v=>v===null||v===undefined||v===''||typeof v==='boolean'))return '진입·손절·목표 정보 부족: 손익비 검증 불가';const [entry,stop,tp]=values.map(Number);if(![entry,stop,tp].every(Number.isFinite)||entry<=0||stop<=0||tp<=0||!['LONG','SHORT'].includes(side))return '진입·손절·목표 정보 부족: 손익비 검증 불가';const risk=side==='LONG'?entry-stop:stop-entry,reward=side==='LONG'?tp-entry:entry-tp;if(risk<=0||reward<=0)return '진입·손절·목표의 방향이 맞지 않아 재검증 필요';return '표시 가격 기준 예상 손익비 1:'+fmt(reward/risk,2)+' (수수료·슬리피지 미반영)'};
 
+function entryReason(x){
+  const action=x.price_action_45||{};
+  if (action.side==='WAIT' && action.reason) return action.reason;
+  return x.entry_blockers?.[0] || x.decision_427?.reasons?.[0] || '진입 조건 확인 대기';
+}
+function flowStatus(x){
+  const legs=Object.values(x.structure_427||{}).flatMap(f=>(f.wave?.alternatives||[])
+    .flatMap(w=>w.flow_validation?.oi_legs||[]));
+  const verified=legs.filter(leg=>leg.status==='ENDPOINTS_AVAILABLE').length;
+  const oi=verified ? '파동 OI 관측 '+verified+'/'+legs.length+'구간 (시작·종료 관측값)'
+    : '파동 OI 관측 자료 없음';
+  const store=x.reversal_tracking_514?.status;
+  const reversal=store==='SAVED' ? '반전 이력 저장됨'
+    : store==='DATABASE_NOT_CONFIGURED' ? '반전 이력 DB 미연결'
+    : store==='STORAGE_ERROR' ? '반전 이력 저장 오류' : '반전 이력 확인 대기';
+  return oi+' · 연속 체결 CVD 미검증 · '+reversal;
+}
 function render(x){
   const side=x.technical_side;
   const ready=x.decision_427?.state==='READY_REVIEW'&&x.integrated_audit_439?.status==='REVIEW_ONLY';
@@ -44,6 +62,8 @@ function render(x){
   const caveats=(x.data_caveats||[]).map(esc).join(' · ');
   return `<article class="card"><div class="head"><span class="coin">${esc(x.symbol)} · ${x.mode==='swing'?'스윙':'단타'}</span><span class="badge ${side}">${side==='LONG'?'롱':'숏'} ${fmt(x.technical_score,0)}점</span></div>
   <div class="metric"><strong>바당의 쉬운 판단 · ${ready?'진입 조건 충족':'진입 대기 · 기술적 후보'}</strong>
+  ${ready?'':`<p class="sub warn">${esc(entryReason(x))}</p>`}
+  <p class="sub flow">${esc(flowStatus(x))}</p>
   <p class="sub">확정봉 ${quality.candles==='VERIFIED'?'검증 통과':'점검 필요'} · ${caveats} · 검증된 승률 자료 없음</p>
   <p class="sub">${esc(divergenceText(x))}</p><p class="sub">${levels}</p></div>
   <div class="grid">${metric(ready?'검증된 진입 기준가':'기술적 참고 진입가',fmt(plan.entry,8))}
@@ -52,16 +72,49 @@ function render(x){
   ${metric('확정봉 분석 기준가',fmt(x.analysis_reference_price,8))}</div>
   <details class="detail"><summary>분석 원본 상세 보기</summary><pre>${esc(JSON.stringify(x,null,2))}</pre></details></article>`;
 }
-async function load(next=false){if(busy)return;busy=true;const button=$('load'),nextButton=$('next');button.disabled=true;nextButton.disabled=true;const at=next?nextOffset:0;$('status').textContent='거래소 데이터를 조회 중이야. 종목당 여러 API 요청으로 시간이 걸릴 수 있어…';try{const ctl=new AbortController();const timer=setTimeout(()=>ctl.abort(),110000);let response;try{response=await fetch(`/api/v13-scan?mode=${encodeURIComponent($('mode').value)}&offset=${at}`,{cache:'no-store',signal:ctl.signal});}finally{clearTimeout(timer)}if(!response.ok)throw new Error(`서버 HTTP ${response.status}`);const data=await response.json();if(data.error)throw new Error(data.error);const analyzed=Array.isArray(data.results)?data.results:[];
-const candidates=new Map((data.technical_candidates||[]).map(x=>[x.symbol,x]));
-const rows=analyzed.filter(x=>candidates.has(x.symbol));
-nextOffset=data.next_offset;
-$('total').textContent=analyzed.length;
-$('long').textContent=rows.filter(x=>x.technical_side==='LONG').length;
-$('short').textContent=rows.filter(x=>x.technical_side==='SHORT').length;
-$('cards').innerHTML=rows.length?rows.map(render).join(''):'<div class="panel empty muted">이 종목에는 80점 이상 롱·숏 후보가 없습니다.</div>';
-$('range').textContent='전체 '+fmt(data.total,0)+'종목 중 '+Math.min(at+1,data.total)+'번째';
-const errors=Array.isArray(data.errors)?data.errors:[];$('status').textContent=`${analyzed.length}종목 조회 완료${errors.length?` · 오류 ${errors.length}건`:''}`;if(errors.length){$('status').textContent+=' · '+errors.map(e=>`${e.symbol}: ${e.error}`).join(' / ').slice(0,220)}$('updated').textContent='마지막 조회: '+new Date().toLocaleString('ko-KR');nextButton.disabled=!(data.next_offset<data.total);}catch(e){$('status').innerHTML=`<span class="error">조회 실패: ${esc(e.message)}</span>`;nextButton.disabled=true;}finally{busy=false;button.disabled=false}}
+async function load(next=false){
+  if(busy)return;
+  busy=true;
+  const button=$('load'),nextButton=$('next'),mode=$('mode');
+  button.disabled=true;
+  nextButton.disabled=true;
+  mode.disabled=true;
+  const at=next?nextOffset:0;
+  $('status').textContent='거래소 데이터를 조회 중이야. 종목당 여러 API 요청으로 시간이 걸릴 수 있어…';
+  const ctl=new AbortController();
+  const timer=setTimeout(()=>ctl.abort(),110000);
+  try{
+    const response=await fetch(`/api/v13-scan?mode=${encodeURIComponent(mode.value)}&offset=${at}`,{cache:'no-store',signal:ctl.signal});
+    if(!response.ok)throw new Error(`서버 HTTP ${response.status}`);
+    const data=await response.json();
+    if(data.error)throw new Error(data.error);
+    const analyzed=Array.isArray(data.results)?data.results:[];
+    const candidates=new Set((data.technical_candidates||[]).map(x=>x.symbol));
+    const rows=analyzed.filter(x=>candidates.has(x.symbol));
+    nextOffset=data.next_offset;
+    $('total').textContent=analyzed.length;
+    $('long').textContent=rows.filter(x=>x.technical_side==='LONG').length;
+    $('short').textContent=rows.filter(x=>x.technical_side==='SHORT').length;
+    $('cards').innerHTML=rows.length?rows.map(render).join(''):'<div class="panel empty muted">이 종목에는 80점 이상 롱·숏 후보가 없습니다.</div>';
+    $('range').textContent='전체 '+fmt(data.total,0)+'종목 중 '+Math.min(at+1,data.total)+'번째';
+    const errors=Array.isArray(data.errors)?data.errors:[];
+    $('status').textContent=`${analyzed.length}종목 조회 완료${errors.length?` · 오류 ${errors.length}건`:''}`;
+    if(errors.length){
+      $('status').textContent+=' · '+errors.map(e=>`${e.symbol}: ${e.error}`).join(' / ').slice(0,220);
+    }
+    $('updated').textContent='마지막 조회: '+new Date().toLocaleString('ko-KR');
+    nextButton.disabled=!(data.next_offset<data.total);
+  }catch(e){
+    const message=ctl.signal.aborted?'응답 대기 시간이 길어졌어요. 새로고침으로 다시 시도해 주세요.':e.message;
+    $('status').innerHTML=`<span class="error">조회 실패: ${esc(message)}</span>`;
+    nextButton.disabled=true;
+  }finally{
+    clearTimeout(timer);
+    busy=false;
+    button.disabled=false;
+    mode.disabled=false;
+  }
+}
 $('load').addEventListener('click',()=>load(false));$('next').addEventListener('click',()=>load(true));$('mode').addEventListener('change',()=>{$('cards').innerHTML='<div class="panel empty muted">모드가 바뀌었어. 분석 새로고침을 눌러줘.</div>';$('next').disabled=true;nextOffset=0});
 </script></body></html>'''
 
