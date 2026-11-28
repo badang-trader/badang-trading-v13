@@ -2,6 +2,7 @@
 No trading execution, no win-rate claims. All levels derived from validated historical candles.
 """
 import math
+from bisect import bisect_left
 
 FRAME_MS={'5m':300000,'15m':900000,'30m':1800000,'1H':3600000,'2H':7200000,'4H':14400000,'1D':86400000}
 
@@ -159,17 +160,19 @@ def impulse_state(turns, current, atr, as_of_open=None):
         if count==5:
             if (vals[3]-vals[1])*direction<=0:continue
             if (vals[4]-vals[1])*direction<=0:continue # conventional non-overlap
-            if abs(vals[3]-vals[2])<abs(vals[1]-vals[0])*.35:continue
         invalid=vals[-1]
         progress=(current-invalid)*direction
         if progress<=0:continue
-        # Wave 3 requires advance past wave1 extreme to be labelled 3-progress.
-        if wave==3 and (current-vals[1])*direction<=0:continue
-        if wave==5 and (current-vals[3])*direction<=0:continue
+        # Early impulse hypotheses are not confirmed breakouts.
+        previous_extreme=vals[1] if wave==3 else vals[3]
+        broken=(current-previous_extreme)*direction>0
+        stage='BREAKOUT_PROGRESS' if broken else 'EARLY_HYPOTHESIS'
+        if wave==5 and abs(vals[3]-vals[2])<min(abs(vals[1]-vals[0]),progress):continue
         strength=progress/max(atr,1e-12)
         possibilities.append({'wave':wave,'direction':'UP' if direction>0 else 'DOWN',
                               'invalidation':round(invalid,8),'last_pivot_time':p[-1]['time'],
                               'last_pivot_confirmed_at':p[-1].get('confirmed_at'),
+                              'stage':stage,'previous_extreme':previous_extreme,
                               'atr_progress':round(strength,2),'pivot_prices':[round(v,8) for v in vals]})
     if not possibilities:return {'status':'UNDETERMINED','label':'현재 3파·5파 판별 불가','alternatives':[],
                                  'note':'최근 확정 전환점이 일반 추진파 규칙을 충족하지 않음'}
@@ -214,21 +217,221 @@ def completed_impulse_rules(prices):
             'direction': 'UP' if direction > 0 else 'DOWN',
             'note': '일반 추진파 완성형 규칙 검사. 대각삼각형·절단파는 별도 분석 필요'}
 
+def historical_wave_shapes(turns, tf):
+    """Endpoint geometry only; subdivisions and wave degree remain unverified."""
+    out=[]
+    abc_evidence={}
+    if len(turns)>=6:
+        q=turns[-6:]
+        p=[t['price'] for t in q]
+        s=1 if p[1]>p[0] else -1
+        d=[(p[i+1]-p[i])*s for i in range(5)]
+        if all(d[i]>0 for i in (0,2,4)) and all(d[i]<0 for i in (1,3)):
+            base=(p[2]-p[0])*s>0 and (p[3]-p[1])*s>0 and d[2]>=min(d[0],d[4])
+            if base and (p[4]-p[1])*s>0:
+                if (p[5]-p[3])*s<0:
+                    out.append(('TRUNCATED_FIFTH_GEOMETRY',q,s))
+                elif completed_impulse_rules(p)['valid']:
+                    for i in (0,2,4):
+                        if d[i]>=1.618*max(d[j] for j in (0,2,4) if j!=i):
+                            out.append(('EXTENDED_'+str(i+1)+'_GEOMETRY',q,s))
+            if base and (p[4]-p[2])*s>0 and (p[4]-p[1])*s<0 and (p[5]-p[3])*s>0:
+                if d[0]>d[2]>d[4] and abs(d[1])>abs(d[3]):
+                    out.append(('CONTRACTING_DIAGONAL_GEOMETRY',q,s))
+                elif d[0]<d[2]<d[4] and abs(d[1])<abs(d[3]):
+                    out.append(('EXPANDING_DIAGONAL_GEOMETRY',q,s))
+    if len(turns)>=4:
+        q=turns[-4:]
+        p=[t['price'] for t in q]
+        s=1 if p[1]>p[0] else -1
+        a=abs(p[1]-p[0])
+        if a>0 and (p[2]-p[1])*s<0 and (p[3]-p[2])*s>0:
+            b=abs(p[2]-p[1])/a
+            c_vs_a_end=(p[3]-p[1])*s
+            ratios={'b_retrace':b,'c_extension':abs(p[3]-p[2])/a}
+            # Endpoint ranges can overlap. Keep both hypotheses pending subwaves.
+            if 0<b<1 and c_vs_a_end>0:
+                out.append(('ABC_ZIGZAG_GEOMETRY',q,s))
+                abc_evidence['ABC_ZIGZAG_GEOMETRY']={**ratios,'expected_subdivision':[5,3,5]}
+            if .9<=b<=1.38 and (c_vs_a_end>=0 or b>1):
+                out.append(('ABC_FLAT_GEOMETRY',q,s))
+                variant='RUNNING' if c_vs_a_end<0 else 'EXPANDED' if b>1 and c_vs_a_end>0 else 'NEAR_REGULAR'
+                abc_evidence['ABC_FLAT_GEOMETRY']={
+                    **ratios,'expected_subdivision':[3,3,5],'variant':variant,
+                }
+    return [{'pattern':kind,'direction':'UP' if s>0 else 'DOWN',
+             'pivot_prices':[t['price'] for t in q],
+             'pivot_times':[t['time'] for t in q],
+             'known_at_ms':q[-1]['confirmed_at']+FRAME_MS[tf],
+             'status':'HISTORICAL_GEOMETRY_ONLY','subdivision_verified':False,
+             'used_in_score':False,
+             **({'geometry_evidence':abc_evidence[kind]} if kind in abc_evidence else {})}
+            for kind,q,s in out]
+
+def complex_correction_geometry(turns, tf):
+    """Double/triple zigzag endpoint hypotheses, not verified subdivisions."""
+    results=[]
+    for count,label in ((8,'WXY'),(12,'WXYXZ')):
+        if len(turns)<count:
+            continue
+        q=turns[-count:]
+        p=[t['price'] for t in q]
+        s=1 if p[1]>p[0] else -1
+        legs=[]
+        valid=True
+        for i in range(0,count-3,4):
+            a=(p[i+1]-p[i])*s
+            b=(p[i+1]-p[i+2])*s
+            c=(p[i+3]-p[i+2])*s
+            if not (a>0 and 0<b<a and c>b):
+                valid=False
+                break
+            legs.append({'a_length':a,'b_retrace':b/a,'c_extension':c/a})
+            if i+4<count:
+                x=(p[i+3]-p[i+4])*s
+                net=(p[i+3]-p[i])*s
+                if not (0<x<net):
+                    valid=False
+                    break
+        if valid:
+            results.append({'pattern':label+'_DOUBLE_ZIGZAG_GEOMETRY' if count==8 else label+'_TRIPLE_ZIGZAG_GEOMETRY',
+                            'direction':'UP' if s>0 else 'DOWN',
+                            'pivot_prices':p,'pivot_times':[t['time'] for t in q],
+                            'known_at_ms':q[-1]['confirmed_at']+FRAME_MS[tf],
+                            'legs':legs,'status':'HISTORICAL_GEOMETRY_ONLY',
+                            'subdivision_verified':False,'used_in_score':False})
+    return results
+
+def lower_pivot_evidence(shape, parent_step, bars, timeframe):
+    """Count confirmed turns inside matched parent legs at the original confirmation time."""
+    times = shape['pivot_times']
+    prices = shape['pivot_prices']
+    step = FRAME_MS[timeframe]
+    opens = [bar[0] for bar in bars]
+    result = {'timeframe': timeframe, 'status': 'INSUFFICIENT_COVERAGE'}
+    if not opens or opens[0] > times[0] or opens[-1] + step < times[-1] + parent_step:
+        return result
+    end = bisect_left(opens, shape['known_at_ms'])
+    matched = []
+    for index, (stamp, price) in enumerate(zip(times, prices)):
+        is_high = price > prices[1] if index == 0 else price > prices[index-1]
+        price_column = 2 if is_high else 3
+        first = bisect_left(opens, stamp)
+        last = bisect_left(opens, stamp + parent_step)
+        matches = [bar[0] for bar in bars[first:last]
+                   if math.isclose(bar[price_column], price, rel_tol=1e-10, abs_tol=1e-10)]
+        if len(matches) != 1:
+            return dict(result, status='AMBIGUOUS_ENDPOINT' if matches else 'ENDPOINT_NOT_MATCHED')
+        matched.append((matches[0], 'H' if is_high else 'L'))
+    counts = []
+    for (left, first_kind), (right, last_kind) in zip(matched, matched[1:]):
+        start = max(0, bisect_left(opens, left) - 3)
+        stop = min(end, bisect_left(opens, right) + 4)
+        pivots = confirmed_turns(bars[start:stop])
+        kinds = [first_kind] + [p['kind'] for p in pivots if left < p['time'] < right] + [last_kind]
+        counts.append(len(kinds)-1 if all(a != b for a, b in zip(kinds, kinds[1:])) else None)
+    result.update(status='PIVOT_COUNTS_ONLY', leg_turn_counts=counts)
+    expected = (shape.get('geometry_evidence') or {}).get('expected_subdivision')
+    if expected:
+        comparison = 'INCOMPLETE'
+        if len(expected) == len(counts) and all(count is not None for count in counts):
+            comparison = 'MATCH' if counts == expected else 'MISMATCH'
+        result['expected_count_comparison'] = comparison
+    return result
+
+
+def annotate_lower_wave_geometry(structures, frame_data, now_ms):
+    """Attach read-only lower-timeframe evidence from the same Bitget snapshot."""
+    validated = {}
+    for tf, structure in structures.items():
+        for shape in structure.get('historical_wave_shapes', []):
+            if not shape['pattern'].startswith(('WXY', 'ABC_', 'CONTRACTING_DIAGONAL', 'EXPANDING_DIAGONAL')):
+                continue
+            parent_step = FRAME_MS[tf]
+            candidates = sorted(
+                (key for key, data in frame_data.items() if key in FRAME_MS
+                 and FRAME_MS[key] < parent_step and parent_step % FRAME_MS[key] == 0
+                 and str(data.get('exchange', '')).lower() == 'bitget'),
+                key=FRAME_MS.__getitem__,
+            )
+            evidence = {'status': 'LOWER_TIMEFRAME_UNAVAILABLE'}
+            for candidate in candidates:
+                if candidate not in validated:
+                    validated[candidate] = closed_bars(frame_data[candidate].get('candles'), candidate, now_ms)[0]
+                bars = validated[candidate]
+                if not bars:
+                    continue
+                evidence = lower_pivot_evidence(shape, parent_step, bars, candidate)
+                if evidence['status'] != 'INSUFFICIENT_COVERAGE':
+                    break
+            shape['lower_pivot_evidence'] = evidence
+
+
 def structure_review(raw,tf,now_ms=None):
     bars,reason=closed_bars(raw,tf,now_ms)
     if bars is None:return {'status':'UNAVAILABLE','reason':reason}
     recent=bars[-64:]; current=recent[-1][4]
-    tr=[max(recent[i][2]-recent[i][3],abs(recent[i][2]-recent[i-1][4]),abs(recent[i][3]-recent[i-1][4])) for i in range(1,len(recent))]
-    atr=sum(tr[-14:])/14
+    # Wilder ATR uses all available validated closed candles for warm-up.
+    tr=[max(bars[i][2]-bars[i][3],abs(bars[i][2]-bars[i-1][4]),abs(bars[i][3]-bars[i-1][4])) for i in range(1,len(bars))]
+    atr=sum(tr[:14])/14
+    for value in tr[14:]:
+        atr=(13*atr+value)/14
     turns=confirmed_turns(recent)
     # previous swing highs/lows only; no forward-looking values
     supports=sorted({round(t['price'],8) for t in turns if t['kind']=='L' and t['price']<current},reverse=True)
     resistances=sorted({round(t['price'],8) for t in turns if t['kind']=='H' and t['price']>current})
     wave=impulse_state(turns,current,atr,as_of_open=recent[-1][0])
+    # Reject a hypothesis if any subsequent closed candle breached its origin.
+    valid=[]
+    for candidate in wave['alternatives']:
+        sign=1 if candidate['direction']=='UP' else -1
+        later=[b for b in recent if b[0]>candidate['last_pivot_time']]
+        origin=candidate['invalidation']
+        if any(((b[3] if sign>0 else b[2])-origin)*sign<=0 for b in later):
+            continue
+        p=candidate['pivot_prices']
+        length=abs(p[1]-p[0])
+        ratios=(1,1.618,2,2.618,4.236) if candidate['wave']==3 else (.618,1,1.272,1.618)
+        targets=[]
+        for ratio in ratios:
+            price=p[-1]+sign*length*ratio
+            if price<=0: continue
+            if candidate['wave']==5 and abs(p[3]-p[2])<min(length,abs(price-p[-1])): continue
+            reached=any((b[2] if sign>0 else b[3])*sign>=price*sign for b in later)
+            targets.append({'price':price,'ratio':ratio,'reached':reached,'timeframe':tf,'anchor':p[-1],'length':length})
+        candidate['targets']=targets
+        candidate['future_targets']=[t for t in targets if not t['reached'] and (t['price']-current)*sign>0]
+        candidate['reference_price']=current
+        candidate['wave1_length']=length
+        candidate['wave2_retrace_ratio']=abs(p[2]-p[1])/length
+        candidate['structural_invalidation']=p[0] if candidate['wave']==3 else p[1]
+        candidate['active_leg_invalidation']=origin
+        candidate['last_pivot_confirmed_close_ms']=candidate['last_pivot_confirmed_at']+FRAME_MS[tf]
+        candidate['flow_validation']={'status':'UNVERIFIED','oi_change_pct':None,'cvd':None,'used_in_score':False}
+        # Compare candle volume on the completed wave 1 and wave 2 intervals.
+        # Volume is unsigned and cannot substitute for OI or trade-side CVD.
+        pivot_times=[t['time'] for t in turns[-candidate['wave']:]]
+        leg_stats=[]
+        for start,end in zip(pivot_times,pivot_times[1:]):
+            segment=[b for b in recent if start<b[0]<=end]
+            leg_stats.append({'start_open_ms':start,'end_open_ms':end,
+                'bar_count':len(segment),'volume_sum':sum(b[5] for b in segment),
+                'volume_mean':sum(b[5] for b in segment)/len(segment) if segment else None})
+        candidate['leg_volume_context']={'legs':leg_stats,
+            'source':'CLOSED_CANDLE_UNSIGNED_VOLUME','used_in_score':False,
+            'boundary_note':'Start pivot candle excluded; end pivot candle included; intrabar pivot timing unknown'}
+
+        candidate['pivot_times']=[t['time'] for t in turns[-candidate['wave']:]]
+        valid.append(candidate)
+    wave['alternatives']=valid
+    wave['status']='AMBIGUOUS' if len(valid)>1 else 'HYPOTHESIS' if valid else 'UNDETERMINED'
+    wave['label']='복수 파동 후보' if len(valid)>1 else ('상승' if valid[0]['direction']=='UP' else '하락')+' '+str(valid[0]['wave'])+'파 진행 후보' if valid else '현재 파동 미확정'
+
     return {'status':'OK','timeframe':tf,'last_closed_time':recent[-1][0],
             'last_closed_price':current,'atr14':round(atr,8),
             'support_levels':supports[:3], 'resistance_levels':resistances[:3],
             'swing_count':len(turns),'wave':wave,
+            'historical_wave_shapes':historical_wave_shapes(turns,tf)+complex_correction_geometry(confirmed_turns(bars[-160:]),tf),
             'note':'완료봉에서 확인된 과거 스윙 레벨. 향후 지지·저항을 보장하지 않음'}
 
 def decision_review(item,structures,mode):
@@ -238,6 +441,7 @@ def decision_review(item,structures,mode):
     old=item.get('decision_plan_425') or {}
     if not isinstance(old,dict): old={}
     side=old.get('side');score=_f(old.get('score'))
+    has_direction = side in ('LONG', 'SHORT')
     raw_reasons=old.get('reasons')
     if isinstance(raw_reasons,(list,tuple)):
         reasons=[str(r)[:200] for r in raw_reasons[:30]]
@@ -255,18 +459,18 @@ def decision_review(item,structures,mode):
         structure=structures.get(tf)
         if not isinstance(structure,dict) or structure.get('status')!='OK':
             reasons.append(tf+' 확정봉·구조 검증 불가')
-    if side not in ('LONG','SHORT'):reasons.append('가격 행동 진입 방향 미확정')
+    if not has_direction:reasons.append('가격 행동 진입 방향 미확정')
     # The final decision must never resurrect a candidate rejected by the scanner.
-    if 'recommendation' in item and (item.get('recommendation') != side or side not in ('LONG','SHORT')):
+    if has_direction and 'recommendation' in item and item.get('recommendation') != side:
         reasons.append('스캔 최종 추천 방향 불일치 또는 진입 보류')
     if item.get('entry_blockers'):
         reasons.append('기존 스캔 진입 차단 사유 존재')
-    if score is None or score<80:reasons.append('진입 검토 기준 80점 미달')
+    if has_direction and (score is None or score<80):reasons.append('진입 검토 기준 80점 미달')
     rr1 = _f(old.get('rr1_net_estimate'))
-    if rr1 is None or rr1 < 1.5:
+    if has_direction and (rr1 is None or rr1 < 1.5):
         reasons.append('수수료·슬리피지 반영 손익비 1.5 미달 또는 산정 불가')
     entry, stop, tp1 = (_f(old.get(k)) for k in ('entry', 'stop', 'tp1'))
-    if any(v is None or v <= 0 for v in (entry, stop, tp1)):
+    if has_direction and any(v is None or v <= 0 for v in (entry, stop, tp1)):
         reasons.append('진입·손절·1차 목표 가격 누락 또는 오류')
     elif side == 'LONG' and not (stop < entry < tp1):
         reasons.append('롱 진입·손절·목표 가격 순서 오류')
@@ -308,7 +512,7 @@ def decision_review(item,structures,mode):
         elif all(v is not None and v > 0 for v in (entry, stop, tp1)) and side in ('LONG', 'SHORT'):
             if (side == 'LONG' and tp2 < tp1) or (side == 'SHORT' and tp2 > tp1):
                 reasons.append('2차 목표가가 1차 목표보다 불리함')
-    if cost_declared and (tp2 is None or tp2 <= 0):
+    if has_direction and cost_declared and (tp2 is None or tp2 <= 0):
         reasons.append('2차 목표 가격 누락 · 비용 반영 계획 검증 불가')
     if cost_declared and old.get('tp2') is not None and rr2 is None:
         reasons.append('2차 순손익비 누락 · 수수료·슬리피지 검증 불가')
@@ -351,13 +555,51 @@ def decision_review(item,structures,mode):
             if type(number) is not int or number not in (3,5): continue
             wave_scenarios.append({'wave':number,'direction':direction,
                                    'invalidation':level,
-                                   'last_pivot_confirmed_at':candidate.get('last_pivot_confirmed_at')})
+                                   'last_pivot_confirmed_at':candidate.get('last_pivot_confirmed_at'),
+                                   'structural_invalidation':candidate.get('structural_invalidation'),
+                                   'active_leg_invalidation':candidate.get('active_leg_invalidation'),
+                                   'future_targets':candidate.get('future_targets',[]),
+                                   'wave2_retrace_ratio':candidate.get('wave2_retrace_ratio'),
+                                   'flow_validation':candidate.get('flow_validation'),
+                                   'leg_volume_context':candidate.get('leg_volume_context')})
+    # Compare only independently confirmed frames; direction agreement is
+    # context, not proof that lower-degree waves belong to a higher wave.
+    frame_wave_context = []
+    for tf in required:
+        structure = structures.get(tf)
+        if not isinstance(structure, dict) or structure.get('status') != 'OK':
+            continue
+        wave = structure.get('wave')
+        alternatives = wave.get('alternatives') if isinstance(wave, dict) else None
+        if not isinstance(alternatives, list):
+            continue
+        last_open = structure.get('last_closed_time')
+        for candidate in alternatives:
+            if (not isinstance(candidate, dict)
+                    or candidate.get('direction') not in ('UP', 'DOWN')
+                    or type(candidate.get('wave')) is not int or candidate['wave'] not in (3, 5)):
+                continue
+            invalidation = _f(candidate.get('invalidation'))
+            if invalidation is None or invalidation <= 0:
+                continue
+            frame_wave_context.append({
+                'timeframe': tf, 'direction': candidate['direction'], 'wave': candidate['wave'],
+                'stage': candidate.get('stage'), 'invalidation': invalidation,
+                'known_at_ms': candidate.get('last_pivot_confirmed_close_ms'),
+                'reference_close_ms': last_open + FRAME_MS[tf] if type(last_open) is int else None,
+            })
+    directions={w['direction'] for w in frame_wave_context if w['direction'] in ('UP','DOWN')}
+    frame_count=len({w['timeframe'] for w in frame_wave_context})
+    wave_alignment={'status':'CONFLICT' if len(directions)>1 else
+        'ALIGNED_DIRECTION_ONLY' if frame_count>=2 and len(directions)==1 else 'INSUFFICIENT',
+        'frames':frame_wave_context,'degree_verified':False,'used_in_score':False}
     unique=list(dict.fromkeys(reasons))
     ready=not unique
     return {'state':'READY_REVIEW' if ready else 'WAIT',
             'label':'진입 검토 가능 · 주문 전 실시간 확인' if ready else '관망 · 진입 조건 미충족',
             'side':side,'score':score,'reasons':unique,'wave_context':wave_note,
             'wave_scenarios':wave_scenarios,
+            'wave_alignment':wave_alignment,
             'plan':{'entry':entry,'stop':stop,'tp1':tp1,'tp2':tp2,
                     'rr1_net_estimate':rr1,'rr2_net_estimate':rr2},
             'data_is_live_quote':False,'win_probability':None,

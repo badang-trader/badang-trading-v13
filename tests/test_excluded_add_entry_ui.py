@@ -27,14 +27,15 @@ class ExcludedAddEntryUiTests(unittest.TestCase):
         source = (ROOT / "app.py").read_text(encoding="utf-8")
         self.assertNotIn("1차 목표 · 1.3R", source)
         self.assertNotIn("2차 목표 · 1.8R", source)
-        self.assertIn("n(a.rr1,2)", source)
-        self.assertIn("n(a.rr2,2)", source)
+        self.assertIn("n(rr1,2)", source)
+        self.assertIn("fmt(plan.tp2)", source)
 
     def test_scanner_card_requires_final_manual_gate(self):
         source = (ROOT / "app.py").read_text(encoding="utf-8")
         self.assertIn("const finalReady=x.decision_427?.state===\\'READY_REVIEW\\'", source)
         self.assertIn("x.integrated_audit_439?.status===\\'REVIEW_ONLY\\'", source)
-        self.assertIn("const d=finalReady?candidate:\\'WAIT\\'", source)
+        self.assertIn("const ready=d.state", source)
+        self.assertIn("const plan=finalReady?", source)
         self.assertIn("최종 보류", source)
 
     def test_api_recommendations_require_both_final_gates(self):
@@ -50,8 +51,21 @@ class ExcludedAddEntryUiTests(unittest.TestCase):
         body = source[start:end]
         self.assertNotIn("'add_entry':", body)
         self.assertNotIn("'add_condition':", body)
-        self.assertIn("'slippage_assumption_roundtrip_pct':0.10", body)
-        self.assertIn("execution_cost=entry*(0.0012+0.0010)", body)
+        self.assertIn("'slippage_assumption_roundtrip_pct':ROUNDTRIP_SLIPPAGE_PCT", body)
+        self.assertIn("execution_cost = entry * (ROUNDTRIP_FEE_PCT + ROUNDTRIP_SLIPPAGE_PCT) / 100", body)
+
+    def test_price_action_plan_can_clear_its_own_net_reward_gate(self):
+        from app import build_decision_plan_425, price_action_45
+
+        rows = [[i, 100, 100.3, 99.7, 100, 10] for i in range(45)]
+        rows += [[45, 100, 100.8, 99.9, 100.75, 15], rows[-1]]
+        action = price_action_45(rows, {'1H': 'UP', '30m': 'UP'}, 'scalp')
+        self.assertEqual(action['side'], 'LONG')
+        plan = build_decision_plan_425({'long_score': 85, 'short_score': 50},
+                                       action, {'status': 'CANDIDATE'}, 'scalp')
+        self.assertEqual(plan['state'], 'READY_REVIEW')
+        self.assertAlmostEqual(plan['rr1_net_estimate'], 1.5)
+        self.assertAlmostEqual(plan['rr2_net_estimate'], 2.0)
 
     def test_scan_offset_rejects_malformed_input(self):
         source = (ROOT / "app.py").read_text(encoding="utf-8")

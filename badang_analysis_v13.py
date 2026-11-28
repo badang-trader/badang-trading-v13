@@ -151,7 +151,7 @@ def pivots(
 
 
 def divergence_details(
-    points, rsi_series, total_bars, max_age=18
+    points, rsi_series, total_bars, max_age=18, *, rows=None
 ):
     """Find recent regular and hidden RSI divergences."""
     found = []
@@ -163,13 +163,24 @@ def divergence_details(
         ]
 
         for a, b in zip(relevant[-5:-1], relevant[-4:]):
-            age = total_bars - 1 - b[0]
+            # A radius-3 swing is only observable after three subsequent
+            # fully closed bars. Report age since confirmation, not pivot bar.
+            confirmation_radius = 3
+            confirmation_index = b[0] + confirmation_radius
+            if confirmation_index >= total_bars:
+                continue
+            age = total_bars - 1 - confirmation_index
             separation = b[0] - a[0]
 
             if age > max_age or not 5 <= separation <= 65:
                 continue
 
             pa, pb = a[2], b[2]
+            if rows is not None and any(
+                row['low'] < pb if typ == 'L' else row['high'] > pb
+                for row in rows[b[0] + 1:]
+            ):
+                continue
             ra, rb = rsi_series[a[0]], rsi_series[b[0]]
 
             price_delta_pct = (
@@ -202,6 +213,7 @@ def divergence_details(
                     'age_bars': age,
                     'first_pivot_index': a[0],
                     'second_pivot_index': b[0],
+                    'confirmation_bar_index': confirmation_index,
                     'price_change_pct': round(price_delta_pct, 3),
                     'rsi_change': round(rsi_delta, 2),
                     'confirmed': True
@@ -559,7 +571,7 @@ def analyze(
     points = pivots(rows)
 
     div_details = divergence_details(
-        points, rs, len(rows)
+        points, rs, len(rows), rows=rows
     )
 
     div = [d['type'] for d in div_details]
@@ -688,7 +700,7 @@ def analyze(
         )
 
     if (
-        'hidden_bullish' in div
+        'bullish' not in div and 'hidden_bullish' in div
         and e20 > e50
     ):
         score(
@@ -697,7 +709,7 @@ def analyze(
         )
 
     if (
-        'hidden_bearish' in div
+        'bearish' not in div and 'hidden_bearish' in div
         and e20 < e50
     ):
         score(
@@ -916,6 +928,14 @@ def analyze(
             'Trendline breaks require backtesting'
         ]
     }
+
+
+def technical_direction(item):
+    """Use the same technical candidate direction in live and historical scans."""
+    long_score = item['long_score']
+    short_score = item['short_score']
+    side = 'LONG' if long_score > short_score else 'SHORT' if short_score > long_score else 'NEUTRAL'
+    return {'technical_side': side, 'technical_score': max(long_score, short_score)}
 
 
 def top_five(
