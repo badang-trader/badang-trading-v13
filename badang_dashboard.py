@@ -26,7 +26,7 @@ HTML = r'''<!doctype html>
 <div id="status" class="muted sub" role="status">분석을 시작하려면 종목을 조회하거나 새로고침을 눌러줘.</div><div id="updated" class="muted sub" style="margin-top:5px"></div></section>
 <div class="meta" style="justify-content:space-between;margin:22px 0 12px"><h2>종목별 분석</h2><div class="muted sub" id="range">한 종목씩 조회</div></div><div class="cards" id="cards"><div class="panel empty muted">데이터를 불러오지 않았어.</div></div>
 <div id="research"></div>
-<p class="muted sub" style="margin-top:24px">OI는 현재 계약 수량이며 변화율이 아닙니다. 체결 압력은 최근 최대 500건의 표본으로 전체 CVD가 아닙니다. VWAP은 봉 기반 근삿값입니다. 모든 판단은 연구용이며 투자 수익을 보장하지 않습니다.</p>
+<p class="muted sub" style="margin-top:24px">OI는 현재 계약 수량이며 변화율이 아닙니다. 별도의 최근 체결 조회는 일부 표본을 제공하며 연속 CVD는 미검증입니다. VWAP은 봉 기반 근삿값입니다. 모든 판단은 연구용이며 투자 수익을 보장하지 않습니다.</p>
 </main><script>
 'use strict';
 const $=id=>document.getElementById(id);let nextOffset=0,busy=false;

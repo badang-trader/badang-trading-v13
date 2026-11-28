@@ -20,6 +20,8 @@ class DashboardClarityTests(unittest.TestCase):
         self.assertEqual(dashboard.status_code, 200)
         self.assertIn('바당의 쉬운 판단'.encode('utf-8'), dashboard.data)
         self.assertIn(b'type="search" enterkeyhint="search"', dashboard.data)
+        self.assertIn('별도의 최근 체결 조회는 일부 표본'.encode('utf-8'), dashboard.data)
+        self.assertNotIn('최근 최대 500건'.encode('utf-8'), dashboard.data)
 
     def test_position_calculator_is_removed(self):
         from app import app
