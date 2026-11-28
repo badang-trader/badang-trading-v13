@@ -1,0 +1,218 @@
+name: BADANG 5.14 validation (no deployment)
+on:
+  push:
+    branches: [badang-514-validation]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  offline-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      DATABASE_URL: ''
+      BADANG_OI_COLLECTOR_TOKEN: ''
+      BADANG_TRADING_ENABLED: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install declared dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Verify Flask and PostgreSQL driver
+        run: |
+          python - <<'PY'
+          import flask, requests, psycopg2
+          print("Flask and PostgreSQL driver import OK")
+          PY
+      - name: Check 5.14 test suite is present
+        run: |
+          test -f badang_test_audit_508.py || { echo "5.14 source not yet uploaded; validation cannot pass"; exit 1; }
+      - name: Python syntax
+        run: python -m compileall -q .
+      - name: Run 5.14 offline audit
+        run: python badang_test_audit_508.py --report badang-ci-audit.json
+      - name: Diagnose offline unit-test errors on failure
+        if: failure()
+        run: python -m unittest discover -v 2>&1 | tail -n 75
+      - name: Optional research regression tests
+        run: python -m unittest -v test_optional_research_515.py
+      - name: Market data provenance regression tests
+        run: python -m unittest -v test_market_provenance_516.py
+      - name: Confirmed-candle regression tests
+        run: python -m unittest -v test_closed_candle_519.py
+      - name: Scanner failure isolation regression tests
+        run: python -m unittest -v test_scan_failure_isolation_520.py
+      - name: Bitget rate limit retry regression tests
+        run: python -m unittest -v test_bitget_rate_limit_521.py
+      - name: Long short scenario invariant regression tests
+        run: python -m unittest -v test_scenario_invariants_522.py
+      - name: Divergence and history diagnostic regression tests
+        run: python -m unittest -v test_divergence_and_history_523.py
+      - name: New candle freshness and finite scenario regression tests
+        run: python -m unittest -v test_candle_freshness_524.py test_scenario_finite_525.py
+      - name: Elliott pivot and impulse rule regression tests
+        run: python -m unittest -v test_wave_pivot_plateau_526.py test_wave_rules_527.py
+      - name: Research analyzer invalid OHLC regression tests
+        run: python -m unittest -v test_research_ohlc_safety_528.py
+      - name: Research target geometry regression tests
+        run: python -m unittest -v test_research_target_safety_529.py
+      - name: Research candle gap safety regression tests
+        run: python -m unittest -v test_research_gap_safety_530.py
+      - name: Candidate ranking finite-value safety regression tests
+        run: python -m unittest -v test_candidate_safety_531.py
+      - name: Signal reference timestamp safety regression tests
+        run: python -m unittest -v test_reference_time_safety_532.py
+      - name: Persisted signal risk reward and target regression tests
+        run: python -m unittest -v test_stored_signal_safety_533.py
+      - name: Price arithmetic overflow safety regression tests
+        run: python -m unittest -v test_price_arithmetic_safety_534.py
+      - name: Scan API turnover input safety regression tests
+        run: python -m unittest -v test_scan_input_safety_535.py
+      - name: Scan pagination offset safety regression tests
+        run: python -m unittest -v test_scan_offset_safety_536.py
+      - name: Bitget historical pagination diagnostic regression tests
+        run: python -m unittest -v test_history_diagnostics_537.py
+      - name: Research extreme-price overflow safety regression tests
+        run: python -m unittest -v test_research_overflow_538.py
+      - name: Bitget transient transport retry regression tests
+        run: python -m unittest -v test_bitget_transport_retry_539.py
+      - name: Future-dated Bitget candle rejection regression tests
+        run: python -m unittest -v test_future_candle_safety_540.py
+      - name: Numeric-equivalent duplicate candle regression tests
+        run: python -m unittest -v test_candle_duplicate_format_541.py
+      - name: Bitget response envelope regression tests
+        run: python -m unittest -v test_bitget_envelope_542.py
+      - name: Research no-lookahead causality regression tests
+        run: python -m unittest -v test_research_causality_543.py
+      - name: Research fee and slippage cost accounting tests
+        run: python -m unittest -v test_cost_model_544.py
+      - name: Research causal next-bar backtest tests
+        run: python -m unittest -v test_research_backtest_545.py
+      - name: Research net returns and drawdown tests
+        run: python -m unittest -v test_research_metrics_546.py
+      - name: Research nonoverlapping trade ledger tests
+        run: python -m unittest -v test_research_ledger_547.py
+      - name: Research chronological signal runner tests
+        run: python -m unittest -v test_research_runner_548.py
+      - name: Historical real-engine signal backtest adapter tests
+        run: python -m unittest -v test_engine_research_549.py
+      - name: Unmocked historical analysis engine research smoke tests
+        run: python -m unittest -v test_engine_research_smoke_550.py
+      - name: Research unexecutable tail cutoff regression
+        run: python -m unittest -v test_research_tail_cutoff_553.py
+      - name: Live Bitget OHLC conversion regression
+        run: python -m unittest -v test_live_history_conversion_552.py
+      - name: Research sample adequacy and claim guard tests
+        run: python -m unittest -v test_research_sample_554.py
+      - name: Causal historical market regime tests
+        run: python -m unittest -v test_research_regimes_555.py
+      - name: Conditional regime performance regression
+        run: python -m unittest -v test_research_regime_metrics_556.py
+      - name: Regime trade ledger corruption regression
+        run: python -m unittest -v test_research_regime_ledger_557.py
+      - name: Research next-open execution timing regression
+        run: python -m unittest -v test_research_execution_timing_558.py
+      - name: Historical adverse gap entry price stress regression
+        run: python -m unittest -v test_research_gap_stress_559.py
+      - name: Research execution cost sensitivity regression
+        run: python -m unittest -v test_research_cost_sensitivity_560.py
+      - name: Research raw OHLC cost repricing consistency
+        run: python -m unittest -v test_research_cost_consistency_561.py
+      - name: Research gross winners erased by cost regression
+        run: python -m unittest -v test_research_cost_flip_562.py
+      - name: Conservative market regime sample adequacy regression
+        run: python -m unittest -v test_research_regime_sample_563.py
+      - name: Historical market regime exposure regression
+        run: python -m unittest -v test_research_regime_exposure_564.py
+      - name: Market regime exposure adequacy screening regression
+        run: python -m unittest -v test_research_regime_exposure_adequacy_565.py
+      - name: Research chronological signal and overlap regression
+        run: python -m unittest -v test_research_chronology_566.py
+      - name: Research malformed execution cost and fill regression
+        run: python -m unittest -v test_research_cost_input_safety_567.py
+      - name: Research historical OHLC corruption regression
+        run: python -m unittest -v test_research_candle_validation_568.py
+      - name: Research historical timestamp integrity regression
+        run: python -m unittest -v test_research_timestamp_validation_569.py
+      - name: Exchange epoch timestamp parsing regression
+        run: python -m unittest -v test_research_exchange_timestamp_570.py
+      - name: Research future-leakage and executable-tail regression
+        run: python -m unittest -v test_research_future_leakage_571.py
+      - name: Exchange historical OHLCV corruption regression
+        run: python -m unittest -v test_research_exchange_ohlcv_572.py
+      - name: Live research timestamp ordering integration regression
+        run: python -m unittest -v test_live_research_ordering_573.py
+      - name: Live research malformed snapshot shape regression
+        run: python -m unittest -v test_live_research_snapshot_shape_574.py
+      - name: Research UTC frame boundary and interval mismatch regression
+        run: python -m unittest -v test_research_frame_boundaries_575.py
+      - name: Research compounded equity and peak drawdown regression
+        run: python -m unittest -v test_research_drawdown_accounting_576.py
+      - name: Research chronological holdout and boundary embargo regression
+        run: python -m unittest -v test_research_holdout_partition_577.py
+      - name: Research separate development holdout metrics regression
+        run: python -m unittest -v test_research_holdout_metrics_578.py
+      - name: Live public historical holdout reporting integration regression
+        run: python -m unittest -v test_live_research_holdout_report_579.py
+      - name: Bitget-only legacy candle source regression
+        run: python -m unittest -v test_bitget_only_exchange_552.py
+      - name: BTC ETH support zone and volume profile regression
+        run: python -m unittest -v test_support_zones_541.py test_volume_profile_542.py test_support_reliability_543.py
+      - name: BTC ETH support timestamp integrity regression
+        run: python -m unittest -v test_support_timestamp_gate_544.py
+      - name: Causal BTC ETH support touch outcome regression
+        run: python -m unittest -v test_support_backtest_545.py
+      - name: Confirmed-close support rebound regression
+        run: python -m unittest -v test_support_close_outcomes_546.py
+      - name: Support adverse excursion regression
+        run: python -m unittest -v test_support_mae_547.py
+      - name: Support pre-outcome adverse excursion regression
+        run: python -m unittest -v test_support_pre_outcome_mae_548.py
+      - name: Outcome-specific support MAE regression
+        run: python -m unittest -v test_support_mae_by_outcome_549.py
+      - name: Chronological support holdout regression
+        run: python -m unittest -v test_support_holdout_550.py
+      - name: Support evidence grade holdout regression
+        run: python -m unittest -v test_support_grade_holdout_581.py
+      - name: Support scan completeness and event-cap regression
+        run: python -m unittest -v test_support_scan_completion_551.py
+      - name: Verify BTC ETH research timeframe coverage
+        run: python -m unittest -v test_live_research_timeframe_580.py
+      - name: Live public Bitget historical research BTC ETH
+        run: python badang_live_historical_research_551.py
+      - name: Upload per-timeframe historical research report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: badang-551-bitget-historical-research
+          path: badang-live-historical-research.json
+          if-no-files-found: ignore
+      - name: Bounded live read-only memory benchmark
+        timeout-minutes: 8
+        run: python badang_live_benchmark_517.py
+      - name: Upload live benchmark report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: badang-517-live-memory-benchmark
+          path: badang-live-benchmark.json
+          if-no-files-found: ignore
+      - name: Production-shaped scan load and memory check
+        timeout-minutes: 8
+        run: python badang_scan_load_518.py
+      - name: Upload scan load report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: badang-518-scan-load
+          path: badang-scan-load.json
+          if-no-files-found: ignore
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: badang-514-offline-audit
+          path: badang-ci-audit.json
+          if-no-files-found: ignore

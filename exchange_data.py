@@ -1,5 +1,6 @@
 import requests
 import time
+import math
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -9,13 +10,29 @@ TIMEOUT = 15
 
 
 def get_json(url, params=None):
-    response = SESSION.get(
-        url,
-        params=params,
-        timeout=TIMEOUT
-    )
-    response.raise_for_status()
-    return response.json()
+    """Bounded retries for transient exchange throttling and server failures."""
+    for attempt in range(3):
+        try:
+            response = SESSION.get(url, params=params, timeout=TIMEOUT)
+        except (requests.Timeout, requests.ConnectionError):
+            if attempt == 2:
+                raise
+            time.sleep(0.5 * (2 ** attempt))
+            continue
+        if response.status_code in (429, 500, 502, 503, 504):
+            if attempt < 2:
+                retry_after = response.headers.get("Retry-After", "")
+                try:
+                    delay = float(retry_after)
+                    if not math.isfinite(delay) or delay < 0:
+                        raise ValueError("invalid Retry-After")
+                    delay = min(delay, 8.0)
+                except (ValueError, TypeError):
+                    delay = 0.5 * (2 ** attempt)
+                time.sleep(delay)
+                continue
+        response.raise_for_status()
+        return response.json()
 
 
 def binance_symbols(min_turnover=1000000):
@@ -257,11 +274,13 @@ def fastest_candles(
     """
 
     if exchanges is None:
-        exchanges = (
-            "bitget",
-            "binance",
-            "okx"
-        )
+        exchanges = ("bitget",)
+    if isinstance(exchanges, str) or not isinstance(exchanges, (list, tuple)):
+        raise ValueError("Bitget-only mode: exchanges must be a sequence")
+    if not exchanges or any(name != "bitget" for name in exchanges):
+        raise ValueError("Bitget-only mode: other exchanges disabled")
+    if len(exchanges) != 1:
+        raise ValueError("Bitget-only mode: exactly one provider required")
 
     providers = {
         "bitget": bitget_candles,
@@ -392,7 +411,10 @@ def validate_candles(
 
     for row in rows:
         try:
-            ts = int(row[0])
+            raw_ts = float(row[0])
+            if not math.isfinite(raw_ts) or not raw_ts.is_integer() or raw_ts < 0:
+                continue
+            ts = int(raw_ts)
 
             op, hi, lo, cl = map(
                 float,
@@ -400,6 +422,8 @@ def validate_candles(
             )
 
             volume = float(row[5])
+            if not all(math.isfinite(v) for v in (op, hi, lo, cl, volume)):
+                continue
 
             if ts + interval_ms > now_ms:
                 continue
@@ -416,13 +440,15 @@ def validate_candles(
             ):
                 continue
 
+            if ts in valid:
+                raise ValueError("Duplicate Bitget candle timestamp")
             valid[ts] = row
 
-        except (
-            ValueError,
-            TypeError,
-            IndexError
-        ):
+        except ValueError as exc:
+            if str(exc) == "Duplicate Bitget candle timestamp":
+                raise
+            continue
+        except (TypeError, IndexError):
             continue
 
     result = [
@@ -435,6 +461,16 @@ def validate_candles(
             f"Completed candles insufficient: "
             f"{len(result)}/{minimum}"
         )
+
+    timestamps = sorted(valid)
+    # A complete historical series is not necessarily a fresh market snapshot.
+    # Refuse a stale tail instead of presenting old prices as current signals.
+    if now_ms - (timestamps[-1] + interval_ms) > 2 * interval_ms:
+        raise ValueError("Stale Bitget candle history")
+    if any(ts % interval_ms != 0 for ts in timestamps):
+        raise ValueError("Misaligned Bitget candle timestamps")
+    if any(b - a != interval_ms for a, b in zip(timestamps, timestamps[1:])):
+        raise ValueError("Noncontiguous Bitget candle history")
 
     return result
 

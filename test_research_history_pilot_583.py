@@ -1,0 +1,77 @@
+"""Offline pilot orchestration tests; no Bitget network calls."""
+import unittest
+from unittest.mock import patch
+from badang_research_history_pilot_583 import pilot
+
+class ResearchPilotTests(unittest.TestCase):
+    def test_four_targets_are_read_only_and_report_coverage(self):
+        calls = []
+        def fake(symbol, frame, **kw):
+            calls.append((symbol, frame, kw["target_bars"], kw["max_pages"]))
+            return {"status": "ok", "confirmed_bars": 1000,
+                    "pages": 6, "fresh": True, "stop_reason": "target_reached",
+                    "target_bars": 1000}
+        with patch("badang_research_history_pilot_583.research_history",
+                   side_effect=fake):
+            report = pilot()
+        self.assertEqual(report["target_count"], 4)
+        self.assertEqual(report["adequate_targets"], 4)
+        self.assertFalse(report["trading_ready"])
+        self.assertEqual(len(set(calls)), 4)
+        self.assertTrue(all(t == 1000 and p == 6 for _, _, t, p in calls))
+
+    def test_rate_limit_is_distinguished_from_insufficient_history(self):
+        def fake(symbol, frame, **kw):
+            if symbol == "ETHUSDT":
+                raise ValueError("Bitget 요청 제한(HTTP 429): 재시도 3회 실패")
+            return {"status": "insufficient_history", "confirmed_bars": 400,
+                    "pages": 6, "fresh": False}
+        with patch("badang_research_history_pilot_583.research_history",
+                   side_effect=fake):
+            report = pilot()
+        categories = [r["result_category"] for r in report["results"]]
+        self.assertEqual(categories.count("rate_limited"), 2)
+        self.assertEqual(categories.count("insufficient_or_stale_history"), 2)
+        self.assertEqual(report["adequate_targets"], 0)
+        self.assertFalse(report["trading_ready"])
+
+    def test_successful_targets_are_all_classified_adequate(self):
+        def fake(symbol, frame, **kw):
+            return {"status": "ok", "confirmed_bars": 1000,
+                    "pages": 5, "fresh": True, "stop_reason": "target_reached"}
+        with patch("badang_research_history_pilot_583.research_history",
+                   side_effect=fake):
+            report = pilot()
+        self.assertEqual(report["adequate_targets"], 4)
+        self.assertTrue(all(r["result_category"] == "adequate"
+                            for r in report["results"]))
+        self.assertTrue(report["read_only"])
+        self.assertFalse(report["trading_ready"])
+
+    def test_unexpected_api_error_is_not_mislabeled_as_rate_limit(self):
+        def fake(symbol, frame, **kw):
+            raise RuntimeError("Bitget invalid granularity")
+        with patch("badang_research_history_pilot_583.research_history",
+                   side_effect=fake):
+            report = pilot()
+        self.assertEqual(report["adequate_targets"], 0)
+        self.assertTrue(all(r["result_category"] == "request_or_data_error"
+                            for r in report["results"]))
+        self.assertTrue(all(r["error_type"] == "RuntimeError"
+                            for r in report["results"]))
+
+    def test_partial_failure_is_not_marked_adequate(self):
+        def fake(symbol, frame, **kw):
+            if symbol == "ETHUSDT":
+                raise ValueError("rate limited")
+            return {"status": "insufficient_history", "confirmed_bars": 400,
+                    "pages": 6, "fresh": True}
+        with patch("badang_research_history_pilot_583.research_history",
+                   side_effect=fake):
+            report = pilot()
+        self.assertEqual(report["adequate_targets"], 0)
+        self.assertEqual(sum(r["status"] == "error" for r in report["results"]), 2)
+        self.assertTrue(report["read_only"])
+
+if __name__ == "__main__":
+    unittest.main()

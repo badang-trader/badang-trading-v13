@@ -1,0 +1,35 @@
+name: BADANG 1000-bar research backtest (read-only one-shot)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: badang-research-1000-backtest
+  cancel-in-progress: false
+jobs:
+  research-backtest:
+    if: github.ref == 'refs/heads/badang-514-validation'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      BADANG_TRADING_ENABLED: 'false'
+      DATABASE_URL: ''
+      BADANG_OI_COLLECTOR_TOKEN: ''
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install declared dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Research-only 1000 confirmed-bar backtest
+        timeout-minutes: 20
+        run: python badang_research_1000_backtest_584.py
+      - name: Upload read-only research metrics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: badang-1000-backtest-research
+          path: badang-research-1000-backtest.json
+          if-no-files-found: warn
+          retention-days: 14

@@ -1,0 +1,39 @@
+name: BADANG 43 independent eight-page Bitget research
+on:
+  push:
+    branches: [badang-514-validation-ui-bridge]
+    paths:
+      - .github/workflows/bitget-eight-page-validation.yml
+  workflow_dispatch:
+jobs:
+  research-eight-page:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      BADANG_BITGET_PAGES: '8'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r requirements.txt
+      - name: Full offline regression
+        run: python -m unittest discover -s tests -p 'test_*.py' -v
+      - name: Fetch ten Bitget markets with eight pages
+        run: python badang_collect_bitget_research.py
+      - name: Recompute reversal and Elliott research with current code
+        run: |
+          python badang_bitget_reversal_audit.py
+          python badang_reversal_artifact_consistency.py
+          python badang_timeframe_exposure.py
+          python badang_reversal_loss_diagnostic.py
+          python badang_reversal_causal_context.py
+          python badang_reversal_multiframe_report.py
+      - name: Upload actual data and calculations even after failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bitget-eight-page-stage43
+          path: research-output/
+          if-no-files-found: warn
+          retention-days: 7

@@ -6,6 +6,7 @@ import time
 import re
 import math
 import requests
+import threading
 
 API='https://api.bitget.com'
 FRAMES={'5m':('5m',300000),'15m':('15m',900000),'30m':('30m',1800000),
@@ -13,13 +14,83 @@ FRAMES={'5m':('5m',300000),'15m':('15m',900000),'30m':('30m',1800000),
         '6H':('6H',21600000),'8H':('8H',28800000),'1D':('1Dutc',86400000)}
 SESSION=requests.Session()
 
+_REQUEST_LOCK=threading.Lock()
+_LAST_REQUEST=[0.0]
+
 def _get(path, params):
-    r=SESSION.get(API+path,params=params,timeout=12)
-    r.raise_for_status()
-    j=r.json()
-    if str(j.get('code'))!='00000':
+    """Bounded retries for rate limits; never substitute stale candles."""
+    for attempt in range(3):
+        # Reserve a non-overlapping request slot under the lock. The actual
+        # sleep and network I/O happen outside it, avoiding global scan stalls.
+        with _REQUEST_LOCK:
+            now_tick=time.monotonic()
+            reserved=max(now_tick, _LAST_REQUEST[0]+0.16)
+            _LAST_REQUEST[0]=reserved
+            wait=max(0.0, reserved-now_tick)
+        if wait:
+            time.sleep(wait)
+        try:
+            r=SESSION.get(API+path,params=params,timeout=12)
+        except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
+            if attempt==2:
+                raise
+            transport_retry=True
+        else:
+            transport_retry=False
+        if transport_retry:
+            time.sleep(0.8*(attempt+1))
+            continue
+        if r.status_code==429:
+            if attempt==2:
+                raise ValueError('Bitget 요청 제한(HTTP 429): 재시도 3회 실패')
+            retry_after=r.headers.get('Retry-After','')
+            try:
+                parsed=float(retry_after)
+                if not math.isfinite(parsed) or parsed < 0:
+                    raise ValueError('invalid Retry-After')
+                delay=max(0.5,min(parsed,4.0))
+            except (ValueError,TypeError,OverflowError):
+                delay=0.8*(attempt+1)
+            time.sleep(delay)
+            continue
+        if r.status_code in (408, 500, 502, 503, 504):
+            if attempt == 2:
+                r.raise_for_status()
+                category='요청 시간 초과' if r.status_code==408 else '서버 오류'
+                raise ValueError('Bitget '+category+'(HTTP '+str(r.status_code)+'): 재시도 3회 실패')
+            time.sleep(0.8*(attempt+1))
+            continue
+        r.raise_for_status()
+        try:
+            j=r.json()
+        except ValueError as exc:
+            raise ValueError('Bitget API JSON 응답 오류') from exc
+        if not isinstance(j,dict):
+            raise ValueError('Bitget API 응답 구조 오류')
+        if str(j.get('code'))=='00000':
+            data=j.get('data')
+            if data is None:
+                raise ValueError('Bitget API 응답 데이터 누락')
+            # Candle endpoints return arrays, while Bitget open-interest and
+            # funding endpoints can legitimately return objects.
+            if path in ('/api/v2/mix/market/candles',
+                        '/api/v2/mix/market/history-candles'):
+                if not isinstance(data,list):
+                    raise ValueError('Bitget API 응답 데이터 구조 오류: 캔들 배열 필요')
+            elif path in ('/api/v2/mix/market/open-interest',
+                          '/api/v2/mix/market/current-fund-rate'):
+                if not isinstance(data,(list,dict)):
+                    raise ValueError('Bitget API 응답 데이터 구조 오류')
+            elif not isinstance(data,(list,dict)):
+                raise ValueError('Bitget API 응답 데이터 구조 오류')
+            return data
+        if str(j.get('code')) in ('429','40015','40017'):
+            if attempt==2:
+                raise ValueError('Bitget API 요청 제한: 재시도 3회 실패')
+            time.sleep(0.8*(attempt+1))
+            continue
         raise ValueError('Bitget API error: '+str(j.get('msg','unknown'))[:100])
-    return j.get('data') or []
+    raise ValueError('Bitget API 재시도 실패')
 
 def fastest_candles(symbol,timeframe,exchanges=None):
     if exchanges and any(str(x).lower()!='bitget' for x in exchanges):
@@ -35,7 +106,15 @@ def fastest_candles(symbol,timeframe,exchanges=None):
     try:
         raw=_get('/api/v2/mix/market/candles',
                  {'symbol':symbol,'productType':'USDT-FUTURES','granularity':gran,'limit':'350'})
-    except (ValueError, requests.RequestException):
+    except ValueError as exc:
+        # Only retry with a smaller page if the exchange explicitly rejects
+        # the page size. Rate limits, transport errors and malformed responses
+        # must not trigger an additional request burst.
+        message=str(exc).lower()
+        if not (('limit' in message or 'page size' in message) and
+                ('invalid' in message or 'exceed' in message or
+                 'maximum' in message or 'range' in message)):
+            raise
         raw=_get('/api/v2/mix/market/candles',
                  {'symbol':symbol,'productType':'USDT-FUTURES','granularity':gran,'limit':'200'})
     if not isinstance(raw,list):
@@ -45,42 +124,109 @@ def fastest_candles(symbol,timeframe,exchanges=None):
     # An empty page, repeated cursor or API error is reported, never filled.
     seen={}
     def ingest(page):
+        # A malformed or runaway exchange page must not grow memory without
+        # bounds during repeated scans. Normal Bitget pages are <=350 rows.
+        if not isinstance(page,list) or len(page)>1000:
+            raise ValueError('Bitget 캔들 페이지 크기 비정상')
+        # Duplicates across pagination are normal: bound actual unique candles,
+        # not the sum of raw page lengths.
+        if len(seen)>3000:
+            raise ValueError('Bitget 캔들 수집 상한 초과')
         for item in page:
-            if not isinstance(item,(list,tuple)) or not item: continue
+            if not isinstance(item,(list,tuple)) or len(item)<6:
+                raise ValueError('Bitget 잘못된 캔들 구조 감지')
             try:
-                stamp=int(item[0]); stamp=stamp*1000 if stamp<100000000000 else stamp
-            except (TypeError,ValueError): continue
-            if stamp in seen and list(seen[stamp])!=list(item):
-                raise ValueError('Conflicting Bitget candle timestamp: '+str(stamp))
+                if isinstance(item[0], bool):
+                    raise ValueError('boolean timestamp')
+                raw_stamp=float(item[0])
+                if not math.isfinite(raw_stamp) or raw_stamp < 0 or not raw_stamp.is_integer():
+                    raise ValueError('invalid timestamp')
+                stamp=int(raw_stamp); stamp=stamp*1000 if stamp<100000000000 else stamp
+            except (TypeError,ValueError,OverflowError):
+                raise ValueError('Bitget 잘못된 캔들 시각 감지')
+            # Reject future/misaligned rows before pagination or gap repair.
+            # This avoids needless network requests on corrupt exchange data.
+            current_open=(int(time.time()*1000)//step)*step
+            if stamp>current_open:
+                raise ValueError('Bitget 미래 시각 캔들 감지: 시계 또는 거래소 데이터 오류')
+            if stamp%step:
+                raise ValueError('Bitget 캔들 시각 정렬 오류: 봉 간격 경계와 불일치')
+            # Reject malformed price/volume data before requesting history.
+            # Otherwise an unusable first page may cause needless pagination.
+            try:
+                if any(isinstance(z,bool) for z in item[1:6]):
+                    raise ValueError('boolean OHLCV')
+                o,h,l,close,volume=(float(z) for z in item[1:6])
+                if (not all(math.isfinite(z) for z in (o,h,l,close,volume))
+                        or min(o,h,l,close)<=0 or volume<0
+                        or h<max(o,l,close) or l>min(o,close)):
+                    raise ValueError('invalid OHLCV')
+            except (TypeError,ValueError,OverflowError) as exc:
+                raise ValueError('Bitget 잘못된 OHLCV 값 감지') from exc
+            # The same candle may be represented with equivalent numeric
+            # strings across current and historical endpoints.
+            if stamp in seen:
+                prior=seen[stamp]
+                try:
+                    same=(len(prior)>=6 and
+                          all(math.isfinite(float(a)) and math.isfinite(float(b))
+                              and float(a)==float(b)
+                              for a,b in zip(prior[1:6],item[1:6])))
+                except (TypeError,ValueError,OverflowError):
+                    same=False
+                if not same:
+                    raise ValueError('Conflicting Bitget candle timestamp: '+str(stamp))
+                continue
             seen[stamp]=item
+            if len(seen)>3000:
+                raise ValueError('Bitget 캔들 수집 상한 초과')
     ingest(raw)
     cursor=None
+    history_pages=0
+    history_stop_reason='enough_closed_bars'
     for _ in range(12):
         now_ms=int(time.time()*1000)
         closed=sum(1 for t in seen if t+step<=now_ms)
-        if closed>=220: break
-        if not seen: break
+        if closed>=205: break
+        if not seen:
+            history_stop_reason='no_initial_candles'
+            break
         oldest=min(seen)
-        next_cursor=oldest-step
+        # Query at the oldest observed timestamp to test the history
+        # boundary without skipping an entire candle interval.
+        next_cursor=oldest
         if cursor is not None and next_cursor>=cursor:
             raise ValueError('Bitget history pagination did not advance')
         cursor=next_cursor
         page=_get('/api/v2/mix/market/history-candles',
                   {'symbol':symbol,'productType':'USDT-FUTURES',
                    'granularity':gran,'endTime':str(cursor),'limit':'200'})
+        history_pages+=1
         if not isinstance(page,list):
             raise ValueError('Unexpected Bitget historical candle response')
-        if not page: break
+        if not page:
+            history_stop_reason='empty_history_page'
+            break
         before=len(seen)
         ingest(page)
-        if len(seen)==before: break
+        if len(seen)==before:
+            history_stop_reason='no_new_history_candles'
+            break
+    if history_pages==12 and history_stop_reason=='enough_closed_bars':
+        # The loop can exhaust its request budget without enough candles.
+        now_ms=int(time.time()*1000)
+        if sum(1 for t in seen if t+step<=now_ms)<205:
+            history_stop_reason='pagination_budget_exhausted'
     # Detect missing bars in the most recent 260 slots. Re-query the exact
     # surrounding window; only accept real exchange candles (never interpolate).
     # Include a buffer because the final row may still be forming.
     for _repair_round in range(2):
         stamps=sorted(seen)
         if len(stamps)<2: break
-        gaps=[(left,right) for left,right in zip(stamps[-262:-1],stamps[-261:])
+        # Slice once before pairing neighbors: independent negative slices
+        # become misaligned when fewer than 261 timestamps are available.
+        recent_stamps=stamps[-262:]
+        gaps=[(left,right) for left,right in zip(recent_stamps,recent_stamps[1:])
               if right-left>step and (right-left)%step==0]
         if not gaps: break
         added=0
@@ -90,25 +236,61 @@ def fastest_candles(symbol,timeframe,exchanges=None):
                     {'symbol':symbol,'productType':'USDT-FUTURES',
                      'granularity':gran,'startTime':str(max(0,left-step)),
                      'endTime':str(right+step),'limit':'200'})
-            except (ValueError,requests.RequestException):
+            except requests.RequestException:
+                # A transport failure can leave a gap unresolved; the final
+                # contiguous-bar gate must then reject insufficient history.
                 continue
+            # Exchange validation failures (429 exhaustion, invalid JSON,
+            # malformed payloads) must not be disguised as missing candles.
             before=len(seen)
-            if isinstance(patch,list): ingest(patch)
+            if not isinstance(patch,list):
+                raise ValueError('Unexpected Bitget gap repair response')
+            ingest(patch)
             added+=len(seen)-before
         if added==0: break
     raw=list(seen.values())
     now=int(time.time()*1000)
     rows=[]
     for r in raw:
-        if not isinstance(r,(list,tuple)) or len(r)<6: continue
+        if not isinstance(r,(list,tuple)) or len(r)<6:
+            raise ValueError('Bitget 잘못된 캔들 구조 감지')
         try:
-            t=int(r[0]); t=t*1000 if t<100000000000 else t
+            if isinstance(r[0], bool):
+                raise ValueError('Bitget 잘못된 캔들 시각 감지')
+            raw_t=float(r[0])
+            if not math.isfinite(raw_t) or raw_t < 0 or not raw_t.is_integer():
+                raise ValueError('Bitget 잘못된 캔들 시각 감지')
+            t=int(raw_t); t=t*1000 if t<100000000000 else t
+            if any(isinstance(z,bool) for z in r[1:6]):
+                raise ValueError('Bitget 잘못된 OHLCV 값 감지')
             o,h,l,c,v=map(float,r[1:6])
             if not (all(math.isfinite(z) for z in (o,h,l,c,v)) and min(o,h,l,c)>0
-                    and h>=max(o,l,c) and l<=min(o,c) and v>=0): continue
+                    and h>=max(o,l,c) and l<=min(o,c) and v>=0):
+                raise ValueError('Bitget 잘못된 OHLCV 값 감지')
             rows.append([str(t),str(o),str(h),str(l),str(c),str(v)])
-        except (ValueError,TypeError,OverflowError): continue
+        except (TypeError,ValueError,OverflowError) as exc:
+            # Keep timestamp failures distinct from price/volume failures.
+            # Ingest normally catches these first; this is a defensive gate.
+            if isinstance(r[0],bool):
+                raise ValueError('Bitget 잘못된 캔들 시각 감지') from exc
+            try:
+                parsed_stamp=float(r[0])
+                valid_stamp=(math.isfinite(parsed_stamp) and parsed_stamp>=0
+                             and parsed_stamp.is_integer())
+            except (TypeError,ValueError,OverflowError):
+                valid_stamp=False
+            if not valid_stamp:
+                raise ValueError('Bitget 잘못된 캔들 시각 감지') from exc
+            raise ValueError('Bitget 잘못된 OHLCV 값 감지') from exc
     rows.sort(key=lambda x:int(x[0]))
+    # Reject exchange timestamps beyond the current candle's opening slot.
+    # Otherwise a future-dated row can be mistaken for the disposable
+    # unclosed candle and leak into legacy rows[:-1] analysis.
+    current_open=(now//step)*step
+    if any(int(r[0])>current_open for r in rows):
+        raise ValueError('Bitget 미래 시각 캔들 감지: 시계 또는 거래소 데이터 오류')
+    if any(int(r[0])%step != 0 for r in rows):
+        raise ValueError('Bitget 캔들 시각 정렬 오류: 봉 간격 경계와 불일치')
     # Duplicate timestamps must not be silently reconciled.
     if len(set(r[0] for r in rows)) != len(rows):
         raise ValueError('Bitget duplicate candle timestamps')
@@ -117,15 +299,30 @@ def fastest_candles(symbol,timeframe,exchanges=None):
     # contaminate EMA200, RSI, MACD, or wave analysis.
     complete=[r for r in rows if int(r[0])+step<=now]
     if complete:
+        # A long but stale history is not suitable for a current trade signal.
+        # At most one additional completed interval may have elapsed since
+        # the latest returned closed candle (allowing exchange publication lag).
+        if now-(int(complete[-1][0])+step)>2*step:
+            raise ValueError('Bitget 최근 확정봉 지연: 최신 봉이 2개 시간간격 이상 오래됨')
         contiguous=[complete[-1]]
         for r in reversed(complete[:-1]):
             if int(contiguous[-1][0])-int(r[0]) != step: break
             contiguous.append(r)
         if len(contiguous)<205:
             raise ValueError('Bitget 연속 확정봉 부족: '+str(len(contiguous))+
-                             '개 / 최소 205개 (과거 누락 또는 페이지 조회 문제)')
+                             '개 / 최소 205개 (과거 누락 또는 페이지 조회 문제)'+
+                             '; history_pages='+str(history_pages)+
+                             '; history_stop='+history_stop_reason+
+                             '; total_timestamps='+str(len(seen)))
         # Keep only the contiguous history and an existing unfinished candle.
-        rows=list(reversed(contiguous)) + [r for r in rows if int(r[0])>int(complete[-1][0])]
+        # Legacy consumers exclude only the last row. Never pass multiple
+        # unfinished/future candles, or a future bar may be analysed as closed.
+        forming=[r for r in rows if int(r[0])>int(complete[-1][0])]
+        if any(int(r[0])>now for r in forming):
+            raise ValueError('Bitget 미래 시각 캔들 감지')
+        if len(forming)>1:
+            raise ValueError('Bitget 미확정 캔들 다중 반환 감지')
+        rows=list(reversed(contiguous)) + forming
     else:
         raise ValueError('Bitget 확정봉 자료 없음')
     # Do not fabricate missing historical bars. A placeholder is only used to
@@ -154,16 +351,36 @@ def bitget_derivatives_snapshot(symbol,candles):
     try:
         rows=_get('/api/v2/mix/market/open-interest',
                   {'symbol':symbol,'productType':'USDT-FUTURES'})
+        if isinstance(rows,list):
+            rows=rows[0] if rows else {}
         if isinstance(rows,dict):
-            oi=rows.get('openInterest') or rows.get('openInterestList')
-            if isinstance(oi,list): oi=oi[0].get('size') if oi and isinstance(oi[0],dict) else None
-            if oi is not None: result['oi_contracts']=float(oi)
+            oi=rows.get('openInterest')
+            if oi is None:
+                oi=rows.get('openInterestList')
+            if isinstance(oi,list):
+                oi=oi[0].get('size') if oi and isinstance(oi[0],dict) else None
+            if oi is None:
+                # Some Bitget OI payloads use size directly, including
+                # entries returned inside the open-interest list.
+                oi=rows.get('size')
+            if oi is not None:
+                if isinstance(oi,bool):
+                    raise ValueError('Invalid Bitget open interest')
+                value=float(oi)
+                if not math.isfinite(value) or value < 0:
+                    raise ValueError('Invalid Bitget open interest')
+                result['oi_contracts']=value
     except Exception as exc: result['errors']['oi']=type(exc).__name__
     try:
         rows=_get('/api/v2/mix/market/current-fund-rate',
                   {'symbol':symbol,'productType':'USDT-FUTURES'})
         if isinstance(rows,list): rows=rows[0] if rows else {}
         if isinstance(rows,dict) and rows.get('fundingRate') is not None:
-            result['funding_rate']=float(rows['fundingRate'])
+            if isinstance(rows['fundingRate'],bool):
+                raise ValueError('Invalid Bitget funding rate')
+            value=float(rows['fundingRate'])
+            if not math.isfinite(value):
+                raise ValueError('Invalid Bitget funding rate')
+            result['funding_rate']=value
     except Exception as exc: result['errors']['funding']=type(exc).__name__
     return result

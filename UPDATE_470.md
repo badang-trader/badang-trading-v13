@@ -1,0 +1,3 @@
+# 4.70 — Read-path PostgreSQL schema transaction fix
+
+The `status()` and `latest_status()` read paths execute `CREATE TABLE IF NOT EXISTS` but previously closed the connection without committing the transaction. On a fresh PostgreSQL database this can roll back table creation, leading to inconsistent first-run behavior. Both paths now explicitly commit via the connection context manager. Two focused mocked-connection regression tests check that the transaction commits and the connection closes. This is a code-level fix, **not** a live PostgreSQL/Render validation. REST trade samples remain audit-only; CVD and trading scores remain disabled for these samples.

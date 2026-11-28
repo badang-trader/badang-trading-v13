@@ -14,7 +14,7 @@ def _num(v: Any) -> float:
     try:
         f = float(v)
         return f if math.isfinite(f) else float('nan')
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         return float('nan')
 
 
@@ -38,7 +38,7 @@ def normalize(candles: list) -> list[dict]:
             continue
 
         if (
-            d['low'] <= 0
+            min(d['open'], d['high'], d['low'], d['close']) <= 0
             or d['high'] < max(d['open'], d['close'], d['low'])
             or d['low'] > min(d['open'], d['close'])
             or d['volume'] < 0
@@ -126,10 +126,13 @@ def pivots(
     for i in range(radius, len(rows) - radius):
         segment = rows[i-radius:i+radius+1]
 
-        if rows[i]['high'] == max(r['high'] for r in segment):
+        highs = [r['high'] for r in segment]
+        lows = [r['low'] for r in segment]
+        # Equal-high/equal-low plateaus are not confirmed swing extrema.
+        if rows[i]['high'] == max(highs) and highs.count(rows[i]['high']) == 1:
             points.append((i, 'H', rows[i]['high']))
 
-        if rows[i]['low'] == min(r['low'] for r in segment):
+        if rows[i]['low'] == min(lows) and lows.count(rows[i]['low']) == 1:
             points.append((i, 'L', rows[i]['low']))
 
     result = []
@@ -148,7 +151,7 @@ def pivots(
 
 
 def divergence_details(
-    points, rsi_series, total_bars, max_age=18
+    points, rsi_series, total_bars, max_age=18, *, rows=None
 ):
     """Find recent regular and hidden RSI divergences."""
     found = []
@@ -160,13 +163,24 @@ def divergence_details(
         ]
 
         for a, b in zip(relevant[-5:-1], relevant[-4:]):
-            age = total_bars - 1 - b[0]
+            # A radius-3 swing is only observable after three subsequent
+            # fully closed bars. Report age since confirmation, not pivot bar.
+            confirmation_radius = 3
+            confirmation_index = b[0] + confirmation_radius
+            if confirmation_index >= total_bars:
+                continue
+            age = total_bars - 1 - confirmation_index
             separation = b[0] - a[0]
 
             if age > max_age or not 5 <= separation <= 65:
                 continue
 
             pa, pb = a[2], b[2]
+            if rows is not None and any(
+                row['low'] < pb if typ == 'L' else row['high'] > pb
+                for row in rows[b[0] + 1:]
+            ):
+                continue
             ra, rb = rsi_series[a[0]], rsi_series[b[0]]
 
             price_delta_pct = (
@@ -199,6 +213,7 @@ def divergence_details(
                     'age_bars': age,
                     'first_pivot_index': a[0],
                     'second_pivot_index': b[0],
+                    'confirmation_bar_index': confirmation_index,
                     'price_change_pct': round(price_delta_pct, 3),
                     'rsi_change': round(rsi_delta, 2),
                     'confirmed': True
@@ -232,7 +247,7 @@ def divergence(points, rsi_series):
     ]
 
 
-def wave_candidates(points):
+def wave_candidates(points, total_bars=None, pivot_radius=3):
     """Elliott wave candidates, not confirmed wave counts."""
     recent = points[-12:]
     patterns = []
@@ -248,7 +263,10 @@ def wave_candidates(points):
             'reasons': reasons,
             'invalidation_price': invalidation,
             'ratios': ratios or {},
-            'pivot_points': [{'bar_index': int(q[0]), 'price': round(float(q[2]), 10)} for q in (pivots_used or [])]
+            'pivot_points': [{'bar_index': int(q[0]), 'price': round(float(q[2]), 10)} for q in (pivots_used or [])],
+            'first_observable_bar_index': (max(int(q[0]) for q in pivots_used) + pivot_radius) if pivots_used else None,
+            'pivot_confirmation_bars': pivot_radius,
+            'observable_in_snapshot': (total_bars is not None and bool(pivots_used) and max(int(q[0]) for q in pivots_used) + pivot_radius < total_bars)
         })
 
     if len(recent) >= 4:
@@ -319,6 +337,8 @@ def wave_candidates(points):
                 (prices[2] - prices[0]) * direction > 0
             )
             rule_3 = w3 >= min(w1, w5)
+            # Wave 4 must stay outside the price territory of wave 1.
+            # For bullish impulses, wave 4 low > wave 1 high; reverse for bearish.
             rule_4 = (
                 (prices[4] - prices[1]) * direction > 0
             )
@@ -507,6 +527,17 @@ def analyze(
 ) -> dict:
     rows = normalize(candles)
 
+    # Do not silently bridge an invalid candle: this would make non-adjacent
+    # bars appear adjacent and corrupt RSI, ATR, pivots and wave counts.
+    if len(rows) != len(candles):
+        return {
+            'symbol': symbol,
+            'status': 'invalid_data',
+            'count': len(rows),
+            'rejected_candles': len(candles) - len(rows),
+            'recommendation': 'WAIT'
+        }
+
     if len(rows) < 205:
         return {
             'symbol': symbol,
@@ -540,7 +571,7 @@ def analyze(
     points = pivots(rows)
 
     div_details = divergence_details(
-        points, rs, len(rows)
+        points, rs, len(rows), rows=rows
     )
 
     div = [d['type'] for d in div_details]
@@ -669,7 +700,7 @@ def analyze(
         )
 
     if (
-        'hidden_bullish' in div
+        'bullish' not in div and 'hidden_bullish' in div
         and e20 > e50
     ):
         score(
@@ -678,7 +709,7 @@ def analyze(
         )
 
     if (
-        'hidden_bearish' in div
+        'bearish' not in div and 'hidden_bearish' in div
         and e20 < e50
     ):
         score(
@@ -794,9 +825,11 @@ def analyze(
 
     rr = (
         abs(target1 - p) / risk
-        if risk > 0
+        if math.isfinite(risk) and risk > 0
         else 0
     )
+    if not math.isfinite(rr):
+        rr = 0
 
     opposite_divergence = (
         any(
@@ -822,8 +855,15 @@ def analyze(
         else trendlines['signal'] == 'BREAKOUT_UP'
     )
 
+    # Reject impossible stop/target geometry before labeling a trade candidate.
+    valid_levels = (
+        all(math.isfinite(x) and x > 0 for x in (p, stop, target1, target2))
+        and ((stop < p < target1 < target2) if side == 'LONG'
+             else (target2 < target1 < p < stop))
+    )
     recommended = (
-        best >= 80
+        valid_levels
+        and best >= 80
         and rr >= 1.5
         and volatility > 0
         and len(
@@ -864,7 +904,7 @@ def analyze(
         'trendline_warning':
             opposite_trendline,
         'wave_candidates':
-            wave_candidates(points),
+            wave_candidates(points, total_bars=len(rows)),
         'fibonacci': fib,
         'funding_rate': f,
         'oi_change_pct': oi,
@@ -888,6 +928,14 @@ def analyze(
             'Trendline breaks require backtesting'
         ]
     }
+
+
+def technical_direction(item):
+    """Use the same technical candidate direction in live and historical scans."""
+    long_score = item['long_score']
+    short_score = item['short_score']
+    side = 'LONG' if long_score > short_score else 'SHORT' if short_score > long_score else 'NEUTRAL'
+    return {'technical_side': side, 'technical_score': max(long_score, short_score)}
 
 
 def top_five(

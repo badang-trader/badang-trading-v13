@@ -1,0 +1,32 @@
+name: BADANG wave research (read-only one-shot)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  wave-research:
+    if: github.ref == 'refs/heads/badang-514-validation'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      BADANG_TRADING_ENABLED: 'false'
+      DATABASE_URL: ''
+      BADANG_OI_COLLECTOR_TOKEN: ''
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install declared dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Causal 1000-bar Elliott observation research
+        timeout-minutes: 15
+        run: python badang_wave_live_research_589.py
+      - name: Upload wave research results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: badang-wave-live-research
+          path: badang-wave-live-research.json
+          if-no-files-found: warn
+          retention-days: 14

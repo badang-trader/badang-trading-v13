@@ -40,6 +40,18 @@ def audit_candidates(wave_result, bars, atr):
           'reference_invalidation':round(invalidation,8),'reference_breached':breached,
           'wave_count_verified':False,
           'note':'교대 스윙 전환점 기반 참고 후보. 3파/5파 실제 파동 번호 확정 아님; 중첩·파동 차수·거래량 검증 미완료.'})
-    ranked.sort(key=lambda z:(z['reference_breached'], -z['structural_fit_score'],z['age_bars']))
-    return {'status':'HEURISTIC_RANKING' if ranked else 'NO_AUDITABLE_CANDIDATE',
-      'ranked':ranked[:3], 'note':'점수는 구조의 상대 적합도이며 승률/매매 허가가 아닙니다. 3·5파 분류는 검증되지 않았습니다.'}
+    # Only recent, unbreached hypotheses are displayed. Keep exclusion counts for auditability.
+    excluded={'reference_breached':0,'stale':0,'duplicate':0}
+    eligible=[];seen=set()
+    for item in sorted(ranked,key=lambda z:(-z['structural_fit_score'],z['age_bars'])):
+        if item['reference_breached']:
+            excluded['reference_breached']+=1;continue
+        if item['age_bars']>24:
+            excluded['stale']+=1;continue
+        signature=(item['direction'],tuple(item['pivot_prices']))
+        if signature in seen:
+            excluded['duplicate']+=1;continue
+        seen.add(signature);eligible.append(item)
+    return {'status':'HEURISTIC_RANKING' if eligible else 'NO_ACTIVE_CANDIDATE',
+      'ranked':eligible[:2], 'total_raw':len(ranked),'excluded':excluded,
+      'note':'최근 24봉 이내의 참고 후보 최대 2개. 점수는 구조 적합도이며 승률이 아니고 3·5파 확정도 아닙니다.'}

@@ -1,0 +1,63 @@
+"""Read-only production-shaped /api/scan load check; no orders or database."""
+import concurrent.futures
+import json
+import os
+import resource
+import time
+import tracemalloc
+
+os.environ["BADANG_TRADING_ENABLED"] = "false"
+os.environ["DATABASE_URL"] = ""
+import app
+
+tracemalloc.start()
+records=[]
+def one(offset, mode):
+    started=time.monotonic()
+    with app.app.test_client() as client:
+        response=client.get("/api/scan",query_string={
+            "mode":mode,"offset":offset,"min_turnover":10000000})
+        payload=response.get_json(silent=True) or {}
+    return {
+        "mode":mode,"offset":offset,"http":response.status_code,
+        "elapsed_s":round(time.monotonic()-started,2),
+        "results":len(payload.get("results",[])),
+        "errors":len(payload.get("errors",[])),
+        "insufficient_history":sum("연속 확정봉 부족" in x.get("error","") or "확정봉 부족" in x.get("error","") for x in payload.get("errors",[])),
+        "total":payload.get("total"),
+        "error_samples":[{"symbol":x.get("symbol"),"reason":x.get("error","")[:180]} for x in payload.get("errors",[])[:5]],
+        "rss_mb":round(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss/1024,2),
+    }
+start=time.monotonic()
+# Production route uses 2 internal workers per request. Keep external load bounded.
+for cycle in range(3):
+    for offset,mode in ((0,"scalp"),(5,"scalp"),(0,"swing")):
+        row=one(offset,mode)
+        row["cycle"]=cycle+1
+        records.append(row)
+        print("SCAN_SAMPLE",json.dumps(row),flush=True)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+        for row in pool.map(lambda args:one(*args),[(0,"scalp"),(5,"scalp")]):
+            row["cycle"]=cycle+1
+            records.append(row)
+            print("SCAN_SAMPLE",json.dumps(row),flush=True)
+current,peak=tracemalloc.get_traced_memory()
+summary={
+    "scope":"isolated_GitHub_Actions_real_public_API_scan_route",
+    "trading_enabled":False,"requests":len(records),
+    "http_200":sum(r["http"]==200 for r in records),
+    "symbol_results":sum(r["results"] for r in records),
+    "symbol_errors":sum(r["errors"] for r in records),
+    "insufficient_history":sum(r["insufficient_history"] for r in records),
+    "unexpected_errors":sum(r["errors"]-r["insufficient_history"] for r in records),
+    "empty_results":sum(r["results"]==0 for r in records),
+    "modes_tested":sorted(set(r["mode"] for r in records)),
+    "peak_rss_mb":round(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss/1024,2),
+    "tracemalloc_peak_mb":round(peak/1048576,2),
+    "elapsed_s":round(time.monotonic()-start,2),
+    "records":records,
+}
+with open("badang-scan-load.json","w") as f:json.dump(summary,f,indent=2)
+print("SCAN_SUMMARY",json.dumps({k:v for k,v in summary.items() if k!="records"}),flush=True)
+if summary["http_200"]!=len(records) or summary["unexpected_errors"] or summary["empty_results"]:
+    raise SystemExit("Scan route failed or produced symbol errors")
